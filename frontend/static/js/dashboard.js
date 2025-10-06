@@ -15,6 +15,7 @@ async function carregarDashboard() {
         const data = await response.json();
         
         renderizarMetricas(data.metricas);
+        renderizarInsights(data.insights);
         renderizarChartCids(data.top_cids);
         renderizarChartSetores(data.top_setores);
         renderizarChartEvolucao(data.evolucao_mensal);
@@ -35,6 +36,34 @@ function renderizarMetricas(metricas) {
     document.getElementById('horasPerdidas').textContent = Math.round(metricas.total_horas_perdidas).toLocaleString('pt-BR');
 }
 
+function renderizarInsights(insights) {
+    const container = document.getElementById('insightsContainer');
+    const section = document.getElementById('insightsSection');
+    
+    if (!insights || insights.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    
+    section.style.display = 'block';
+    
+    container.innerHTML = insights.map(insight => `
+        <div class="insight-card ${insight.tipo}">
+            <div class="insight-header">
+                <div class="insight-icon">${insight.icone}</div>
+                <div class="insight-content">
+                    <div class="insight-titulo">${insight.titulo}</div>
+                    <div class="insight-descricao">${insight.descricao}</div>
+                    <div class="insight-recomendacao">
+                        <i class="fas fa-lightbulb"></i>
+                        ${insight.recomendacao}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
 function renderizarChartCids(dados) {
     const ctx = document.getElementById('chartCids');
     
@@ -44,9 +73,9 @@ function renderizarChartCids(dados) {
     chartCids = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dados.map(d => `${d.cid} - ${truncate(d.descricao, 25)}`),
+            labels: dados.map(d => truncate(d.descricao || d.cid, 28)),
             datasets: [{
-                label: 'Quantidade',
+                label: 'Atestados',
                 data: dados.map(d => d.quantidade),
                 backgroundColor: '#1976D2',
                 borderRadius: 6,
@@ -62,6 +91,10 @@ function renderizarChartCids(dados) {
                 },
                 tooltip: {
                     callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            return `${dados[index].cid} - ${dados[index].descricao || 'Não especificado'}`;
+                        },
                         label: function(context) {
                             return `Atestados: ${context.parsed.x}`;
                         }
@@ -326,6 +359,7 @@ async function aplicarFiltros() {
         const data = await response.json();
         
         renderizarMetricas(data.metricas);
+        renderizarInsights(data.insights);
         renderizarChartCids(data.top_cids);
         renderizarChartSetores(data.top_setores);
         renderizarChartEvolucao(data.evolucao_mensal);

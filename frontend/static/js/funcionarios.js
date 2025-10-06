@@ -18,6 +18,7 @@ async function carregarFuncionarios() {
         renderizarFuncionarios(data);
         renderizarResumo(data);
         carregarSetores(data);
+        carregarFuncionariosDropdown(data);
         
     } catch (error) {
         console.error('Erro:', error);
@@ -69,11 +70,19 @@ function renderizarResumo(dados) {
 }
 
 function carregarSetores(dados) {
-    const setores = [...new Set(dados.map(f => f.setor).filter(s => s))];
+    const setores = [...new Set(dados.map(f => f.setor).filter(s => s))].sort();
     const select = document.getElementById('filtroSetor');
     
     select.innerHTML = '<option value="">Todos</option>' + 
         setores.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
+function carregarFuncionariosDropdown(dados) {
+    const funcionarios = [...new Set(dados.map(f => f.nome).filter(n => n))].sort();
+    const select = document.getElementById('filtroFuncionario');
+    
+    select.innerHTML = '<option value="">Todos</option>' + 
+        funcionarios.map(f => `<option value="${f}">${f}</option>`).join('');
 }
 
 function getBadge(quantidade) {
@@ -87,17 +96,11 @@ function getBadge(quantidade) {
 }
 
 function setupSearch() {
-    const searchInput = document.getElementById('searchFuncionario');
-    searchInput.addEventListener('input', (e) => {
-        const termo = e.target.value.toLowerCase();
-        const filtrados = funcionariosData.filter(f => 
-            (f.nome || '').toLowerCase().includes(termo)
-        );
-        renderizarFuncionarios(filtrados);
-    });
+    // Removido - agora usa dropdown
 }
 
 function aplicarFiltrosFuncionarios() {
+    const funcionario = document.getElementById('filtroFuncionario').value;
     const setor = document.getElementById('filtroSetor').value;
     const periodo = document.getElementById('filtroPeriodo').value;
     
@@ -112,8 +115,13 @@ function aplicarFiltrosFuncionarios() {
             funcionariosData = data;
             
             let filtrados = data;
+            
+            if (funcionario) {
+                filtrados = filtrados.filter(f => f.nome === funcionario);
+            }
+            
             if (setor) {
-                filtrados = data.filter(f => f.setor === setor);
+                filtrados = filtrados.filter(f => f.setor === setor);
             }
             
             renderizarFuncionarios(filtrados);

@@ -15,6 +15,7 @@ from .database import get_db, init_db
 from .models import Client, Upload, Atestado
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
+from .insights import InsightsEngine
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -221,19 +222,22 @@ async def dashboard(
 ):
     """Dashboard principal"""
     analytics = Analytics(db)
+    insights_engine = InsightsEngine(db)
     
     metricas = analytics.metricas_gerais(client_id, mes_inicio, mes_fim)
     top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim)
     top_setores = analytics.top_setores(client_id, 5, mes_inicio, mes_fim)
     evolucao = analytics.evolucao_mensal(client_id, 12)
     distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim)
+    insights = insights_engine.gerar_insights(client_id)
     
     return {
         "metricas": metricas,
         "top_cids": top_cids,
         "top_setores": top_setores,
         "evolucao_mensal": evolucao,
-        "distribuicao_genero": distribuicao_genero
+        "distribuicao_genero": distribuicao_genero,
+        "insights": insights
     }
 
 @app.get("/api/preview/{upload_id}")

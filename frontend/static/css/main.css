@@ -455,6 +455,83 @@ body {
     }
 }
 
+/* ==================== INSIGHTS ==================== */
+
+.insight-card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid var(--primary);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+}
+
+.insight-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateX(4px);
+}
+
+.insight-card.alerta {
+    border-left-color: var(--danger);
+}
+
+.insight-card.atencao {
+    border-left-color: var(--warning);
+}
+
+.insight-card.positivo {
+    border-left-color: var(--success);
+}
+
+.insight-card.info {
+    border-left-color: var(--info);
+}
+
+.insight-card.tendencia {
+    border-left-color: #FF9800;
+}
+
+.insight-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.insight-icon {
+    font-size: 32px;
+}
+
+.insight-content {
+    flex: 1;
+}
+
+.insight-titulo {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.insight-descricao {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.insight-recomendacao {
+    font-size: 13px;
+    color: var(--primary);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.insight-recomendacao i {
+    font-size: 12px;
+}
+
 /* ==================== UTILITIES ==================== */
 
 .text-center { text-align: center; }

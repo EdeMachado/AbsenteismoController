@@ -39,6 +39,8 @@ class ExcelProcessor:
             'DEPARTAMENTO': 'SETOR',
             'ÁREA': 'SETOR',
             'AREA': 'SETOR',
+            'DESCCENTROCUSTO2': 'SETOR',
+            'DESCCENTROCUSTO3': 'SETOR',
             
             'CARGO': 'CARGO',
             'FUNÇÃO': 'CARGO',
@@ -68,6 +70,7 @@ class ExcelProcessor:
             'DESCRIÇÃO CID': 'DESCRICAO_CID',
             'DESCRICAO CID': 'DESCRICAO_CID',
             'DESC CID': 'DESCRICAO_CID',
+            'DESCCID': 'DESCRICAO_CID',
             
             'NRODIASATESTADO': 'NUMERO_DIAS_ATESTADO',
             'NRO DIAS ATESTADO': 'NUMERO_DIAS_ATESTADO',
