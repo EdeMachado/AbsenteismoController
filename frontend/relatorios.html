@@ -3,10 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatórios - Absenteísmo Controller</title>
+    <title>Relatórios - AbsenteismoController</title>
     
     <link rel="stylesheet" href="/static/css/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+        .export-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            border: 2px solid var(--border);
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .export-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-4px);
+        }
+        .export-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .export-icon.pdf { color: #F44336; }
+        .export-icon.excel { color: #4CAF50; }
+        .export-icon.pptx { color: #FF9800; }
+        .export-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .export-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -27,17 +65,13 @@
                     <i class="fas fa-upload"></i>
                     <span>Upload</span>
                 </a>
-                <a href="/preview" class="nav-item">
-                    <i class="fas fa-eye"></i>
-                    <span>Preview dos Dados</span>
+                <a href="/funcionarios" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>Funcionários</span>
                 </a>
-                <a href="/analises" class="nav-item">
-                    <i class="fas fa-chart-bar"></i>
-                    <span>Análises</span>
-                </a>
-                <a href="/tendencias" class="nav-item">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Tendências</span>
+                <a href="/comparativos" class="nav-item">
+                    <i class="fas fa-balance-scale"></i>
+                    <span>Comparativos</span>
                 </a>
                 <a href="/relatorios" class="nav-item active">
                     <i class="fas fa-file-alt"></i>
@@ -52,18 +86,120 @@
         
         <main class="main-content">
             <header class="header">
-                <h1 class="header-title">Relatórios Comparativos</h1>
+                <h1 class="header-title">Relatórios e Exports</h1>
             </header>
             
             <div class="content">
-                <div class="card mb-3">
-                    <p style="text-align: center; color: var(--text-secondary);">
-                        Página em desenvolvimento.
-                    </p>
+                <!-- Filtro de Período -->
+                <div class="filters mb-3">
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label class="filter-label">Período</label>
+                            <input type="month" id="periodoRelatorio" class="filter-input">
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Upload Específico</label>
+                            <select id="uploadRelatorio" class="filter-input">
+                                <option value="">Último upload</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Export Options -->
+                <div class="export-grid">
+                    <div class="export-card" onclick="exportarPDF()">
+                        <div class="export-icon pdf">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <div class="export-title">Exportar PDF</div>
+                        <div class="export-description">
+                            Relatório completo com gráficos e tabelas
+                        </div>
+                    </div>
+                    
+                    <div class="export-card" onclick="exportarExcel()">
+                        <div class="export-icon excel">
+                            <i class="fas fa-file-excel"></i>
+                        </div>
+                        <div class="export-title">Exportar Excel</div>
+                        <div class="export-description">
+                            Dados tratados prontos para análise
+                        </div>
+                    </div>
+                    
+                    <div class="export-card" onclick="exportarPowerPoint()">
+                        <div class="export-icon pptx">
+                            <i class="fas fa-file-powerpoint"></i>
+                        </div>
+                        <div class="export-title">Exportar PowerPoint</div>
+                        <div class="export-description">
+                            Apresentação pronta com gráficos
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Histórico de Exports -->
+                <div style="margin-top: 40px;">
+                    <h2 style="margin-bottom: 16px;">Últimos Exports</h2>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Período</th>
+                                    <th>Data</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="exportsTableBody">
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: var(--text-secondary);">
+                                        Nenhum export realizado ainda
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>
     </div>
+    
+    <script>
+        async function exportarPDF() {
+            alert('Funcionalidade de export PDF será implementada em breve!');
+        }
+        
+        async function exportarExcel() {
+            const periodo = document.getElementById('periodoRelatorio').value;
+            const upload = document.getElementById('uploadRelatorio').value;
+            
+            let url = '/api/export/excel?client_id=1';
+            if (periodo) url += `&mes=${periodo}`;
+            if (upload) url += `&upload_id=${upload}`;
+            
+            try {
+                window.location.href = url;
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao exportar Excel');
+            }
+        }
+        
+        async function exportarPowerPoint() {
+            alert('Funcionalidade de export PowerPoint será implementada em breve!');
+        }
+        
+        // Carregar uploads
+        fetch('/api/uploads?client_id=1')
+            .then(res => res.json())
+            .then(uploads => {
+                const select = document.getElementById('uploadRelatorio');
+                select.innerHTML = '<option value="">Último upload</option>' +
+                    uploads.map(u => `<option value="${u.id}">${u.filename} - ${u.mes_referencia}</option>`).join('');
+            });
+    </script>
 </body>
 </html>
 

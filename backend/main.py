@@ -105,6 +105,20 @@ async def apresentacao_page():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+@app.get("/funcionarios", response_class=HTMLResponse)
+async def funcionarios_page():
+    """Página de funcionários"""
+    file_path = os.path.join(FRONTEND_DIR, "funcionarios.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/comparativos", response_class=HTMLResponse)
+async def comparativos_page():
+    """Página de comparativos"""
+    file_path = os.path.join(FRONTEND_DIR, "comparativos.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 # ==================== ROUTES - API ====================
 
 @app.get("/api/health")
@@ -350,6 +364,65 @@ async def delete_upload(
     db.commit()
     
     return {"success": True, "message": "Upload deletado com sucesso"}
+
+@app.get("/api/export/excel")
+async def export_excel(
+    client_id: int = 1,
+    mes: Optional[str] = None,
+    upload_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """Exporta dados tratados para Excel"""
+    import pandas as pd
+    from datetime import datetime
+    
+    query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
+    
+    if upload_id:
+        query = query.filter(Upload.id == upload_id)
+    elif mes:
+        query = query.filter(Upload.mes_referencia == mes)
+    
+    atestados = query.all()
+    
+    if not atestados:
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado")
+    
+    # Converter para DataFrame
+    dados = []
+    for a in atestados:
+        dados.append({
+            'Nome': a.nome_funcionario,
+            'CPF': a.cpf,
+            'Setor': a.setor,
+            'Cargo': a.cargo,
+            'Gênero': a.genero,
+            'Data Afastamento': a.data_afastamento,
+            'Data Retorno': a.data_retorno,
+            'Tipo': a.tipo_atestado,
+            'CID': a.cid,
+            'Descrição CID': a.descricao_cid,
+            'Dias Atestado': a.numero_dias_atestado,
+            'Horas Atestado': a.numero_horas_atestado,
+            'Dias Perdidos': a.dias_perdidos,
+            'Horas Perdidas': a.horas_perdidas
+        })
+    
+    df = pd.DataFrame(dados)
+    
+    # Salvar arquivo
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"absenteismo_tratado_{timestamp}.xlsx"
+    filepath = os.path.join(EXPORTS_DIR, filename)
+    
+    os.makedirs(EXPORTS_DIR, exist_ok=True)
+    df.to_excel(filepath, index=False)
+    
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 if __name__ == "__main__":
     import uvicorn

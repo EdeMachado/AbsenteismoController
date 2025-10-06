@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparativos - AbsenteismoController</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        .periodo-selector {
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+        .periodo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 16px;
+            align-items: end;
+        }
+        .periodo-box {
+            background: var(--surface-hover);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .periodo-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+        .comparativo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .variacao-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .variacao-positiva {
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--danger);
+        }
+        .variacao-negativa {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-chart-line"></i> AbsenteismoController
+                </div>
+                <div class="sidebar-subtitle">GrupoBiomed</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/upload" class="nav-item">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload</span>
+                </a>
+                <a href="/funcionarios" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>Funcionários</span>
+                </a>
+                <a href="/comparativos" class="nav-item active">
+                    <i class="fas fa-balance-scale"></i>
+                    <span>Comparativos</span>
+                </a>
+                <a href="/relatorios" class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Relatórios</span>
+                </a>
+                <a href="/apresentacao" class="nav-item">
+                    <i class="fas fa-presentation-screen"></i>
+                    <span>Apresentação</span>
+                </a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="header">
+                <h1 class="header-title">Relatórios Comparativos</h1>
+            </header>
+            
+            <div class="content">
+                <!-- Seletor de Períodos -->
+                <div class="periodo-selector">
+                    <div class="periodo-grid">
+                        <div class="periodo-box">
+                            <div class="periodo-title">Período 1</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div>
+                                    <label class="filter-label">Início</label>
+                                    <input type="month" id="periodo1Inicio" class="filter-input">
+                                </div>
+                                <div>
+                                    <label class="filter-label">Fim</label>
+                                    <input type="month" id="periodo1Fim" class="filter-input">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="periodo-box">
+                            <div class="periodo-title">Período 2</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div>
+                                    <label class="filter-label">Início</label>
+                                    <input type="month" id="periodo2Inicio" class="filter-input">
+                                </div>
+                                <div>
+                                    <label class="filter-label">Fim</label>
+                                    <input type="month" id="periodo2Fim" class="filter-input">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-primary" onclick="compararPeriodos()" style="height: fit-content;">
+                            <i class="fas fa-search"></i>
+                            Comparar
+                        </button>
+                    </div>
+                    
+                    <div style="margin-top: 16px; display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" onclick="setComparacao('mensal')">Último Mês</button>
+                        <button class="btn btn-secondary" onclick="setComparacao('trimestral')">Último Trimestre</button>
+                        <button class="btn btn-secondary" onclick="setComparacao('anual')">Último Ano</button>
+                    </div>
+                </div>
+                
+                <!-- Resultados -->
+                <div id="resultadosComparativos" style="display: none;">
+                    <!-- Cards Comparativos -->
+                    <div class="comparativo-grid">
+                        <div class="card">
+                            <div class="card-title">Período 1</div>
+                            <div id="periodo1Cards"></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">Período 2</div>
+                            <div id="periodo2Cards"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Variações -->
+                    <div class="card mb-3">
+                        <h3 style="margin-bottom: 16px;">Variações</h3>
+                        <div id="variacoesDiv"></div>
+                    </div>
+                    
+                    <!-- Gráficos Comparativos -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Comparação Visual</h3>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartComparativo"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="/static/js/comparativos.js"></script>
+</body>
+</html>
+
