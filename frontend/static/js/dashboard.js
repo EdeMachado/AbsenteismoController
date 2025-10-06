@@ -7,6 +7,7 @@ let chartCids, chartSetores, chartEvolucao, chartGenero, chartTipoAtestado, char
 // Inicializa o dashboard
 document.addEventListener('DOMContentLoaded', () => {
     carregarDashboard();
+    carregarFiltros();
 });
 
 async function carregarDashboard() {
@@ -389,7 +390,32 @@ async function aplicarFiltros() {
 function recarregarDados() {
     document.getElementById('mesInicio').value = '';
     document.getElementById('mesFim').value = '';
+    document.getElementById('filtroFuncionario').value = '';
+    document.getElementById('filtroSetor').value = '';
     carregarDashboard();
+}
+
+async function carregarFiltros() {
+    try {
+        const response = await fetch('/api/analises/funcionarios?client_id=1');
+        const funcionarios = await response.json();
+        
+        // Extrair listas únicas
+        const nomes = [...new Set(funcionarios.map(f => f.nome).filter(n => n))].sort();
+        const setores = [...new Set(funcionarios.map(f => f.setor).filter(s => s))].sort();
+        
+        // Popular dropdowns
+        const selectFunc = document.getElementById('filtroFuncionario');
+        selectFunc.innerHTML = '<option value="">Todos</option>' +
+            nomes.map(n => `<option value="${n}">${n}</option>`).join('');
+        
+        const selectSetor = document.getElementById('filtroSetor');
+        selectSetor.innerHTML = '<option value="">Todos</option>' +
+            setores.map(s => `<option value="${s}">${s}</option>`).join('');
+        
+    } catch (error) {
+        console.log('Aguardando upload de dados...');
+    }
 }
 
 // Utilities
