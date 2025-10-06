@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any
 import re
+from .genero_detector import GeneroDetector
 
 class ExcelProcessor:
     """Processador de planilhas Excel"""
@@ -148,13 +149,23 @@ class ExcelProcessor:
         # Converte para lista de dicionários
         registros = []
         for _, row in self.df.iterrows():
+            # Detecta gênero pelo nome se não tiver coluna GENERO
+            genero = ''
+            if pd.notna(row.get('GENERO')) and row.get('GENERO'):
+                genero = str(row.get('GENERO'))[:1].upper()
+            else:
+                # Detecta automaticamente pelo nome
+                nome = str(row.get('NOME_FUNCIONARIO', ''))
+                if nome:
+                    genero = GeneroDetector.detectar(nome)
+            
             registro = {
                 'nome_funcionario': str(row.get('NOME_FUNCIONARIO', '')),
                 'cpf': str(row.get('CPF', '')),
                 'matricula': str(row.get('MATRICULA', '')),
                 'setor': str(row.get('SETOR', '')),
                 'cargo': str(row.get('CARGO', '')),
-                'genero': str(row.get('GENERO', ''))[:1].upper() if pd.notna(row.get('GENERO')) else '',
+                'genero': genero,
                 'data_afastamento': row.get('DATA_AFASTAMENTO'),
                 'data_retorno': row.get('DATA_RETORNO'),
                 'tipo_info_atestado': int(row.get('TIPO_INFO_ATESTADO', 0)) if pd.notna(row.get('TIPO_INFO_ATESTADO')) else None,
