@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apresentação - Absenteísmo Controller</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        body { background: #1a1a2e; }
+        .apresentacao-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 40px;
+            color: white;
+        }
+        .apresentacao-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .apresentacao-title {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        .apresentacao-subtitle {
+            font-size: 24px;
+            color: rgba(255,255,255,0.7);
+        }
+        .apresentacao-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        .apresentacao-kpi {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        .apresentacao-kpi-value {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .apresentacao-kpi-label {
+            font-size: 16px;
+            color: rgba(255,255,255,0.7);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .apresentacao-chart {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 32px;
+            backdrop-filter: blur(10px);
+            flex: 1;
+        }
+        .btn-exit {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn-exit:hover {
+            background: rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <button class="btn-exit" onclick="window.location.href='/'">
+        <i class="fas fa-times"></i> Sair da Apresentação
+    </button>
+    
+    <div class="apresentacao-container">
+        <div class="apresentacao-header">
+            <div class="apresentacao-title">Relatório de Absenteísmo</div>
+            <div class="apresentacao-subtitle">GrupoBiomed</div>
+        </div>
+        
+        <div class="apresentacao-kpis" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="apresentacao-kpi">
+                <div class="apresentacao-kpi-value" id="presAtestadosDias">-</div>
+                <div class="apresentacao-kpi-label">Atestados DIAS</div>
+            </div>
+            <div class="apresentacao-kpi">
+                <div class="apresentacao-kpi-value" id="presAtestadosHoras">-</div>
+                <div class="apresentacao-kpi-label">Atestados HORAS</div>
+            </div>
+            <div class="apresentacao-kpi">
+                <div class="apresentacao-kpi-value" id="presDias">-</div>
+                <div class="apresentacao-kpi-label">Dias Perdidos</div>
+            </div>
+            <div class="apresentacao-kpi">
+                <div class="apresentacao-kpi-value" id="presHoras">-</div>
+                <div class="apresentacao-kpi-label">Horas Perdidas</div>
+            </div>
+        </div>
+        
+        <div class="apresentacao-chart">
+            <canvas id="presChart"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        let presChart;
+        
+        async function carregarApresentacao() {
+            try {
+                const response = await fetch('/api/dashboard?client_id=1');
+                const data = await response.json();
+                
+                document.getElementById('presAtestadosDias').textContent = data.metricas.total_atestados_dias;
+                document.getElementById('presAtestadosHoras').textContent = data.metricas.total_atestados_horas;
+                document.getElementById('presDias').textContent = Math.round(data.metricas.total_dias_perdidos);
+                document.getElementById('presHoras').textContent = Math.round(data.metricas.total_horas_perdidas).toLocaleString('pt-BR');
+                
+                const ctx = document.getElementById('presChart');
+                
+                if (presChart) presChart.destroy();
+                
+                presChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.evolucao_mensal.map(d => d.mes),
+                        datasets: [{
+                            label: 'Atestados',
+                            data: data.evolucao_mensal.map(d => d.quantidade),
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            borderWidth: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.7)',
+                                    font: { size: 16 }
+                                },
+                                grid: {
+                                    color: 'rgba(255,255,255,0.1)'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.7)',
+                                    font: { size: 16 }
+                                },
+                                grid: {
+                                    color: 'rgba(255,255,255,0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', carregarApresentacao);
+    </script>
+</body>
+</html>

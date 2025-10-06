@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload - Absenteísmo Controller</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .upload-zone {
+            border: 3px dashed var(--border);
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            background: var(--surface);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(25, 118, 210, 0.05);
+        }
+        
+        .upload-icon {
+            font-size: 64px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        
+        .upload-text {
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .upload-hint {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .file-selected {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .file-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--success);
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .file-size {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .progress-container {
+            margin-top: 24px;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: var(--divider);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--success);
+            transition: width 0.3s;
+        }
+        
+        .progress-text {
+            text-align: center;
+            margin-top: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .upload-history {
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-chart-line"></i> AbsenteismoController
+                </div>
+                <div class="sidebar-subtitle">GrupoBiomed</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/upload" class="nav-item active">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload</span>
+                </a>
+                <a href="/preview" class="nav-item">
+                    <i class="fas fa-eye"></i>
+                    <span>Preview dos Dados</span>
+                </a>
+                <a href="/analises" class="nav-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Análises</span>
+                </a>
+                <a href="/tendencias" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Tendências</span>
+                </a>
+                <a href="/relatorios" class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Relatórios</span>
+                </a>
+                <a href="/apresentacao" class="nav-item">
+                    <i class="fas fa-presentation-screen"></i>
+                    <span>Apresentação</span>
+                </a>
+            </nav>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1 class="header-title">Upload de Planilha</h1>
+                <div class="header-actions">
+                    <a href="/" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Voltar
+                    </a>
+                </div>
+            </header>
+            
+            <div class="content">
+                <div class="card">
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="upload-text">Clique ou arraste a planilha aqui</div>
+                        <div class="upload-hint">Arquivos Excel (.xlsx, .xls)</div>
+                        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
+                    </div>
+                    
+                    <div id="fileSelectedDiv" class="file-selected" style="display: none;">
+                        <div class="file-icon">
+                            <i class="fas fa-file-excel"></i>
+                        </div>
+                        <div class="file-info">
+                            <div class="file-name" id="fileName"></div>
+                            <div class="file-size" id="fileSize"></div>
+                        </div>
+                        <button class="btn btn-primary" onclick="uploadFile()">
+                            <i class="fas fa-upload"></i>
+                            Enviar
+                        </button>
+                        <button class="btn btn-secondary" onclick="cancelFile()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="progress-container" id="progressContainer">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">Processando...</div>
+                    </div>
+                </div>
+                
+                <div class="upload-history">
+                    <h2 style="margin-bottom: 16px;">Histórico de Uploads</h2>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Arquivo</th>
+                                    <th>Mês Referência</th>
+                                    <th>Data Upload</th>
+                                    <th>Registros</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="uploadsTableBody">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-secondary);">
+                                        Carregando...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="/static/js/upload.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,356 @@
+"""
+FastAPI Main Application - AbsenteismoController v2.0
+"""
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from typing import Optional, List
+import os
+import shutil
+from datetime import datetime
+
+from .database import get_db, init_db
+from .models import Client, Upload, Atestado
+from .excel_processor import ExcelProcessor
+from .analytics import Analytics
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="AbsenteismoController",
+    version="2.0.0",
+    description="Sistema de Gestão de Absenteísmo"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Paths
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+EXPORTS_DIR = os.path.join(BASE_DIR, "exports")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
+
+# Initialize database
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+    # Cria cliente padrão se não existir
+    db = next(get_db())
+    client = db.query(Client).filter(Client.id == 1).first()
+    if not client:
+        client = Client(id=1, nome="GrupoBiomed", cnpj="00.000.000/0001-00")
+        db.add(client)
+        db.commit()
+    db.close()
+
+# ==================== ROUTES - FRONTEND ====================
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    """Página principal"""
+    file_path = os.path.join(FRONTEND_DIR, "index.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/upload", response_class=HTMLResponse)
+async def upload_page():
+    """Página de upload"""
+    file_path = os.path.join(FRONTEND_DIR, "upload.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/preview", response_class=HTMLResponse)
+async def preview_page():
+    """Página de preview"""
+    file_path = os.path.join(FRONTEND_DIR, "preview.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/analises", response_class=HTMLResponse)
+async def analises_page():
+    """Página de análises"""
+    file_path = os.path.join(FRONTEND_DIR, "analises.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/tendencias", response_class=HTMLResponse)
+async def tendencias_page():
+    """Página de tendências"""
+    file_path = os.path.join(FRONTEND_DIR, "tendencias.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/relatorios", response_class=HTMLResponse)
+async def relatorios_page():
+    """Página de relatórios"""
+    file_path = os.path.join(FRONTEND_DIR, "relatorios.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/apresentacao", response_class=HTMLResponse)
+async def apresentacao_page():
+    """Página de apresentação"""
+    file_path = os.path.join(FRONTEND_DIR, "apresentacao.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+# ==================== ROUTES - API ====================
+
+@app.get("/api/health")
+async def health_check():
+    """Health check"""
+    return {"status": "ok", "version": "2.0.0"}
+
+@app.post("/api/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    client_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Upload de planilha"""
+    try:
+        # Salva arquivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{file.filename}"
+        file_path = os.path.join(UPLOADS_DIR, filename)
+        
+        os.makedirs(UPLOADS_DIR, exist_ok=True)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Processa Excel
+        processor = ExcelProcessor(file_path)
+        registros = processor.processar()
+        
+        if not registros:
+            raise HTTPException(status_code=400, detail="Erro ao processar planilha")
+        
+        # Detecta mês de referência (pega do primeiro registro)
+        mes_ref = None
+        if registros and registros[0].get('data_afastamento'):
+            data = registros[0]['data_afastamento']
+            if isinstance(data, datetime):
+                mes_ref = data.strftime("%Y-%m")
+            else:
+                mes_ref = datetime.now().strftime("%Y-%m")
+        else:
+            mes_ref = datetime.now().strftime("%Y-%m")
+        
+        # Cria registro de upload
+        upload = Upload(
+            client_id=client_id,
+            filename=file.filename,
+            mes_referencia=mes_ref,
+            total_registros=len(registros)
+        )
+        db.add(upload)
+        db.flush()
+        
+        # Salva atestados
+        for reg in registros:
+            atestado = Atestado(
+                upload_id=upload.id,
+                **reg
+            )
+            db.add(atestado)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "upload_id": upload.id,
+            "total_registros": len(registros),
+            "mes_referencia": mes_ref
+        }
+    
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/uploads")
+async def list_uploads(
+    client_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Lista uploads"""
+    uploads = db.query(Upload).filter(Upload.client_id == client_id).order_by(Upload.data_upload.desc()).all()
+    
+    return [
+        {
+            "id": u.id,
+            "filename": u.filename,
+            "mes_referencia": u.mes_referencia,
+            "data_upload": u.data_upload.isoformat(),
+            "total_registros": u.total_registros
+        }
+        for u in uploads
+    ]
+
+@app.get("/api/dashboard")
+async def dashboard(
+    client_id: int = 1,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Dashboard principal"""
+    analytics = Analytics(db)
+    
+    metricas = analytics.metricas_gerais(client_id, mes_inicio, mes_fim)
+    top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim)
+    top_setores = analytics.top_setores(client_id, 5, mes_inicio, mes_fim)
+    evolucao = analytics.evolucao_mensal(client_id, 12)
+    distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim)
+    
+    return {
+        "metricas": metricas,
+        "top_cids": top_cids,
+        "top_setores": top_setores,
+        "evolucao_mensal": evolucao,
+        "distribuicao_genero": distribuicao_genero
+    }
+
+@app.get("/api/preview/{upload_id}")
+async def preview_data(
+    upload_id: int,
+    page: int = 1,
+    per_page: int = 50,
+    db: Session = Depends(get_db)
+):
+    """Preview dos dados do upload"""
+    offset = (page - 1) * per_page
+    
+    atestados = db.query(Atestado).filter(Atestado.upload_id == upload_id).offset(offset).limit(per_page).all()
+    total = db.query(Atestado).filter(Atestado.upload_id == upload_id).count()
+    
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page,
+        "dados": [
+            {
+                "id": a.id,
+                "nome_funcionario": a.nome_funcionario,
+                "setor": a.setor,
+                "cargo": a.cargo,
+                "genero": a.genero,
+                "data_afastamento": a.data_afastamento.isoformat() if a.data_afastamento else None,
+                "data_retorno": a.data_retorno.isoformat() if a.data_retorno else None,
+                "tipo_atestado": a.tipo_atestado,
+                "cid": a.cid,
+                "descricao_cid": a.descricao_cid,
+                "dias_perdidos": a.dias_perdidos,
+                "horas_perdidas": a.horas_perdidas
+            }
+            for a in atestados
+        ]
+    }
+
+@app.get("/api/analises/funcionarios")
+async def analise_funcionarios(
+    client_id: int = 1,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Análise por funcionários"""
+    analytics = Analytics(db)
+    return analytics.top_funcionarios(client_id, 50, mes_inicio, mes_fim)
+
+@app.get("/api/analises/setores")
+async def analise_setores(
+    client_id: int = 1,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Análise por setores"""
+    analytics = Analytics(db)
+    return analytics.top_setores(client_id, 20, mes_inicio, mes_fim)
+
+@app.get("/api/analises/cids")
+async def analise_cids(
+    client_id: int = 1,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Análise por CIDs"""
+    analytics = Analytics(db)
+    return analytics.top_cids(client_id, 20, mes_inicio, mes_fim)
+
+@app.get("/api/tendencias")
+async def tendencias(
+    client_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Análise de tendências"""
+    analytics = Analytics(db)
+    evolucao = analytics.evolucao_mensal(client_id, 12)
+    
+    # Calcula tendência simples (média móvel)
+    if len(evolucao) >= 3:
+        ultimos_3 = evolucao[-3:]
+        media_recente = sum(m['quantidade'] for m in ultimos_3) / 3
+        
+        primeiros_3 = evolucao[:3]
+        media_antiga = sum(m['quantidade'] for m in primeiros_3) / 3
+        
+        tendencia = "crescente" if media_recente > media_antiga else "decrescente" if media_recente < media_antiga else "estável"
+    else:
+        tendencia = "insuficiente"
+    
+    return {
+        "evolucao": evolucao,
+        "tendencia": tendencia,
+        "analise": "Análise de tendências com base nos últimos 12 meses"
+    }
+
+@app.get("/api/relatorios/comparativo")
+async def relatorio_comparativo(
+    client_id: int = 1,
+    periodo1_inicio: str = Query(...),
+    periodo1_fim: str = Query(...),
+    periodo2_inicio: str = Query(...),
+    periodo2_fim: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Relatório comparativo entre períodos"""
+    analytics = Analytics(db)
+    return analytics.comparativo_periodos(
+        client_id,
+        (periodo1_inicio, periodo1_fim),
+        (periodo2_inicio, periodo2_fim)
+    )
+
+@app.delete("/api/uploads/{upload_id}")
+async def delete_upload(
+    upload_id: int,
+    db: Session = Depends(get_db)
+):
+    """Deleta um upload e seus dados"""
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload não encontrado")
+    
+    db.delete(upload)
+    db.commit()
+    
+    return {"success": True, "message": "Upload deletado com sucesso"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
