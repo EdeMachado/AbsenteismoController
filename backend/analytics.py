@@ -55,6 +55,9 @@ class Analytics:
     
     def top_cids(self, client_id: int, limit: int = 5, mes_inicio: str = None, mes_fim: str = None) -> List[Dict[str, Any]]:
         """TOP CIDs mais frequentes"""
+        # CIDs genéricos para excluir
+        cids_genericos = ['Z00', 'Z01', 'Z02', 'Z52', 'Z76']
+        
         query = self.db.query(
             Atestado.cid,
             Atestado.descricao_cid,
@@ -70,6 +73,10 @@ class Analytics:
             query = query.filter(Upload.mes_referencia >= mes_inicio)
         if mes_fim:
             query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        # Filtra CIDs genéricos
+        for cid_gen in cids_genericos:
+            query = query.filter(~Atestado.cid.startswith(cid_gen))
         
         query = query.group_by(Atestado.cid, Atestado.descricao_cid).order_by(func.count(Atestado.id).desc()).limit(limit)
         

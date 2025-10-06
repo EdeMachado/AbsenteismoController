@@ -312,7 +312,7 @@ function renderizarChartMediaCid(dados) {
     chartMediaCid = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: top5.map(d => d.cid),
+            labels: top5.map(d => truncate(d.descricao || d.cid, 18)),
             datasets: [{
                 label: 'Dias',
                 data: top5.map(d => d.dias_perdidos),
@@ -326,6 +326,17 @@ function renderizarChartMediaCid(dados) {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            return `${top5[index].cid} - ${top5[index].descricao}`;
+                        },
+                        label: function(context) {
+                            return `Dias Perdidos: ${context.parsed.y.toFixed(1)}`;
+                        }
+                    }
                 }
             },
             scales: {
@@ -338,7 +349,9 @@ function renderizarChartMediaCid(dados) {
                 },
                 x: {
                     ticks: {
-                        font: { size: 10 }
+                        font: { size: 9 },
+                        maxRotation: 45,
+                        minRotation: 45
                     }
                 }
             }

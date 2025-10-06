@@ -28,20 +28,20 @@ class ExcelProcessor:
         # Remove espaços extras e converte para minúsculas
         self.df.columns = self.df.columns.str.strip().str.upper()
         
-        # Mapeamento de possíveis nomes de colunas
+        # Primeiro pega os campos importantes diretamente
+        if 'NOMECOMPLETO' in self.df.columns:
+            self.df['NOME_FUNCIONARIO'] = self.df['NOMECOMPLETO']
+        
+        if 'DESCCENTROCUSTO2' in self.df.columns:
+            self.df['SETOR'] = self.df['DESCCENTROCUSTO2']
+        elif 'DESCCENTROCUSTO3' in self.df.columns:
+            self.df['SETOR'] = self.df['DESCCENTROCUSTO3']
+        
+        if 'DESCCID' in self.df.columns:
+            self.df['DESCRICAO_CID'] = self.df['DESCCID']
+        
+        # Mapeamento de outras colunas
         mapeamento = {
-            'NOME': 'NOME_FUNCIONARIO',
-            'FUNCIONÁRIO': 'NOME_FUNCIONARIO',
-            'FUNCIONARIO': 'NOME_FUNCIONARIO',
-            'COLABORADOR': 'NOME_FUNCIONARIO',
-            
-            'SETOR': 'SETOR',
-            'DEPARTAMENTO': 'SETOR',
-            'ÁREA': 'SETOR',
-            'AREA': 'SETOR',
-            'DESCCENTROCUSTO2': 'SETOR',
-            'DESCCENTROCUSTO3': 'SETOR',
-            
             'CARGO': 'CARGO',
             'FUNÇÃO': 'CARGO',
             'FUNCAO': 'CARGO',
@@ -66,11 +66,6 @@ class ExcelProcessor:
             
             'CID': 'CID',
             'CID10': 'CID',
-            
-            'DESCRIÇÃO CID': 'DESCRICAO_CID',
-            'DESCRICAO CID': 'DESCRICAO_CID',
-            'DESC CID': 'DESCRICAO_CID',
-            'DESCCID': 'DESCRICAO_CID',
             
             'NRODIASATESTADO': 'NUMERO_DIAS_ATESTADO',
             'NRO DIAS ATESTADO': 'NUMERO_DIAS_ATESTADO',
@@ -100,6 +95,15 @@ class ExcelProcessor:
         """Limpa e valida os dados"""
         # Remove linhas completamente vazias
         self.df.dropna(how='all', inplace=True)
+        
+        # Converte para string e limpa
+        for col in ['NOME_FUNCIONARIO', 'SETOR', 'DESCRICAO_CID']:
+            if col in self.df.columns:
+                try:
+                    self.df[col] = self.df[col].fillna('').astype(str).str.replace(r'\n.*', '', regex=True).str.strip()
+                except:
+                    # Se der erro, deixa como string simples
+                    self.df[col] = self.df[col].fillna('').astype(str)
         
         # Preenche valores nulos com padrões
         colunas_texto = ['NOME_FUNCIONARIO', 'SETOR', 'CARGO', 'TIPO_ATESTADO', 'CID', 'DESCRICAO_CID']

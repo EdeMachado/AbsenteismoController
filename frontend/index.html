@@ -150,26 +150,15 @@
                 </div>
                 
                 <!-- Charts Grid - Estilo Power BI -->
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
                     <!-- TOP CIDs -->
-                    <div class="chart-container" style="grid-column: span 2;">
-                        <div class="chart-header">
-                            <h3 class="chart-title">TOP 10 CIDs mais Frequentes</h3>
-                            <p class="chart-subtitle">Principais causas de afastamento</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 280px;">
-                            <canvas id="chartCids"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Distribuição por Gênero -->
                     <div class="chart-container">
                         <div class="chart-header">
-                            <h3 class="chart-title">Por Gênero</h3>
-                            <p class="chart-subtitle">Distribuição M/F</p>
+                            <h3 class="chart-title">TOP 10 Doenças mais Frequentes</h3>
+                            <p class="chart-subtitle">Principais causas de afastamento (exceto exames/doações)</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 280px;">
-                            <canvas id="chartGenero"></canvas>
+                        <div class="chart-wrapper" style="height: 320px;">
+                            <canvas id="chartCids"></canvas>
                         </div>
                     </div>
                 </div>
@@ -197,11 +186,11 @@
                         </div>
                     </div>
                     
-                    <!-- Média Dias por CID -->
+                    <!-- Dias por Doença -->
                     <div class="chart-container">
                         <div class="chart-header">
-                            <h3 class="chart-title">Média Dias/CID</h3>
-                            <p class="chart-subtitle">Dias perdidos por CID</p>
+                            <h3 class="chart-title">Dias por Doença</h3>
+                            <p class="chart-subtitle">Total de dias perdidos</p>
                         </div>
                         <div class="chart-wrapper" style="height: 250px;">
                             <canvas id="chartMediaCid"></canvas>
