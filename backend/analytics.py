@@ -37,10 +37,11 @@ class Analytics:
         total_dias_perdidos = sum(a.numero_dias_atestado for a in atestados_dias)
         total_horas_perdidas = sum(a.horas_perdidas for a in atestados_dias)
         
-        # Taxa de absenteísmo (simplificada - pode ajustar conforme necessário)
+        # Taxa de absenteísmo corrigida
         # Fórmula: (Horas perdidas / Horas disponíveis) * 100
         # Assumindo jornada de 8h/dia, 22 dias úteis/mês
-        horas_disponiveis = 176 * len(set(a.nome_funcionario for a in atestados))  # 22 dias * 8h
+        funcionarios_unicos = len(set(a.nome_funcionario for a in atestados if a.nome_funcionario))
+        horas_disponiveis = 176 * funcionarios_unicos  # 22 dias * 8h por funcionário
         taxa_absenteismo = (total_horas_perdidas / horas_disponiveis * 100) if horas_disponiveis > 0 else 0
         
         return {
@@ -55,8 +56,8 @@ class Analytics:
     
     def top_cids(self, client_id: int, limit: int = 5, mes_inicio: str = None, mes_fim: str = None) -> List[Dict[str, Any]]:
         """TOP CIDs mais frequentes"""
-        # CIDs genéricos para excluir
-        cids_genericos = ['Z00', 'Z01', 'Z02', 'Z52', 'Z76']
+        # CIDs genéricos para excluir (apenas os mais genéricos)
+        cids_genericos = ['Z00.0', 'Z00.1', 'Z52.0', 'Z76.0', 'Z76.1']
         
         query = self.db.query(
             Atestado.cid,

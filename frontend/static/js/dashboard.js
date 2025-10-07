@@ -71,6 +71,12 @@ function renderizarChartCids(dados) {
     // Destroy previous chart
     if (chartCids) chartCids.destroy();
     
+    // Verifica se há dados
+    if (!dados || dados.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="no-data">Nenhum dado de CID disponível</div>';
+        return;
+    }
+    
     chartCids = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -124,6 +130,12 @@ function renderizarChartSetores(dados) {
     const ctx = document.getElementById('chartSetores');
     
     if (chartSetores) chartSetores.destroy();
+    
+    // Verifica se há dados
+    if (!dados || dados.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="no-data">Nenhum dado de setor disponível</div>';
+        return;
+    }
     
     chartSetores = new Chart(ctx, {
         type: 'bar',

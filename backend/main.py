@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 import os
 import shutil
+import json
 from datetime import datetime
 
 from .database import get_db, init_db
@@ -24,6 +25,33 @@ app = FastAPI(
     description="Sistema de Gestão de Absenteísmo"
 )
 
+# Configuração para UTF-8
+import sys
+import locale
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
+def corrigir_encoding_json(dados):
+    """Corrige encoding de caracteres especiais em dados JSON"""
+    if isinstance(dados, dict):
+        return {k: corrigir_encoding_json(v) for k, v in dados.items()}
+    elif isinstance(dados, list):
+        return [corrigir_encoding_json(item) for item in dados]
+    elif isinstance(dados, str):
+        # Corrige caracteres mal codificados
+        correcoes = {
+            '??': 'ã', '??': 'é', '??': 'í', '??': 'ó', '??': 'ú', '??': 'ç',
+            '??': 'á', '??': 'ê', '??': 'ô', '??': 'õ', '??': 'à', '??': 'è',
+            '??': 'ì', '??': 'ò', '??': 'ù', '??': 'ñ', '??': 'ü', '??': 'ä',
+            '??': 'ö', '??': 'ß', '??': 'Ä', '??': 'Ö', '??': 'Ü'
+        }
+        texto_corrigido = dados
+        for mal_codificado, correto in correcoes.items():
+            texto_corrigido = texto_corrigido.replace(mal_codificado, correto)
+        return texto_corrigido
+    else:
+        return dados
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +60,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Middleware para garantir UTF-8
+@app.middleware("http")
+async def add_charset_header(request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Type"] = response.headers.get("Content-Type", "application/json") + "; charset=utf-8"
+    return response
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -231,7 +266,7 @@ async def dashboard(
     distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim)
     insights = insights_engine.gerar_insights(client_id)
     
-    return {
+    resultado = {
         "metricas": metricas,
         "top_cids": top_cids,
         "top_setores": top_setores,
@@ -239,6 +274,9 @@ async def dashboard(
         "distribuicao_genero": distribuicao_genero,
         "insights": insights
     }
+    
+    # Corrige encoding antes de retornar
+    return corrigir_encoding_json(resultado)
 
 @app.get("/api/preview/{upload_id}")
 async def preview_data(

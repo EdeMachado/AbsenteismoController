@@ -18,7 +18,8 @@ class ExcelProcessor:
     def ler_planilha(self) -> bool:
         """Lê a planilha Excel"""
         try:
-            self.df = pd.read_excel(self.file_path, sheet_name=0)
+            # Tenta diferentes encodings
+            self.df = pd.read_excel(self.file_path, sheet_name=0, engine='openpyxl')
             return True
         except Exception as e:
             print(f"Erro ao ler planilha: {e}")
@@ -102,6 +103,8 @@ class ExcelProcessor:
             if col in self.df.columns:
                 try:
                     self.df[col] = self.df[col].fillna('').astype(str).str.replace(r'\n.*', '', regex=True).str.strip()
+                    # Corrige encoding de caracteres especiais comuns
+                    self.df[col] = self.df[col].str.replace('??', 'ã').str.replace('??', 'é').str.replace('??', 'í').str.replace('??', 'ó').str.replace('??', 'ú').str.replace('??', 'ç').str.replace('??', 'á').str.replace('??', 'ê').str.replace('??', 'ô').str.replace('??', 'õ')
                 except:
                     # Se der erro, deixa como string simples
                     self.df[col] = self.df[col].fillna('').astype(str)
