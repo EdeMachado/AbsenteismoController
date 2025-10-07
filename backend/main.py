@@ -1,7 +1,7 @@
 """
 FastAPI Main Application - AbsenteismoController v2.0
 """
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Form
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -155,26 +155,35 @@ async def comparativos_page():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
-@app.get("/dados", response_class=HTMLResponse)
-async def dados_page():
-    """Página de gestão de dados"""
-    file_path = os.path.join(FRONTEND_DIR, "dados.html")
+
+@app.get("/dados_powerbi", response_class=HTMLResponse)
+async def dados_powerbi_page():
+    """Página de análise de dados estilo PowerBI"""
+    file_path = os.path.join(FRONTEND_DIR, "dados_powerbi.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
-@app.get("/dados_avancado", response_class=HTMLResponse)
-async def dados_avancado_page():
-    """Página de análise avançada com IA"""
-    file_path = os.path.join(FRONTEND_DIR, "dados_avancado.html")
+@app.get("/upload_inteligente", response_class=HTMLResponse)
+async def upload_inteligente_page():
+    """Página de upload inteligente"""
+    file_path = os.path.join(FRONTEND_DIR, "upload_inteligente.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
-@app.get("/dados_completo", response_class=HTMLResponse)
-async def dados_completo_page():
-    """Página de análise completa - VERSÃO FINAL"""
-    file_path = os.path.join(FRONTEND_DIR, "dados_completo.html")
+@app.get("/dashboard_powerbi", response_class=HTMLResponse)
+async def dashboard_powerbi_page():
+    """Página do Dashboard PowerBI"""
+    file_path = os.path.join(FRONTEND_DIR, "dashboard_powerbi.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+@app.get("/auto_processor", response_class=HTMLResponse)
+async def auto_processor_page():
+    """Página do Sistema Automático"""
+    file_path = os.path.join(FRONTEND_DIR, "auto_processor.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 
 # ==================== ROUTES - API ====================
 
@@ -345,7 +354,7 @@ async def analise_funcionarios(
 ):
     """Análise por funcionários"""
     analytics = Analytics(db)
-    return analytics.top_funcionarios(client_id, 50, mes_inicio, mes_fim)
+    return analytics.top_funcionarios(client_id, 1000, mes_inicio, mes_fim)
 
 @app.get("/api/analises/setores")
 async def analise_setores(
@@ -634,6 +643,199 @@ async def excluir_dado(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== ROUTES - UPLOAD INTELIGENTE ====================
+
+@app.post("/api/upload/analyze")
+async def analyze_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Analisa arquivo e sugere configurações das colunas"""
+    try:
+        # Salva arquivo temporário
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"temp_{timestamp}_{file.filename}"
+        file_path = os.path.join(UPLOADS_DIR, filename)
+        
+        os.makedirs(UPLOADS_DIR, exist_ok=True)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Analisa arquivo
+        processor = ExcelProcessor(file_path)
+        df = processor.df
+        
+        # Analisa cada coluna
+        columns = []
+        for col in df.columns:
+            column_info = analyze_column(col, df[col])
+            columns.append(column_info)
+        
+        # Remove arquivo temporário
+        os.remove(file_path)
+        
+        return {"columns": columns}
+        
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/upload/process")
+async def process_file_with_config(
+    file: UploadFile = File(...),
+    config: str = Form(...),
+    client_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Processa arquivo com configurações das colunas"""
+    try:
+        # Parse configurações
+        column_configs = json.loads(config)
+        
+        # Salva arquivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{file.filename}"
+        file_path = os.path.join(UPLOADS_DIR, filename)
+        
+        os.makedirs(UPLOADS_DIR, exist_ok=True)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Processa com configurações
+        processor = ExcelProcessor(file_path)
+        registros = processor.processar()
+        
+        if not registros:
+            raise HTTPException(status_code=400, detail="Erro ao processar planilha")
+        
+        # Detecta mês de referência
+        mes_ref = None
+        if registros:
+            primeiro_registro = registros[0]
+            if 'data_afastamento' in primeiro_registro and primeiro_registro['data_afastamento']:
+                mes_ref = primeiro_registro['data_afastamento'].strftime('%Y-%m')
+        
+        # Cria upload
+        upload = Upload(
+            client_id=client_id,
+            filename=filename,
+            mes_referencia=mes_ref,
+            total_registros=len(registros),
+            data_upload=datetime.now()
+        )
+        db.add(upload)
+        db.commit()
+        db.refresh(upload)
+        
+        # Salva registros
+        for dados in registros:
+            atestado = Atestado(
+                upload_id=upload.id,
+                **dados
+            )
+            db.add(atestado)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "upload_id": upload.id,
+            "total_records": len(registros),
+            "message": "Dados processados com sucesso!"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+def analyze_column(column_name: str, column_data):
+    """Analisa uma coluna e sugere configurações"""
+    import pandas as pd
+    import re
+    
+    # Amostra dos dados
+    sample_data = column_data.dropna().head(5).tolist()
+    preview = ', '.join([str(x)[:20] for x in sample_data[:3]])
+    
+    # Detecta tipo de dados
+    data_type = str(column_data.dtype)
+    
+    # Sugere tipo baseado no nome da coluna
+    column_lower = column_name.lower()
+    suggested_type = 'outro'
+    analysis_important = True
+    ai_notes = []
+    
+    # Detecção inteligente por nome
+    if any(word in column_lower for word in ['nome', 'funcionario', 'funcionário']):
+        suggested_type = 'nome_funcionario'
+        ai_notes.append("Detectado como nome de funcionário")
+    elif any(word in column_lower for word in ['cpf', 'documento']):
+        suggested_type = 'cpf'
+        ai_notes.append("Detectado como CPF")
+    elif any(word in column_lower for word in ['matricula', 'matrícula', 'codigo', 'código']):
+        suggested_type = 'matricula'
+        ai_notes.append("Detectado como matrícula")
+    elif any(word in column_lower for word in ['setor', 'departamento', 'area', 'área']):
+        suggested_type = 'setor'
+        ai_notes.append("Detectado como setor")
+    elif any(word in column_lower for word in ['cargo', 'funcao', 'função']):
+        suggested_type = 'cargo'
+        ai_notes.append("Detectado como cargo")
+    elif any(word in column_lower for word in ['afastamento', 'inicio', 'início']):
+        suggested_type = 'data_afastamento'
+        ai_notes.append("Detectado como data de afastamento")
+    elif any(word in column_lower for word in ['retorno', 'fim', 'termino', 'término']):
+        suggested_type = 'data_retorno'
+        ai_notes.append("Detectado como data de retorno")
+    elif any(word in column_lower for word in ['cid', 'codigo', 'código']):
+        suggested_type = 'cid'
+        ai_notes.append("Detectado como CID")
+    elif any(word in column_lower for word in ['descricao', 'descrição', 'diagnostico', 'diagnóstico']):
+        suggested_type = 'descricao_cid'
+        ai_notes.append("Detectado como descrição do CID")
+    elif any(word in column_lower for word in ['dias', 'dia']):
+        suggested_type = 'dias_atestado'
+        ai_notes.append("Detectado como dias de atestado")
+    elif any(word in column_lower for word in ['horas', 'hora']):
+        suggested_type = 'horas_atestado'
+        ai_notes.append("Detectado como horas de atestado")
+    
+    # Análise do conteúdo
+    if data_type in ['datetime64[ns]', 'object'] and column_data.dropna().empty == False:
+        try:
+            pd.to_datetime(column_data.dropna().iloc[0])
+            if suggested_type == 'outro':
+                suggested_type = 'data_afastamento'
+                ai_notes.append("Detectado como data pelo conteúdo")
+        except:
+            pass
+    
+    # Verifica se é numérico
+    if data_type in ['int64', 'float64']:
+        if suggested_type == 'outro':
+            if column_data.max() < 100:
+                suggested_type = 'dias_atestado'
+                ai_notes.append("Detectado como dias (valor numérico baixo)")
+            else:
+                suggested_type = 'horas_atestado'
+                ai_notes.append("Detectado como horas (valor numérico alto)")
+    
+    # Determina se é importante para análise
+    if suggested_type == 'outro':
+        analysis_important = False
+        ai_notes.append("Coluna não identificada - considere excluir")
+    
+    return {
+        "name": column_name,
+        "preview": preview,
+        "suggested_type": suggested_type,
+        "analysis_important": analysis_important,
+        "include": analysis_important,
+        "ai_notes": "; ".join(ai_notes) if ai_notes else "Coluna analisada automaticamente"
+    }
 
 if __name__ == "__main__":
     import uvicorn

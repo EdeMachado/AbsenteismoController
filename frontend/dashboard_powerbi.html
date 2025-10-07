@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard PowerBI - AbsenteismoController</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+        
+        .powerbi-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* SIDEBAR ESQUERDO - FILTROS */
+        .sidebar-left {
+            width: 280px;
+            background: #2c2c2c;
+            color: white;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .company-logo {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #404040;
+        }
+        
+        .company-logo h1 {
+            color: #00bcf2;
+            font-size: 16px;
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .company-logo p {
+            color: #ccc;
+            font-size: 12px;
+            margin: 5px 0 0 0;
+        }
+        
+        .filter-section {
+            margin-bottom: 25px;
+        }
+        
+        .filter-title {
+            color: #00bcf2;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .filter-dropdown {
+            width: 100%;
+            padding: 8px 12px;
+            background: #404040;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .filter-dropdown:focus {
+            outline: none;
+            border-color: #00bcf2;
+        }
+        
+        .filter-dropdown option {
+            background: #404040;
+            color: white;
+        }
+        
+        /* ÁREA CENTRAL - GRÁFICOS */
+        .main-dashboard {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+        
+        .dashboard-header {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .dashboard-title {
+            color: #2c2c2c;
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 20px;
+            height: calc(100vh - 200px);
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            position: relative;
+        }
+        
+        .chart-title {
+            color: #2c2c2c;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .chart-canvas {
+            width: 100%;
+            height: 300px;
+        }
+        
+        .chart-large {
+            grid-column: 1 / -1;
+        }
+        
+        .chart-large .chart-canvas {
+            height: 400px;
+        }
+        
+        /* SIDEBAR DIREITO - FERRAMENTAS */
+        .sidebar-right {
+            width: 300px;
+            background: white;
+            border-left: 1px solid #dee2e6;
+            overflow-y: auto;
+        }
+        
+        .tools-tabs {
+            display: flex;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .tool-tab {
+            flex: 1;
+            padding: 12px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            color: #6c757d;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tool-tab.active {
+            background: white;
+            color: #00bcf2;
+            border-bottom-color: #00bcf2;
+        }
+        
+        .tool-content {
+            padding: 20px;
+        }
+        
+        .visualization-gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        
+        .visual-item {
+            aspect-ratio: 1;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .visual-item:hover {
+            background: #e3f2fd;
+            border-color: #00bcf2;
+        }
+        
+        .visual-item i {
+            font-size: 20px;
+            color: #6c757d;
+        }
+        
+        .visual-item:hover i {
+            color: #00bcf2;
+        }
+        
+        .data-fields {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .data-field {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            cursor: grab;
+            font-size: 14px;
+            color: #2c2c2c;
+        }
+        
+        .data-field:hover {
+            background: #e3f2fd;
+            border-color: #00bcf2;
+        }
+        
+        .data-field:active {
+            cursor: grabbing;
+        }
+        
+        .filter-section-right {
+            margin-bottom: 20px;
+        }
+        
+        .filter-section-right h4 {
+            color: #2c2c2c;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .filter-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        
+        .filter-item label {
+            font-size: 12px;
+            color: #6c757d;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .filter-item select {
+            width: 100%;
+            padding: 4px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        /* RESPONSIVO */
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-large {
+                grid-column: 1;
+            }
+        }
+        
+        /* LOADING */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: #6c757d;
+        }
+        
+        .loading i {
+            font-size: 24px;
+            margin-right: 10px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* ESTATÍSTICAS */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00bcf2;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="powerbi-container">
+        <!-- SIDEBAR ESQUERDO - FILTROS -->
+        <div class="sidebar-left">
+            <div class="company-logo">
+                <h1>ABSENTEISMO CONTROLLER</h1>
+                <p>Sistema de Análise Automática</p>
+            </div>
+            
+            <div class="filter-section">
+                <div class="filter-title">Avaliação de Absenteísmo</div>
+                
+                <select class="filter-dropdown" id="filterDepartamento">
+                    <option value="">Todos</option>
+                </select>
+                
+                <select class="filter-dropdown" id="filterFuncionario">
+                    <option value="">Todos</option>
+                </select>
+                
+                <select class="filter-dropdown" id="filterTipoDoenca">
+                    <option value="">Todos</option>
+                </select>
+                
+                <select class="filter-dropdown" id="filterAno">
+                    <option value="">Todos</option>
+                </select>
+                
+                <select class="filter-dropdown" id="filterMes">
+                    <option value="">Todos</option>
+                </select>
+                
+                <select class="filter-dropdown" id="filterProcedencia">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- ÁREA CENTRAL - DASHBOARD -->
+        <div class="main-dashboard">
+            <div class="dashboard-header">
+                <h1 class="dashboard-title">Dashboard de Absenteísmo</h1>
+            </div>
+            
+            <!-- ESTATÍSTICAS -->
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalRegistros">0</div>
+                    <div class="stat-label">Total de Registros</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalDias">0</div>
+                    <div class="stat-label">Total de Dias</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalHoras">0</div>
+                    <div class="stat-label">Total de Horas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="taxaAbsenteismo">0%</div>
+                    <div class="stat-label">Taxa de Absenteísmo</div>
+                </div>
+            </div>
+            
+            <!-- GRÁFICOS -->
+            <div class="charts-grid">
+                <!-- Classificação por Funcionário -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Classificação por Funcionário</h3>
+                    <canvas id="chartFuncionarios" class="chart-canvas"></canvas>
+                </div>
+                
+                <!-- Classificação por Setor -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Classificação por Setor</h3>
+                    <canvas id="chartSetores" class="chart-canvas"></canvas>
+                </div>
+                
+                <!-- Dias Atestados por Ano -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Dias Atestados por Ano</h3>
+                    <canvas id="chartAnos" class="chart-canvas"></canvas>
+                </div>
+                
+                <!-- Classificação por Doença -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Classificação por Doença</h3>
+                    <canvas id="chartDoencas" class="chart-canvas"></canvas>
+                </div>
+                
+                <!-- Análise Atestados -->
+                <div class="chart-container">
+                    <h3 class="chart-title">Análise Atestados</h3>
+                    <canvas id="chartAnalise" class="chart-canvas"></canvas>
+                </div>
+                
+                <!-- Tempo Serviço x Atestados -->
+                <div class="chart-container chart-large">
+                    <h3 class="chart-title">Tempo Serviço x Atestados</h3>
+                    <canvas id="chartTempoServico" class="chart-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SIDEBAR DIREITO - FERRAMENTAS -->
+        <div class="sidebar-right">
+            <div class="tools-tabs">
+                <button class="tool-tab active" onclick="showTab('visualizations')">
+                    << Visualizações
+                </button>
+                <button class="tool-tab" onclick="showTab('data')">
+                    >> Dados
+                </button>
+            </div>
+            
+            <div class="tool-content">
+                <!-- Aba Visualizações -->
+                <div id="tab-visualizations">
+                    <h4>Visualizações</h4>
+                    <div class="visualization-gallery">
+                        <div class="visual-item" onclick="addChart('bar')">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="visual-item" onclick="addChart('line')">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="visual-item" onclick="addChart('pie')">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <div class="visual-item" onclick="addChart('doughnut')">
+                            <i class="fas fa-circle"></i>
+                        </div>
+                        <div class="visual-item" onclick="addChart('area')">
+                            <i class="fas fa-chart-area"></i>
+                        </div>
+                        <div class="visual-item" onclick="addChart('scatter')">
+                            <i class="fas fa-chart-scatter"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-section-right">
+                        <h4>Filtros</h4>
+                        <div class="filter-item">
+                            <label>Campo</label>
+                            <select id="filterField">
+                                <option value="">Selecione um campo</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <label>Valor</label>
+                            <select id="filterValue">
+                                <option value="">Selecione um valor</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Aba Dados -->
+                <div id="tab-data" style="display: none;">
+                    <h4>Dados</h4>
+                    <div style="margin-bottom: 15px;">
+                        <input type="text" placeholder="Pesquisar..." style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    
+                    <h5>Medidas</h5>
+                    <ul class="data-fields">
+                        <li class="data-field">Total Registros</li>
+                        <li class="data-field">Total Dias</li>
+                        <li class="data-field">Total Horas</li>
+                        <li class="data-field">Taxa Absenteísmo</li>
+                    </ul>
+                    
+                    <h5>Analítico</h5>
+                    <ul class="data-fields">
+                        <li class="data-field">Nome Funcionário</li>
+                        <li class="data-field">Setor</li>
+                        <li class="data-field">CID</li>
+                        <li class="data-field">Data Afastamento</li>
+                        <li class="data-field">Dias Atestado</li>
+                    </ul>
+                    
+                    <h5>Calendário</h5>
+                    <ul class="data-fields">
+                        <li class="data-field">Ano</li>
+                        <li class="data-field">Mês</li>
+                        <li class="data-field">Trimestre</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/dashboard_powerbi.js"></script>
+</body>
+</html>
