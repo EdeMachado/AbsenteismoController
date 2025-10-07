@@ -13,7 +13,7 @@ let mostrarTodos = false;
 let colunasConfig = {
     // Colunas padrão da planilha
     id: { visible: false, label: 'ID', type: 'number', sticky: false },
-    nome_funcionario: { visible: true, label: 'Funcionário', type: 'text', sticky: true },
+    nome_funcionario: { visible: true, label: 'Funcionário', type: 'text', sticky: false }, // Mudei para false para não atrapalhar scroll
     cpf: { visible: true, label: 'CPF', type: 'text', sticky: false },
     matricula: { visible: true, label: 'Matrícula', type: 'text', sticky: false },
     setor: { visible: true, label: 'Setor', type: 'text', sticky: false },
@@ -778,6 +778,43 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// ============ NAVEGAÇÃO HORIZONTAL ============
+
+function scrollTabela(pixels) {
+    const container = document.getElementById('tableContainer');
+    container.scrollBy({
+        left: pixels,
+        behavior: 'smooth'
+    });
+}
+
+// Adiciona indicadores de scroll
+function atualizarIndicadoresScroll() {
+    const container = document.getElementById('tableContainer');
+    if (!container) return;
+    
+    const podeRolarEsquerda = container.scrollLeft > 0;
+    const podeRolarDireita = container.scrollLeft < (container.scrollWidth - container.clientWidth - 10);
+    
+    // Atualiza visualmente (pode adicionar setas ou sombras depois)
+    if (podeRolarDireita) {
+        container.style.boxShadow = 'inset -10px 0 10px -10px rgba(0,0,0,0.3)';
+    } else {
+        container.style.boxShadow = 'var(--shadow-md)';
+    }
+}
+
+// Monitora scroll
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const container = document.getElementById('tableContainer');
+        if (container) {
+            container.addEventListener('scroll', atualizarIndicadoresScroll);
+            atualizarIndicadoresScroll();
+        }
+    }, 1000);
+});
 
 // Fecha dropdowns ao clicar fora
 document.addEventListener('click', () => {
