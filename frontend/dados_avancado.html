@@ -429,6 +429,13 @@
                     </div>
                     
                     <div class="toolbar-right">
+                        <button class="btn btn-secondary" onclick="toggleMostrarTodos()" id="btnMostrarTodos">
+                            <i class="fas fa-list"></i>
+                            Ver Todos
+                        </button>
+                        <button class="btn btn-secondary btn-icon" onclick="abrirModalNovaColuna()" title="Criar Coluna Customizada">
+                            <i class="fas fa-plus-circle"></i>
+                        </button>
                         <button class="btn btn-secondary btn-icon" onclick="limparFiltros()" title="Limpar todos os filtros">
                             <i class="fas fa-times"></i>
                         </button>
@@ -522,6 +529,67 @@
     
     <!-- Overlay -->
     <div class="overlay" id="overlay" onclick="toggleColumnManager()"></div>
+    
+    <!-- Modal para Criar Nova Coluna -->
+    <div class="modal-overlay" id="modalNovaColuna">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">🔧 Criar Nova Coluna</h2>
+                <button class="modal-close" onclick="fecharModalNovaColuna()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-field full-width">
+                        <label class="form-label">Nome da Coluna *</label>
+                        <input type="text" id="nomeNovaColuna" class="form-input" placeholder="Ex: Status, Categoria, etc">
+                    </div>
+                    
+                    <div class="form-field full-width">
+                        <label class="form-label">Tipo de Coluna</label>
+                        <select id="tipoNovaColuna" class="form-input">
+                            <option value="formula">Fórmula/Cálculo</option>
+                            <option value="condicional">Condicional (Se...Então)</option>
+                            <option value="texto">Texto Fixo</option>
+                            <option value="concatenar">Concatenar Campos</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-field full-width" id="campoFormula">
+                        <label class="form-label">Fórmula JavaScript *</label>
+                        <textarea id="formulaNovaColuna" class="form-input" rows="4" 
+                                  placeholder="Ex: registro.dias_perdidos * 8&#10;Ex: registro.nome_funcionario.split(' ')[0]&#10;Ex: registro.cid.startsWith('M') ? 'Músculo' : 'Outros'"></textarea>
+                        <small style="color: var(--text-secondary); margin-top: 4px; display: block;">
+                            Use "registro.nome_do_campo" para acessar os dados. Exemplo: registro.setor
+                        </small>
+                    </div>
+                    
+                    <div class="form-field full-width">
+                        <label class="form-label">Exemplos Rápidos</label>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="preencherExemplo('primeiro_nome')">
+                                Primeiro Nome
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="preencherExemplo('dias_em_horas')">
+                                Dias → Horas (dias × 8)
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="preencherExemplo('categoria_duracao')">
+                                Curto/Médio/Longo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharModalNovaColuna()">Cancelar</button>
+                <button class="btn btn-primary" onclick="criarColunaCustomizada()">
+                    <i class="fas fa-plus"></i>
+                    Criar Coluna
+                </button>
+            </div>
+        </div>
+    </div>
     
     <script src="/static/js/dados_avancado.js"></script>
 </body>

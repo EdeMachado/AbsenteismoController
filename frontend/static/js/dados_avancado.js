@@ -6,7 +6,8 @@
 let dadosCompletos = [];
 let dadosFiltrados = [];
 let paginaAtual = 1;
-const registrosPorPagina = 100;
+let registrosPorPagina = 100; // Agora é variável
+let mostrarTodos = false;
 
 // Configuração de colunas
 let colunasConfig = {
@@ -463,7 +464,7 @@ async function criarColunaIA(tipo) {
     }
 }
 
-// Criar coluna de gênero baseado no nome
+// Criar coluna de gênero baseado no nome - REGRA MELHORADA
 async function criarColunaGenero() {
     return {
         key: 'ia_genero',
@@ -471,27 +472,21 @@ async function criarColunaGenero() {
         type: 'text',
         calcular: (registro) => {
             const nome = registro.nome_funcionario || '';
+            if (!nome) return 'Indefinido';
             
-            // Lista de nomes masculinos comuns
-            const nomesMasculinos = ['JOÃO', 'JOSÉ', 'ANTONIO', 'FRANCISCO', 'CARLOS', 'PAULO', 'PEDRO', 'LUCAS', 
-                                     'LUIZ', 'MARCOS', 'LUIS', 'GABRIEL', 'RAFAEL', 'DANIEL', 'MARCELO', 'BRUNO',
-                                     'EDUARDO', 'FELIPE', 'RODRIGO', 'GUSTAVO', 'ANDRE', 'FERNANDO', 'FABIO'];
+            // Pega apenas o PRIMEIRO NOME
+            const primeiroNome = nome.trim().split(' ')[0].toUpperCase();
             
-            // Lista de nomes femininos comuns
-            const nomesFemininos = ['MARIA', 'ANA', 'FRANCISCA', 'ANTONIA', 'ADRIANA', 'JULIANA', 'MARCIA',
-                                    'FERNANDA', 'PATRICIA', 'ALINE', 'SANDRA', 'CAMILA', 'AMANDA', 'BRUNA',
-                                    'JESSICA', 'LETICIA', 'VANESSA', 'CARLA', 'PAULA', 'CRISTINA', 'MONICA'];
+            if (!primeiroNome) return 'Indefinido';
             
-            const primeiroNome = nome.split(' ')[0].toUpperCase();
+            // REGRA PRINCIPAL: Termina com "A" = Feminino, resto = Masculino
+            const ultimaLetra = primeiroNome.charAt(primeiroNome.length - 1);
             
-            if (nomesMasculinos.includes(primeiroNome)) return 'M';
-            if (nomesFemininos.includes(primeiroNome)) return 'F';
-            
-            // Terminações típicas
-            if (primeiroNome.endsWith('O') || primeiroNome.endsWith('OS')) return 'M';
-            if (primeiroNome.endsWith('A') || primeiroNome.endsWith('AS')) return 'F';
-            
-            return 'Indefinido';
+            if (ultimaLetra === 'A') {
+                return 'F';
+            } else {
+                return 'M';
+            }
         }
     };
 }
@@ -614,6 +609,175 @@ function formatMesReferencia(mes) {
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     return `${meses[parseInt(mesNum) - 1]}/${ano}`;
 }
+
+// ============ MOSTRAR TODOS OS REGISTROS ============
+
+function toggleMostrarTodos() {
+    mostrarTodos = !mostrarTodos;
+    const btn = document.getElementById('btnMostrarTodos');
+    
+    if (mostrarTodos) {
+        registrosPorPagina = dadosFiltrados.length; // Mostra TODOS
+        btn.innerHTML = '<i class="fas fa-compress"></i> Paginar';
+        btn.style.background = 'var(--success)';
+        btn.style.color = 'white';
+    } else {
+        registrosPorPagina = 100;
+        btn.innerHTML = '<i class="fas fa-list"></i> Ver Todos';
+        btn.style.background = '';
+        btn.style.color = '';
+    }
+    
+    paginaAtual = 1;
+    renderizarTabela();
+}
+
+// ============ CRIAR COLUNA CUSTOMIZADA ============
+
+function abrirModalNovaColuna() {
+    document.getElementById('modalNovaColuna').classList.add('active');
+}
+
+function fecharModalNovaColuna() {
+    document.getElementById('modalNovaColuna').classList.remove('active');
+    document.getElementById('nomeNovaColuna').value = '';
+    document.getElementById('formulaNovaColuna').value = '';
+}
+
+function preencherExemplo(tipo) {
+    const textarea = document.getElementById('formulaNovaColuna');
+    const nomeInput = document.getElementById('nomeNovaColuna');
+    
+    switch(tipo) {
+        case 'primeiro_nome':
+            nomeInput.value = 'Primeiro Nome';
+            textarea.value = 'registro.nome_funcionario ? registro.nome_funcionario.split(\' \')[0] : \'-\'';
+            break;
+        case 'dias_em_horas':
+            nomeInput.value = 'Dias em Horas';
+            textarea.value = '(registro.dias_perdidos || 0) * 8';
+            break;
+        case 'categoria_duracao':
+            nomeInput.value = 'Categoria Duração';
+            textarea.value = `const dias = registro.dias_perdidos || 0;
+if (dias <= 1) return 'Curto';
+if (dias <= 7) return 'Médio';
+return 'Longo';`;
+            break;
+    }
+}
+
+function criarColunaCustomizada() {
+    const nome = document.getElementById('nomeNovaColuna').value.trim();
+    const formula = document.getElementById('formulaNovaColuna').value.trim();
+    
+    if (!nome || !formula) {
+        alert('❌ Preencha o nome e a fórmula da coluna!');
+        return;
+    }
+    
+    // Gera uma chave única
+    const key = 'custom_' + nome.toLowerCase().replace(/\s+/g, '_');
+    
+    // Cria a função de cálculo
+    let funcaoCalculo;
+    try {
+        funcaoCalculo = new Function('registro', `
+            try {
+                ${formula.includes('return') ? formula : 'return ' + formula}
+            } catch (e) {
+                return 'ERRO: ' + e.message;
+            }
+        `);
+        
+        // Testa com primeiro registro
+        if (dadosCompletos.length > 0) {
+            const teste = funcaoCalculo(dadosCompletos[0]);
+            console.log('Teste da fórmula:', teste);
+        }
+        
+    } catch (e) {
+        alert('❌ Erro na fórmula:\n' + e.message);
+        return;
+    }
+    
+    // Adiciona a nova coluna
+    colunasIA[key] = {
+        visible: true,
+        label: nome,
+        type: 'text',
+        sticky: false,
+        ia: true,
+        custom: true
+    };
+    
+    // Calcula valores para todos os registros
+    dadosCompletos.forEach(registro => {
+        try {
+            registro[key] = funcaoCalculo(registro);
+        } catch (e) {
+            registro[key] = 'ERRO';
+        }
+    });
+    
+    dadosFiltrados = [...dadosCompletos];
+    
+    renderizarTabela();
+    renderizarGerenciadorColunas();
+    fecharModalNovaColuna();
+    
+    alert(`✅ Coluna "${nome}" criada com sucesso!\n\nVocê pode:\n- Ver os valores na tabela\n- Filtrar por esta coluna\n- Gerenciar no painel de colunas`);
+}
+
+// ============ ESTILOS ADICIONAIS ============
+
+// Adiciona estilo para botão sm
+const style = document.createElement('style');
+style.textContent = `
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+        width: 100%;
+    }
+    
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+    
+    .modal-overlay.active {
+        display: flex;
+    }
+    
+    .search-box {
+        position: relative;
+    }
+    
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+    
+    .search-box input {
+        padding-left: 40px;
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 10px 10px 40px;
+    }
+`;
+document.head.appendChild(style);
 
 // Fecha dropdowns ao clicar fora
 document.addEventListener('click', () => {
