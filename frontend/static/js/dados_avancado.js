@@ -179,7 +179,7 @@ function renderizarTabela() {
     `).join('');
     
     atualizarPaginacao();
-    preencherOpcoesFiltr os();
+    preencherOpcoesFiltros();
 }
 
 // Toggle filtro de coluna
@@ -234,7 +234,7 @@ function preencherOpcoesColuna(coluna) {
 }
 
 // Preenche opções de TODOS os filtros (chamado após renderizar tabela)
-function preencherOpcoesF iltros() {
+function preencherOpcoesFiltros() {
     const colunasVisiveis = Object.keys({...colunasConfig, ...colunasIA})
         .filter(key => colunasConfig[key]?.visible || colunasIA[key]?.visible);
     
