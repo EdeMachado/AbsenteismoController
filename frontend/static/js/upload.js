@@ -227,3 +227,4 @@ function formatDateTime(dateStr) {
     return date.toLocaleString('pt-BR');
 }
 
+

@@ -141,3 +141,4 @@ class InsightsEngine:
         
         return recomendacoes.get(cid_grupo, 'Investigar causas e implementar ações preventivas')
 
+

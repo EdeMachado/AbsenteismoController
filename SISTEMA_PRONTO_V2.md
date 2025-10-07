@@ -338,3 +338,4 @@ Muito mais completo que Metabase, totalmente automático, e 100% SEU!
 
 **BORA TESTAR!** 💪😊
 
+

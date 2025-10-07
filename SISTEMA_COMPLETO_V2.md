@@ -379,3 +379,4 @@ Para expandir funcionalidades ou tirar dúvidas, entre em contato!
 
 **PARABÉNS! VOCÊ TEM UM SISTEMA PROFISSIONAL DE ABSENTEÍSMO!** 🚀💪
 
+
