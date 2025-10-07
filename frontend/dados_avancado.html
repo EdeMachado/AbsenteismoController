@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Dados - AbsenteismoController</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Layout principal */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .toolbar-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .toolbar-right {
+            display: flex;
+            gap: 12px;
+        }
+        
+        /* Tabela com scroll horizontal */
+        .table-container {
+            background: var(--surface);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            overflow: auto;
+            max-height: calc(100vh - 350px);
+            position: relative;
+        }
+        
+        .data-table-advanced {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: max-content;
+        }
+        
+        /* Cabeçalho fixo e coluna fixa */
+        .data-table-advanced thead th {
+            position: sticky;
+            top: 0;
+            background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
+            z-index: 100;
+            padding: 12px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--divider);
+            white-space: nowrap;
+        }
+        
+        .data-table-advanced th.sticky-col,
+        .data-table-advanced td.sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 50;
+        }
+        
+        .data-table-advanced th.sticky-col {
+            z-index: 150;
+            background: linear-gradient(to bottom, #dee2e6 0%, #ced4da 100%);
+        }
+        
+        .data-table-advanced td.sticky-col {
+            background: white;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+        }
+        
+        .data-table-advanced tbody tr:hover td.sticky-col {
+            background: var(--surface-hover);
+        }
+        
+        /* Células da tabela */
+        .data-table-advanced tbody td {
+            padding: 10px 8px;
+            font-size: 13px;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--divider);
+            white-space: nowrap;
+        }
+        
+        .data-table-advanced tbody tr:hover {
+            background: var(--surface-hover);
+        }
+        
+        /* Filtros por coluna */
+        .column-filter {
+            position: relative;
+            display: inline-block;
+            margin-left: 6px;
+        }
+        
+        .filter-icon {
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 12px;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+        
+        .filter-icon:hover {
+            background: rgba(25, 118, 210, 0.1);
+            color: var(--primary);
+        }
+        
+        .filter-icon.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .filter-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: var(--shadow-lg);
+            padding: 8px;
+            min-width: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 200;
+        }
+        
+        .filter-dropdown.active {
+            display: block;
+        }
+        
+        .filter-search {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .filter-option {
+            padding: 6px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .filter-option:hover {
+            background: var(--surface-hover);
+        }
+        
+        .filter-option input {
+            cursor: pointer;
+        }
+        
+        /* Gerenciador de colunas */
+        .column-manager {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -4px 0 16px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transition: right 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .column-manager.active {
+            right: 0;
+        }
+        
+        .column-manager-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--divider);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .column-manager-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .column-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .column-item {
+            padding: 12px;
+            background: var(--surface);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: move;
+        }
+        
+        .column-item input[type="checkbox"] {
+            cursor: pointer;
+        }
+        
+        .column-item-label {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .column-item-type {
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--background);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        
+        /* IA para criar colunas */
+        .ia-column-creator {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .ia-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ia-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .ia-option {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ia-option:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(4px);
+        }
+        
+        /* Badge para colunas IA */
+        .ia-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        
+        /* Stats resumo */
+        .stats-mini {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .stat-mini {
+            flex: 1;
+            background: var(--surface);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-mini-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .stat-mini-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+        
+        /* Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+        
+        .overlay.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-chart-line"></i> AbsenteismoController
+                </div>
+                <div class="sidebar-subtitle">GrupoBiomed</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/upload" class="nav-item">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload</span>
+                </a>
+                <a href="/dados" class="nav-item">
+                    <i class="fas fa-database"></i>
+                    <span>Dados</span>
+                </a>
+                <a href="/dados_avancado" class="nav-item active">
+                    <i class="fas fa-brain"></i>
+                    <span>Análise IA</span>
+                </a>
+                <a href="/funcionarios" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>Funcionários</span>
+                </a>
+                <a href="/comparativos" class="nav-item">
+                    <i class="fas fa-balance-scale"></i>
+                    <span>Comparativos</span>
+                </a>
+                <a href="/relatorios" class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Relatórios</span>
+                </a>
+            </nav>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1 class="header-title">
+                    <i class="fas fa-brain" style="color: #667eea;"></i>
+                    Análise Avançada com IA
+                </h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary btn-icon" onclick="toggleColumnManager()" title="Gerenciar Colunas">
+                        <i class="fas fa-columns"></i>
+                    </button>
+                    <button class="btn btn-secondary btn-icon" onclick="exportarDados()" title="Exportar Excel">
+                        <i class="fas fa-file-excel"></i>
+                    </button>
+                    <button class="btn btn-primary" onclick="location.href='/dados'">
+                        <i class="fas fa-edit"></i>
+                        Editar Dados
+                    </button>
+                </div>
+            </header>
+            
+            <div class="content">
+                <!-- Stats Resumo -->
+                <div class="stats-mini">
+                    <div class="stat-mini">
+                        <div class="stat-mini-value" id="totalRegistros">-</div>
+                        <div class="stat-mini-label">Total Registros</div>
+                    </div>
+                    <div class="stat-mini">
+                        <div class="stat-mini-value" id="totalColunas">-</div>
+                        <div class="stat-mini-label">Colunas Visíveis</div>
+                    </div>
+                    <div class="stat-mini">
+                        <div class="stat-mini-value" id="totalFiltros">0</div>
+                        <div class="stat-mini-label">Filtros Ativos</div>
+                    </div>
+                </div>
+                
+                <!-- Toolbar -->
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <select id="filtroUpload" class="form-input" onchange="carregarDados()">
+                            <option value="">Todos os uploads</option>
+                        </select>
+                        
+                        <div class="search-box" style="min-width: 300px;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="searchGlobal" placeholder="Busca global..." onkeyup="buscarGlobal()">
+                        </div>
+                    </div>
+                    
+                    <div class="toolbar-right">
+                        <button class="btn btn-secondary btn-icon" onclick="limparFiltros()" title="Limpar todos os filtros">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon" onclick="recarregarDados()" title="Recarregar">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Tabela com todos os campos -->
+                <div class="table-container" id="tableContainer">
+                    <table class="data-table-advanced" id="dataTable">
+                        <thead id="tableHead">
+                            <!-- Será gerado dinamicamente -->
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr>
+                                <td colspan="20" style="text-align: center; padding: 40px;">
+                                    <div class="spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Paginação -->
+                <div class="pagination" style="margin-top: 16px;">
+                    <div class="pagination-info" id="paginationInfo">-</div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" onclick="mudarPagina(-1)" id="btnAnterior">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span id="paginationPages"></span>
+                        <button class="pagination-btn" onclick="mudarPagina(1)" id="btnProxima">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Gerenciador de Colunas -->
+    <div class="column-manager" id="columnManager">
+        <div class="column-manager-header">
+            <h3 style="margin: 0; font-size: 18px;">Gerenciar Colunas</h3>
+            <button class="modal-close" onclick="toggleColumnManager()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="column-manager-body">
+            <!-- IA para criar colunas -->
+            <div class="ia-column-creator">
+                <div class="ia-title">
+                    <i class="fas fa-magic"></i>
+                    Criar Colunas com IA
+                </div>
+                <div class="ia-options">
+                    <div class="ia-option" onclick="criarColunaIA('genero')">
+                        <i class="fas fa-venus-mars"></i>
+                        Detectar Gênero (pelo nome)
+                    </div>
+                    <div class="ia-option" onclick="criarColunaIA('faixa_etaria')">
+                        <i class="fas fa-birthday-cake"></i>
+                        Faixa Etária (se tiver data nasc.)
+                    </div>
+                    <div class="ia-option" onclick="criarColunaIA('categoria_cid')">
+                        <i class="fas fa-tags"></i>
+                        Categoria CID (M54=Musculo, J00=Respiratório)
+                    </div>
+                    <div class="ia-option" onclick="criarColunaIA('duracao_afastamento')">
+                        <i class="fas fa-clock"></i>
+                        Duração do Afastamento (dias)
+                    </div>
+                    <div class="ia-option" onclick="criarColunaIA('mes_ano')">
+                        <i class="fas fa-calendar"></i>
+                        Mês/Ano do Afastamento
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Lista de colunas -->
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--text-secondary);">
+                Colunas Disponíveis
+            </h4>
+            <div class="column-list" id="columnList">
+                <!-- Será gerado dinamicamente -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overlay -->
+    <div class="overlay" id="overlay" onclick="toggleColumnManager()"></div>
+    
+    <script src="/static/js/dados_avancado.js"></script>
+</body>
+</html>
+

@@ -162,6 +162,13 @@ async def dados_page():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+@app.get("/dados_avancado", response_class=HTMLResponse)
+async def dados_avancado_page():
+    """Página de análise avançada com IA"""
+    file_path = os.path.join(FRONTEND_DIR, "dados_avancado.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 # ==================== ROUTES - API ====================
 
 @app.get("/api/health")

@@ -81,12 +81,40 @@
             background: var(--surface);
             border-radius: 12px;
             box-shadow: var(--shadow-md);
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: visible;
+            position: relative;
         }
         
         .data-table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 1800px;
+        }
+        
+        .data-table th {
+            position: sticky;
+            top: 0;
+            background: var(--background);
+            z-index: 10;
+        }
+        
+        .data-table th.sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            background: var(--background);
+        }
+        
+        .data-table td.sticky-col {
+            position: sticky;
+            left: 0;
+            background: white;
+            z-index: 5;
+        }
+        
+        .data-table tbody tr:hover td.sticky-col {
+            background: var(--surface-hover);
         }
         
         .data-table thead {
