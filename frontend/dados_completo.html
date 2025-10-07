@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise Completa de Dados - AbsenteismoController</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Container principal */
+        .main-wrapper {
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Toolbar superior */
+        .data-toolbar {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .toolbar-section {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        /* Tabela responsiva */
+        .table-wrapper {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .table-scroll {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+        }
+        
+        /* Customização da scrollbar */
+        .table-scroll::-webkit-scrollbar {
+            width: 14px;
+            height: 14px;
+        }
+        
+        .table-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 8px;
+            margin: 4px;
+        }
+        
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #1976D2;
+            border-radius: 8px;
+            border: 3px solid #f1f1f1;
+        }
+        
+        .table-scroll::-webkit-scrollbar-thumb:hover {
+            background: #1565C0;
+        }
+        
+        .table-scroll::-webkit-scrollbar-corner {
+            background: #f1f1f1;
+        }
+        
+        /* Tabela */
+        .data-grid {
+            width: max-content;
+            min-width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .data-grid th {
+            position: sticky;
+            top: 0;
+            background: linear-gradient(to bottom, #e3f2fd 0%, #bbdefb 100%);
+            padding: 14px 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: #1565C0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #1976D2;
+            white-space: nowrap;
+            z-index: 100;
+            min-width: 150px;
+        }
+        
+        .data-grid th.col-small {
+            min-width: 80px;
+        }
+        
+        .data-grid th.col-medium {
+            min-width: 120px;
+        }
+        
+        .data-grid th.col-large {
+            min-width: 200px;
+        }
+        
+        .data-grid th.col-xlarge {
+            min-width: 300px;
+        }
+        
+        .data-grid td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        
+        .data-grid tbody tr:hover {
+            background: #f5f9ff;
+        }
+        
+        .data-grid tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+        
+        .data-grid tbody tr:nth-child(even):hover {
+            background: #f5f9ff;
+        }
+        
+        /* Cabeçalho de coluna com filtro */
+        .col-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: space-between;
+        }
+        
+        .col-title {
+            flex: 1;
+        }
+        
+        .filter-btn {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        
+        .filter-btn:hover {
+            background: rgba(25, 118, 210, 0.1);
+            color: #1976D2;
+        }
+        
+        .filter-btn.active {
+            background: #1976D2;
+            color: white;
+        }
+        
+        /* Dropdown de filtro */
+        .filter-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            padding: 12px;
+            min-width: 250px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .filter-dropdown.show {
+            display: block;
+        }
+        
+        .filter-search {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+        
+        .filter-options {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .filter-option {
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        
+        .filter-option:hover {
+            background: #f5f5f5;
+        }
+        
+        .filter-option input[type="checkbox"] {
+            cursor: pointer;
+        }
+        
+        /* Stats */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background: white;
+            padding: 16px;
+            border-radius: 10px;
+            box-shadow: var(--shadow-sm);
+            text-align: center;
+            border-left: 4px solid #1976D2;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1976D2;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+        
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge-dias {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .badge-horas {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        
+        .badge-ia {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: 6px;
+        }
+        
+        /* Panel lateral */
+        .side-panel {
+            position: fixed;
+            top: 0;
+            right: -450px;
+            width: 450px;
+            height: 100vh;
+            background: white;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+            z-index: 2000;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .side-panel.active {
+            right: 0;
+        }
+        
+        .panel-header {
+            padding: 24px;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1976D2;
+        }
+        
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        
+        /* IA Creator */
+        .ia-creator {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            margin-bottom: 24px;
+        }
+        
+        .ia-creator h3 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ia-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 8px;
+            text-align: left;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .ia-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateX(4px);
+        }
+        
+        /* Lista de colunas */
+        .columns-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .column-toggle {
+            padding: 12px 16px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .column-toggle:hover {
+            background: #e3f2fd;
+        }
+        
+        .column-toggle input {
+            cursor: pointer;
+        }
+        
+        .column-name {
+            flex: 1;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        /* Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1999;
+            display: none;
+        }
+        
+        .overlay.active {
+            display: block;
+        }
+        
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 600px;
+            z-index: 2001;
+            display: none;
+        }
+        
+        .modal.active {
+            display: block;
+        }
+        
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1976D2;
+        }
+        
+        .modal-body {
+            padding: 24px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #1976D2;
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+        }
+        
+        textarea.form-control {
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .example-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .btn-example {
+            padding: 8px;
+            font-size: 12px;
+            background: #e3f2fd;
+            border: 1px solid #1976D2;
+            color: #1976D2;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-example:hover {
+            background: #1976D2;
+            color: white;
+        }
+        
+        /* Edição inline */
+        .editable {
+            cursor: text;
+            position: relative;
+        }
+        
+        .editable:hover {
+            background: #fff3e0 !important;
+            outline: 1px dashed #ff9800;
+        }
+        
+        .editable input {
+            width: 100%;
+            border: 2px solid #1976D2;
+            padding: 8px;
+            font-size: 13px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <i class="fas fa-chart-line"></i> AbsenteismoController
+                </div>
+                <div class="sidebar-subtitle">GrupoBiomed</div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/upload" class="nav-item">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload</span>
+                </a>
+                <a href="/dados_completo" class="nav-item active">
+                    <i class="fas fa-table"></i>
+                    <span>Análise de Dados</span>
+                </a>
+                <a href="/comparativos" class="nav-item">
+                    <i class="fas fa-balance-scale"></i>
+                    <span>Comparativos</span>
+                </a>
+                <a href="/relatorios" class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Relatórios</span>
+                </a>
+            </nav>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1 class="header-title">
+                    <i class="fas fa-table"></i>
+                    Análise Completa de Dados
+                </h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="exportarExcel()">
+                        <i class="fas fa-file-excel"></i>
+                        Exportar
+                    </button>
+                    <button class="btn btn-primary" onclick="location.reload()">
+                        <i class="fas fa-sync"></i>
+                        Recarregar
+                    </button>
+                </div>
+            </header>
+            
+            <div class="content">
+                <!-- Stats -->
+                <div class="stats-bar">
+                    <div class="stat-box">
+                        <div class="stat-value" id="statTotal">-</div>
+                        <div class="stat-label">Total Registros</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statColunas">-</div>
+                        <div class="stat-label">Colunas Visíveis</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statFiltrados">-</div>
+                        <div class="stat-label">Filtrados</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="statFiltros">0</div>
+                        <div class="stat-label">Filtros Ativos</div>
+                    </div>
+                </div>
+                
+                <!-- Toolbar -->
+                <div class="data-toolbar">
+                    <div class="toolbar-section">
+                        <select id="uploadSelect" class="form-control" style="width: 250px;" onchange="loadData()">
+                            <option value="">Todos os uploads</option>
+                        </select>
+                        
+                        <input type="text" id="searchBox" class="form-control" placeholder="🔍 Buscar em todos os campos..." 
+                               style="width: 300px;" onkeyup="searchData()">
+                    </div>
+                    
+                    <div class="toolbar-section">
+                        <button class="btn btn-secondary" onclick="clearAllFilters()">
+                            <i class="fas fa-times"></i>
+                            Limpar Filtros
+                        </button>
+                        
+                        <button class="btn btn-secondary" onclick="toggleShowAll()">
+                            <i class="fas fa-list" id="iconShowAll"></i>
+                            <span id="textShowAll">Ver Todos</span>
+                        </button>
+                        
+                        <button class="btn btn-primary" onclick="openColumnManager()">
+                            <i class="fas fa-cog"></i>
+                            Gerenciar Colunas
+                        </button>
+                        
+                        <button class="btn btn-primary" onclick="openNewColumnModal()">
+                            <i class="fas fa-plus-circle"></i>
+                            Nova Coluna
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Alert de navegação -->
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px; border-radius: 10px; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <i class="fas fa-info-circle" style="font-size: 24px;"></i>
+                        <div>
+                            <strong style="font-size: 15px;">📊 Visualização Completa Ativa!</strong>
+                            <div style="font-size: 13px; margin-top: 4px; opacity: 0.9;">
+                                • Use a <strong>BARRA DE ROLAGEM AZUL</strong> abaixo e à direita para navegar
+                                • Clique no <strong>🔍</strong> de cada coluna para filtrar
+                                • Clique duas vezes em qualquer célula para editar
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabela -->
+                <div class="table-wrapper">
+                    <div class="table-scroll" id="tableScroll">
+                        <table class="data-grid" id="dataTable">
+                            <thead id="tableHead"></thead>
+                            <tbody id="tableBody">
+                                <tr>
+                                    <td colspan="20" style="text-align: center; padding: 60px;">
+                                        <div class="spinner"></div>
+                                        <div style="margin-top: 16px; color: #666;">Carregando dados...</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Panel de Colunas -->
+    <div class="side-panel" id="columnPanel">
+        <div class="panel-header">
+            <h3 class="panel-title">
+                <i class="fas fa-columns"></i>
+                Gerenciar Colunas
+            </h3>
+            <button class="btn btn-secondary btn-icon" onclick="closeColumnManager()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-body">
+            <!-- IA Creator -->
+            <div class="ia-creator">
+                <h3>
+                    <i class="fas fa-brain"></i>
+                    Criar Colunas com IA
+                </h3>
+                <button class="ia-button" onclick="createIAColumn('genero')">
+                    <i class="fas fa-venus-mars"></i>
+                    <span>Detectar Gênero (nome termina com A = Feminino)</span>
+                </button>
+                <button class="ia-button" onclick="createIAColumn('categoria_cid')">
+                    <i class="fas fa-tags"></i>
+                    <span>Categoria do CID (Muscular, Respiratório, etc)</span>
+                </button>
+                <button class="ia-button" onclick="createIAColumn('primeiro_nome')">
+                    <i class="fas fa-user"></i>
+                    <span>Primeiro Nome</span>
+                </button>
+                <button class="ia-button" onclick="createIAColumn('mes_ano')">
+                    <i class="fas fa-calendar"></i>
+                    <span>Mês/Ano</span>
+                </button>
+            </div>
+            
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #666;">Colunas Disponíveis</h4>
+            <div class="columns-list" id="columnsList"></div>
+        </div>
+    </div>
+    
+    <!-- Modal Nova Coluna -->
+    <div class="modal" id="newColumnModal">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-plus-circle"></i>
+                Criar Nova Coluna Customizada
+            </h3>
+            <button class="btn btn-secondary btn-icon" onclick="closeNewColumnModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nome da Coluna *</label>
+                <input type="text" id="newColumnName" class="form-control" placeholder="Ex: Status, Categoria, etc">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Fórmula JavaScript *</label>
+                <textarea id="newColumnFormula" class="form-control" rows="5" 
+                          placeholder="Ex: registro.nome_funcionario.split(' ')[0]&#10;Ex: registro.dias_perdidos > 7 ? 'Longo' : 'Curto'"></textarea>
+                <small style="color: #666; font-size: 12px;">
+                    Use <code>registro.nome_do_campo</code> para acessar os dados
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Exemplos Rápidos</label>
+                <div class="example-buttons">
+                    <button class="btn-example" onclick="fillExample('primeiro_nome')">
+                        Primeiro Nome
+                    </button>
+                    <button class="btn-example" onclick="fillExample('ultimo_nome')">
+                        Último Nome
+                    </button>
+                    <button class="btn-example" onclick="fillExample('categoria_duracao')">
+                        Curto/Médio/Longo
+                    </button>
+                    <button class="btn-example" onclick="fillExample('dias_em_horas')">
+                        Dias → Horas
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeNewColumnModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="createCustomColumn()">
+                <i class="fas fa-check"></i>
+                Criar Coluna
+            </button>
+        </div>
+    </div>
+    
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+    
+    <script src="/static/js/dados_completo.js"></script>
+</body>
+</html>
+
