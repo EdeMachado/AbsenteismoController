@@ -170,7 +170,7 @@ async function loadUploads() {
                 <td>${formatDateTime(u.data_upload)}</td>
                 <td>${u.total_registros}</td>
                 <td>
-                    <a href="/preview?upload_id=${u.id}" class="btn btn-secondary btn-icon" title="Ver dados">
+                    <a href="/dados?upload_id=${u.id}" class="btn btn-secondary btn-icon" title="Ver e editar dados">
                         <i class="fas fa-eye"></i>
                     </a>
                     <button onclick="deleteUpload(${u.id})" class="btn btn-secondary btn-icon" title="Deletar" style="margin-left: 8px;">

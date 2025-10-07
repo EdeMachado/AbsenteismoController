@@ -155,6 +155,13 @@ async def comparativos_page():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+@app.get("/dados", response_class=HTMLResponse)
+async def dados_page():
+    """Página de gestão de dados"""
+    file_path = os.path.join(FRONTEND_DIR, "dados.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 # ==================== ROUTES - API ====================
 
 @app.get("/api/health")
@@ -465,6 +472,154 @@ async def export_excel(
         filename=filename,
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
+
+# ==================== ROUTES - GESTÃO DE DADOS ====================
+
+@app.get("/api/dados/todos")
+async def listar_todos_dados(
+    client_id: int = 1,
+    upload_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """Lista todos os dados com filtros"""
+    query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
+    
+    if upload_id:
+        query = query.filter(Upload.id == upload_id)
+    
+    atestados = query.order_by(Atestado.data_afastamento.desc()).all()
+    
+    # Estatísticas
+    atestados_dias = [a for a in atestados if a.tipo_info_atestado == 1]
+    atestados_horas = [a for a in atestados if a.tipo_info_atestado == 3]
+    
+    estatisticas = {
+        'total_registros': len(atestados),
+        'total_atestados_dias': len(atestados_dias),
+        'total_atestados_horas': len(atestados_horas),
+        'total_dias_perdidos': sum(a.dias_perdidos for a in atestados_dias)
+    }
+    
+    # Dados
+    dados = [
+        {
+            'id': a.id,
+            'upload_id': a.upload_id,
+            'nome_funcionario': a.nome_funcionario,
+            'cpf': a.cpf,
+            'matricula': a.matricula,
+            'setor': a.setor,
+            'cargo': a.cargo,
+            'genero': a.genero,
+            'data_afastamento': a.data_afastamento.isoformat() if a.data_afastamento else None,
+            'data_retorno': a.data_retorno.isoformat() if a.data_retorno else None,
+            'tipo_info_atestado': a.tipo_info_atestado,
+            'tipo_atestado': a.tipo_atestado,
+            'cid': a.cid,
+            'descricao_cid': a.descricao_cid,
+            'numero_dias_atestado': a.numero_dias_atestado,
+            'numero_horas_atestado': a.numero_horas_atestado,
+            'dias_perdidos': a.dias_perdidos,
+            'horas_perdidas': a.horas_perdidas
+        }
+        for a in atestados
+    ]
+    
+    return corrigir_encoding_json({
+        'dados': dados,
+        'estatisticas': estatisticas
+    })
+
+@app.get("/api/dados/{atestado_id}")
+async def obter_dado(
+    atestado_id: int,
+    db: Session = Depends(get_db)
+):
+    """Obtém um registro específico"""
+    atestado = db.query(Atestado).filter(Atestado.id == atestado_id).first()
+    
+    if not atestado:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    
+    return corrigir_encoding_json({
+        'id': atestado.id,
+        'upload_id': atestado.upload_id,
+        'nome_funcionario': atestado.nome_funcionario,
+        'cpf': atestado.cpf,
+        'matricula': atestado.matricula,
+        'setor': atestado.setor,
+        'cargo': atestado.cargo,
+        'genero': atestado.genero,
+        'data_afastamento': atestado.data_afastamento.isoformat() if atestado.data_afastamento else None,
+        'data_retorno': atestado.data_retorno.isoformat() if atestado.data_retorno else None,
+        'tipo_info_atestado': atestado.tipo_info_atestado,
+        'tipo_atestado': atestado.tipo_atestado,
+        'cid': atestado.cid,
+        'descricao_cid': atestado.descricao_cid,
+        'numero_dias_atestado': atestado.numero_dias_atestado,
+        'numero_horas_atestado': atestado.numero_horas_atestado,
+        'dias_perdidos': atestado.dias_perdidos,
+        'horas_perdidas': atestado.horas_perdidas
+    })
+
+@app.post("/api/dados")
+async def criar_dado(
+    atestado: dict,
+    db: Session = Depends(get_db)
+):
+    """Cria um novo registro"""
+    try:
+        novo = Atestado(**atestado)
+        db.add(novo)
+        db.commit()
+        db.refresh(novo)
+        
+        return {"success": True, "id": novo.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/dados/{atestado_id}")
+async def atualizar_dado(
+    atestado_id: int,
+    dados: dict,
+    db: Session = Depends(get_db)
+):
+    """Atualiza um registro"""
+    atestado = db.query(Atestado).filter(Atestado.id == atestado_id).first()
+    
+    if not atestado:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    
+    try:
+        for key, value in dados.items():
+            if hasattr(atestado, key):
+                setattr(atestado, key, value)
+        
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/dados/{atestado_id}")
+async def excluir_dado(
+    atestado_id: int,
+    db: Session = Depends(get_db)
+):
+    """Exclui um registro"""
+    atestado = db.query(Atestado).filter(Atestado.id == atestado_id).first()
+    
+    if not atestado:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    
+    try:
+        db.delete(atestado)
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
