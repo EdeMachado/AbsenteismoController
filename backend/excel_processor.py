@@ -5,6 +5,8 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any
 import re
+import json
+from collections import OrderedDict
 from .genero_detector import GeneroDetector
 
 class ExcelProcessor:
@@ -26,72 +28,48 @@ class ExcelProcessor:
             return False
     
     def padronizar_colunas(self):
-        """Padroniza nomes das colunas"""
-        # Remove espaços extras e converte para minúsculas
-        self.df.columns = self.df.columns.str.strip().str.upper()
+        """Padroniza nomes das colunas da planilha padronizada"""
+        # Mantém os nomes originais das colunas, apenas normaliza espaços
+        self.df.columns = self.df.columns.str.strip()
         
-        # Primeiro pega os campos importantes diretamente
-        if 'NOMECOMPLETO' in self.df.columns:
-            self.df['NOME_FUNCIONARIO'] = self.df['NOMECOMPLETO']
-        
-        if 'DESCCENTROCUSTO2' in self.df.columns:
-            self.df['SETOR'] = self.df['DESCCENTROCUSTO2']
-        elif 'DESCCENTROCUSTO3' in self.df.columns:
-            self.df['SETOR'] = self.df['DESCCENTROCUSTO3']
-        
-        if 'DESCCID' in self.df.columns:
-            self.df['DESCRICAO_CID'] = self.df['DESCCID']
-        
-        # Mapeamento de outras colunas
+        # Mapeamento direto dos campos da planilha padronizada (case-insensitive)
         mapeamento = {
-            'CARGO': 'CARGO',
-            'FUNÇÃO': 'CARGO',
-            'FUNCAO': 'CARGO',
-            
-            'SEXO': 'GENERO',
-            'GÊNERO': 'GENERO',
-            'GENERO': 'GENERO',
-            
-            'DATA AFASTAMENTO': 'DATA_AFASTAMENTO',
-            'DATA DE AFASTAMENTO': 'DATA_AFASTAMENTO',
-            'DT AFASTAMENTO': 'DATA_AFASTAMENTO',
-            
-            'DATA RETORNO': 'DATA_RETORNO',
-            'DATA DE RETORNO': 'DATA_RETORNO',
-            'DT RETORNO': 'DATA_RETORNO',
-            
-            'TIPO DE ATESTADO': 'TIPO_ATESTADO',
-            'TIPO ATESTADO': 'TIPO_ATESTADO',
-            'TIPO': 'TIPO_ATESTADO',
-            'TIPOINFOATEST': 'TIPO_INFO_ATESTADO',
-            'DESCTIPOINFOATEST': 'TIPO_ATESTADO',
-            
+            'NOMECOMPLETO': 'NOMECOMPLETO',
+            'DESCRIÇÃO ATESTAD': 'DESCRICAO_ATESTAD',
+            'DESCRICAO ATESTAD': 'DESCRICAO_ATESTAD',
+            'DESCRIÇÃO ATESTADO': 'DESCRICAO_ATESTAD',
+            'DESCRICAO ATESTADO': 'DESCRICAO_ATESTAD',
+            'DIAS ATESTADOS': 'DIAS_ATESTADOS',
             'CID': 'CID',
-            'CID10': 'CID',
-            
-            'NRODIASATESTADO': 'NUMERO_DIAS_ATESTADO',
-            'NRO DIAS ATESTADO': 'NUMERO_DIAS_ATESTADO',
-            'DIAS ATESTADO': 'NUMERO_DIAS_ATESTADO',
-            'QTD DIAS': 'NUMERO_DIAS_ATESTADO',
-            
-            'NROHORASATESTADO': 'NUMERO_HORAS_ATESTADO',
-            'NRO HORAS ATESTADO': 'NUMERO_HORAS_ATESTADO',
-            'HORAS ATESTADO': 'NUMERO_HORAS_ATESTADO',
-            'QTD HORAS': 'NUMERO_HORAS_ATESTADO',
-            
-            'MÉDIA HORAS PERDIDAS': 'HORAS_PERDIDAS',
-            'MEDIA HORAS PERDIDAS': 'HORAS_PERDIDAS',
-            'HORAS PERDIDAS': 'HORAS_PERDIDAS',
-            
-            'CPF': 'CPF',
-            'MATRÍCULA': 'MATRICULA',
-            'MATRICULA': 'MATRICULA',
+            'DIAGNÓSTICO': 'DIAGNOSTICO',
+            'DIAGNOSTICO': 'DIAGNOSTICO',
+            'CENTROCUST': 'CENTRO_CUSTO',
+            'CENTRO CUSTO': 'CENTRO_CUSTO',
+            'CENTROCUSTO': 'CENTRO_CUSTO',
+            'setor': 'SETOR',
+            'SETOR': 'SETOR',
+            'motivo atestado': 'MOTIVO_ATESTADO',
+            'MOTIVO ATESTADO': 'MOTIVO_ATESTADO',
+            'escala': 'ESCALA',
+            'ESCALA': 'ESCALA',
+            'Horas/dia': 'HORAS_DIA',
+            'HORAS/DIA': 'HORAS_DIA',
+            'Horas perdi': 'HORAS_PERDI',
+            'HORAS PERDI': 'HORAS_PERDI',
+            'HORAS PERDIDAS': 'HORAS_PERDI',
+            'Horas perdidas': 'HORAS_PERDI',
         }
         
-        # Renomeia as colunas
+        # Renomeia as colunas para formato padronizado (maiúsculas com underscore)
         for col_atual in self.df.columns:
-            if col_atual in mapeamento:
-                self.df.rename(columns={col_atual: mapeamento[col_atual]}, inplace=True)
+            col_normalizada = col_atual.strip()
+            if col_normalizada.upper() in mapeamento:
+                self.df.rename(columns={col_atual: mapeamento[col_normalizada.upper()]}, inplace=True)
+            else:
+                # Se não estiver no mapeamento, normaliza para maiúsculas com underscore
+                col_nova = col_normalizada.upper().replace(' ', '_').replace('/', '_')
+                if col_nova != col_normalizada:
+                    self.df.rename(columns={col_atual: col_nova}, inplace=True)
     
     def limpar_dados(self):
         """Limpa e valida os dados"""
@@ -145,40 +123,126 @@ class ExcelProcessor:
         if not self.ler_planilha():
             return []
         
+        # Guarda os nomes originais das colunas ANTES de qualquer processamento
+        # IMPORTANTE: mantém a ordem original
+        self.colunas_originais = list(self.df.columns)
+        
+        # Cria um mapeamento de colunas originais para normalizadas (para buscar valores)
+        # Guarda o DataFrame original ANTES de normalizar
+        self.df_original = self.df.copy()
+        
         self.padronizar_colunas()
+        
+        # Após padronizar, cria mapeamento das colunas originais para normalizadas
+        mapeamento_colunas = {}
+        for col_original in self.colunas_originais:
+            # Encontra a coluna normalizada correspondente
+            col_normalizada = None
+            # Tenta encontrar pelo nome original (pode ter sido renomeada)
+            if col_original in self.df.columns:
+                col_normalizada = col_original
+            else:
+                # Procura na lista de colunas normalizadas
+                for col_df in self.df.columns:
+                    # Compara sem case e sem espaços/underscores
+                    orig_clean = col_original.upper().strip().replace(' ', '_').replace('/', '_')
+                    df_clean = col_df.upper().strip().replace(' ', '_').replace('/', '_')
+                    if orig_clean == df_clean:
+                        col_normalizada = col_df
+                        break
+            mapeamento_colunas[col_original] = col_normalizada if col_normalizada else col_original
+        
         self.limpar_dados()
         self.calcular_metricas()
         
         # Converte para lista de dicionários
         registros = []
-        for _, row in self.df.iterrows():
+        
+        for idx, (_, row) in enumerate(self.df.iterrows()):
             # Detecta gênero pelo nome se não tiver coluna GENERO
             genero = ''
-            if pd.notna(row.get('GENERO')) and row.get('GENERO'):
-                genero = str(row.get('GENERO'))[:1].upper()
-            else:
-                # Detecta automaticamente pelo nome
-                nome = str(row.get('NOME_FUNCIONARIO', ''))
-                if nome:
-                    genero = GeneroDetector.detectar(nome)
+            nome_para_genero = str(row.get('NOMECOMPLETO', '')) or str(row.get('NOME_FUNCIONARIO', ''))
+            if nome_para_genero:
+                genero = GeneroDetector.detectar(nome_para_genero)
+            
+            # Salva TODAS as colunas originais da planilha em um JSON
+            # MANTÉM A ORDEM ORIGINAL DAS COLUNAS
+            # Busca valores no DataFrame ORIGINAL (antes de normalizar)
+            dados_originais_dict = OrderedDict()  # Usa OrderedDict para manter ordem
+            for col_original in self.colunas_originais:
+                # Busca o valor no DataFrame original (pelo índice da linha)
+                try:
+                    # Pega o valor da linha original usando o índice
+                    row_original = self.df_original.iloc[idx]
+                    valor = row_original[col_original] if col_original in row_original.index else None
+                except:
+                    # Se der erro, tenta buscar na coluna normalizada
+                    try:
+                        col_busca = mapeamento_colunas.get(col_original, col_original)
+                        if col_busca and col_busca in self.df.columns:
+                            valor = row.get(col_busca)
+                        else:
+                            valor = None
+                    except:
+                        valor = None
+                
+                # Converte valores para tipos Python nativos (serializável em JSON)
+                if valor is None or (isinstance(valor, (int, float)) and pd.isna(valor)):
+                    dados_originais_dict[col_original] = None
+                elif isinstance(valor, pd.Timestamp):
+                    dados_originais_dict[col_original] = valor.strftime('%Y-%m-%d') if not pd.isna(valor) else None
+                elif isinstance(valor, (int, float)):
+                    dados_originais_dict[col_original] = float(valor) if not pd.isna(valor) else None
+                else:
+                    dados_originais_dict[col_original] = str(valor) if valor is not None else None
+            
+            # Mapeia campos da planilha padronizada - busca valores nas colunas normalizadas
+            def get_valor(col_normalizada, default=''):
+                if col_normalizada and col_normalizada in self.df.columns:
+                    return row.get(col_normalizada)
+                return default
+            
+            def get_valor_float(col_normalizada, default=0):
+                val = get_valor(col_normalizada, None)
+                if val is not None and pd.notna(val):
+                    try:
+                        return float(val)
+                    except:
+                        return default
+                return default
             
             registro = {
-                'nome_funcionario': str(row.get('NOME_FUNCIONARIO', '')),
-                'cpf': str(row.get('CPF', '')),
-                'matricula': str(row.get('MATRICULA', '')),
-                'setor': str(row.get('SETOR', '')),
-                'cargo': str(row.get('CARGO', '')),
+                # Campos principais da planilha padronizada
+                'nomecompleto': str(get_valor('NOMECOMPLETO', '')),
+                'descricao_atestad': str(get_valor('DESCRICAO_ATESTAD', '')),
+                'dias_atestados': get_valor_float('DIAS_ATESTADOS', 0),
+                'cid': str(get_valor('CID', '')),
+                'diagnostico': str(get_valor('DIAGNOSTICO', '')),
+                'centro_custo': str(get_valor('CENTRO_CUSTO', '')),
+                'setor': str(get_valor('SETOR', '')),
+                'motivo_atestado': str(get_valor('MOTIVO_ATESTADO', '')),
+                'escala': str(get_valor('ESCALA', '')),
+                'horas_dia': get_valor_float('HORAS_DIA', 0),
+                'horas_perdi': get_valor_float('HORAS_PERDI', 0),
+                
+                # Campos legados (para compatibilidade)
+                'nome_funcionario': str(get_valor('NOMECOMPLETO', '')),
+                'cpf': str(get_valor('CPF', '')),
+                'matricula': str(get_valor('MATRICULA', '')),
+                'cargo': str(get_valor('CARGO', '')),
                 'genero': genero,
-                'data_afastamento': row.get('DATA_AFASTAMENTO'),
-                'data_retorno': row.get('DATA_RETORNO'),
-                'tipo_info_atestado': int(row.get('TIPO_INFO_ATESTADO', 0)) if pd.notna(row.get('TIPO_INFO_ATESTADO')) else None,
-                'tipo_atestado': str(row.get('TIPO_ATESTADO', '')),
-                'cid': str(row.get('CID', '')),
-                'descricao_cid': str(row.get('DESCRICAO_CID', '')),
-                'numero_dias_atestado': float(row.get('NUMERO_DIAS_ATESTADO', 0)),
-                'numero_horas_atestado': float(row.get('NUMERO_HORAS_ATESTADO', 0)),
-                'dias_perdidos': float(row.get('DIAS_PERDIDOS', 0)),
-                'horas_perdidas': float(row.get('HORAS_PERDIDAS', 0)),
+                'data_afastamento': get_valor('DATA_AFASTAMENTO', None),
+                'data_retorno': get_valor('DATA_RETORNO', None),
+                'tipo_info_atestado': int(get_valor_float('TIPO_INFO_ATESTADO', 0)) if get_valor('TIPO_INFO_ATESTADO', None) else None,
+                'tipo_atestado': str(get_valor('TIPO_ATESTADO', '')),
+                'descricao_cid': str(get_valor('DIAGNOSTICO', '')),
+                'numero_dias_atestado': get_valor_float('DIAS_ATESTADOS', 0),
+                'numero_horas_atestado': get_valor_float('HORAS_DIA', 0),
+                'dias_perdidos': get_valor_float('DIAS_ATESTADOS', 0),
+                'horas_perdidas': get_valor_float('HORAS_PERDI', 0),
+                
+                # Salva dados originais com TODAS as colunas na ordem original
+                'dados_originais': json.dumps(dados_originais_dict, ensure_ascii=False, default=str),
             }
             registros.append(registro)
         

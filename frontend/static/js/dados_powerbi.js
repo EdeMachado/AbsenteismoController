@@ -6,6 +6,7 @@
 let allData = [];
 let filteredData = [];
 let activeFilters = {};
+let todasColunas = []; // Todas as colunas da planilha original
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -26,10 +27,88 @@ async function loadData() {
         }
         
         const response = await fetch(url);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Erro HTTP:', response.status, errorText);
+            throw new Error(`Erro ${response.status}: ${errorText}`);
+        }
+        
         const data = await response.json();
         
         allData = data.dados || [];
         filteredData = [...allData];
+        
+        // Detecta todas as colunas dinamicamente a partir dos dados
+        // PRIORIDADE: usa a ordem que veio do backend (colunas_originais)
+        if (data.colunas_originais && data.colunas_originais.length > 0) {
+            // Usa as colunas originais da planilha EXATAMENTE na ordem que veio
+            todasColunas = data.colunas_originais;
+        } else if (allData.length > 0) {
+            // Se não vier do backend, detecta a partir dos dados
+            todasColunas = Object.keys(allData[0]);
+            // Remove campos internos do sistema
+            todasColunas = todasColunas.filter(col => 
+                !['id', 'upload_id', 'dados_originais'].includes(col.toLowerCase())
+            );
+        } else {
+            // Fallback para colunas padrão da planilha padronizada (ORDEM EXATA)
+            todasColunas = [
+                'nomecompleto',      // 1. NOMECOMPLETO
+                'descricao_atestad', // 2. DESCRIÇÃO ATESTAD
+                'dias_atestados',    // 3. DIAS ATESTADOS
+                'cid',               // 4. CID
+                'diagnostico',       // 5. DIAGNÓSTICO
+                'centro_custo',      // 6. CENTROCUST
+                'setor',             // 7. setor
+                'motivo_atestado',   // 8. motivo atestado
+                'escala',            // 9. escala
+                'horas_dia',         // 10. Horas/dia
+                'horas_perdi'        // 11. Horas perdi
+            ];
+        }
+        
+        // Ordena colunas EXATAMENTE na ordem da planilha padronizada
+        const colunasPrincipais = [
+            'nomecompleto',      // 1. NOMECOMPLETO
+            'descricao_atestad', // 2. DESCRIÇÃO ATESTAD
+            'dias_atestados',    // 3. DIAS ATESTADOS
+            'cid',               // 4. CID
+            'diagnostico',       // 5. DIAGNÓSTICO
+            'centro_custo',      // 6. CENTROCUST
+            'setor',             // 7. setor
+            'motivo_atestado',   // 8. motivo atestado
+            'escala',            // 9. escala
+            'horas_dia',         // 10. Horas/dia
+            'horas_perdi'        // 11. Horas perdi
+        ];
+        const colunasOrdenadas = [];
+        
+        // Se veio do backend com colunas_originais, usa EXATAMENTE essa ordem
+        // Não tenta reordenar - usa a ordem que veio da planilha
+        if (data.colunas_originais && data.colunas_originais.length > 0) {
+            // Já está na ordem correta, não precisa fazer nada
+            // todasColunas já foi definido acima
+        } else {
+            // Se não veio do backend, ordena usando a ordem padrão
+            const ordemFinal = [];
+            
+            // Adiciona colunas principais na ordem exata
+            colunasPrincipais.forEach(col => {
+                if (todasColunas.includes(col)) {
+                    ordemFinal.push(col);
+                }
+            });
+            
+            // Adiciona as demais colunas que não estão na lista principal (se houver)
+            todasColunas.forEach(col => {
+                if (!ordemFinal.includes(col)) {
+                    ordemFinal.push(col);
+                }
+            });
+            
+            todasColunas = ordemFinal.length > 0 ? ordemFinal : colunasPrincipais;
+        }
         
         updateStats();
         renderTable();
@@ -98,12 +177,41 @@ function setupEventListeners() {
 
 // Renderizar tabela
 function renderTable() {
+    const thead = document.getElementById('tableHead');
     const tbody = document.getElementById('tableBody');
     
+    // Renderiza cabeçalho dinamicamente
+    if (todasColunas.length > 0) {
+        thead.innerHTML = `
+            <tr>
+                ${todasColunas.map(col => `<th>${formatColumnName(col)}</th>`).join('')}
+            </tr>
+        `;
+    } else {
+        // Fallback para colunas padrão se não tiver detectado
+        thead.innerHTML = `
+            <tr>
+                <th>ID</th>
+                <th>Funcionário</th>
+                <th>CPF</th>
+                <th>Setor</th>
+                <th>Gênero</th>
+                <th>Data Afastamento</th>
+                <th>Data Retorno</th>
+                <th>Tipo</th>
+                <th>CID</th>
+                <th>Descrição CID</th>
+                <th>Dias</th>
+                <th>Horas</th>
+            </tr>
+        `;
+    }
+    
     if (filteredData.length === 0) {
+        const colspan = todasColunas.length || 12;
         tbody.innerHTML = `
             <tr>
-                <td colspan="12" style="text-align: center; padding: 40px;">
+                <td colspan="${colspan}" style="text-align: center; padding: 40px;">
                     <i class="fas fa-inbox"></i> Nenhum registro encontrado
                 </td>
             </tr>
@@ -111,22 +219,26 @@ function renderTable() {
         return;
     }
     
-    tbody.innerHTML = filteredData.map(row => `
-        <tr>
-            <td>${row.id || '-'}</td>
-            <td class="editable" data-field="nome_funcionario" data-id="${row.id}">${row.nome_funcionario || '-'}</td>
-            <td class="editable" data-field="cpf" data-id="${row.id}">${formatCPF(row.cpf) || '-'}</td>
-            <td class="editable" data-field="setor" data-id="${row.id}">${row.setor || '-'}</td>
-            <td class="editable" data-field="genero" data-id="${row.id}">${row.genero || '-'}</td>
-            <td>${formatDate(row.data_afastamento) || '-'}</td>
-            <td>${formatDate(row.data_retorno) || '-'}</td>
-            <td>${formatTipo(row.tipo_info_atestado) || '-'}</td>
-            <td class="editable" data-field="cid" data-id="${row.id}">${row.cid || '-'}</td>
-            <td class="editable" data-field="descricao_cid" data-id="${row.id}">${row.descricao_cid || '-'}</td>
-            <td>${row.numero_dias_atestado || '-'}</td>
-            <td>${row.numero_horas_atestado || '-'}</td>
-        </tr>
-    `).join('');
+    // Renderiza linhas dinamicamente
+    tbody.innerHTML = filteredData.map(row => {
+        const cells = todasColunas.map(col => {
+            const value = row[col];
+            const formattedValue = formatCellValue(value, col);
+            
+            // Define quais campos são editáveis (campos principais da planilha)
+            const editableFields = ['nomecompleto', 'descricao_atestad', 'cid', 'diagnostico', 
+                                   'centro_custo', 'setor', 'motivo_atestado', 'escala'];
+            const isEditable = editableFields.includes(col.toLowerCase());
+            
+            if (isEditable) {
+                return `<td class="editable" data-field="${col}" data-id="${row.id}">${formattedValue}</td>`;
+            } else {
+                return `<td>${formattedValue}</td>`;
+            }
+        }).join('');
+        
+        return `<tr>${cells}</tr>`;
+    }).join('');
     
     // Foca na primeira célula editável
     setTimeout(() => {
@@ -135,6 +247,79 @@ function renderTable() {
             focusCell(firstEditable);
         }
     }, 100);
+}
+
+// Formata nome da coluna para exibição
+function formatColumnName(colName) {
+    // Mapeamento de nomes técnicos para nomes COMPLETOS EM MAIÚSCULO (planilha padronizada)
+    const nomeMap = {
+        'nomecompleto': 'NOMECOMPLETO',
+        'descricao_atestad': 'DESCRIÇÃO ATESTAD',
+        'dias_atestados': 'DIAS ATESTADOS',
+        'cid': 'CID',
+        'diagnostico': 'DIAGNÓSTICO',
+        'centro_custo': 'CENTROCUST',
+        'setor': 'SETOR',
+        'motivo_atestado': 'MOTIVO ATESTADO',
+        'escala': 'ESCALA',
+        'horas_dia': 'HORAS/DIA',
+        'horas_perdi': 'HORAS PERDI',
+        // Campos legados
+        'id': 'ID',
+        'nome_funcionario': 'NOME FUNCIONÁRIO',
+        'cpf': 'CPF',
+        'genero': 'GÊNERO',
+        'data_afastamento': 'DATA AFASTAMENTO',
+        'data_retorno': 'DATA RETORNO',
+        'tipo_info_atestado': 'TIPO INFO ATESTADO',
+        'tipo_atestado': 'TIPO ATESTADO',
+        'descricao_cid': 'DESCRIÇÃO CID',
+        'numero_dias_atestado': 'NUMERO DIAS ATESTADO',
+        'numero_horas_atestado': 'NUMERO HORAS ATESTADO',
+        'dias_perdidos': 'DIAS PERDIDOS',
+        'horas_perdidas': 'HORAS PERDIDAS',
+        'matricula': 'MATRÍCULA',
+        'cargo': 'CARGO'
+    };
+    
+    // Se tiver mapeamento, usa ele
+    if (nomeMap[colName.toLowerCase()]) {
+        return nomeMap[colName.toLowerCase()];
+    }
+    
+    // Senão, formata o nome da coluna em MAIÚSCULO (remove underscores, converte para maiúsculo)
+    return colName
+        .replace(/_/g, ' ')
+        .toUpperCase();
+}
+
+// Formata valor da célula
+function formatCellValue(value, colName) {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+    
+    const col = colName.toLowerCase();
+    
+    // Formatação específica por tipo de coluna
+    if (col === 'cpf') {
+        return formatCPF(value);
+    }
+    
+    if (col.includes('data') || col.includes('datahora') || col.includes('dataemissao')) {
+        return formatDate(value);
+    }
+    
+    if (col === 'tipo_info_atestado') {
+        return formatTipo(value);
+    }
+    
+    // Para valores numéricos
+    if (typeof value === 'number') {
+        return value.toLocaleString('pt-BR');
+    }
+    
+    return String(value);
 }
 
 // Focar célula
@@ -350,20 +535,14 @@ function applyFilters() {
 
 // Exportar dados
 function exportData() {
-    const data = filteredData.map(row => ({
-        'ID': row.id,
-        'Funcionário': row.nome_funcionario,
-        'CPF': row.cpf,
-        'Setor': row.setor,
-        'Gênero': row.genero,
-        'Data Afastamento': row.data_afastamento,
-        'Data Retorno': row.data_retorno,
-        'Tipo': formatTipo(row.tipo_info_atestado),
-        'CID': row.cid,
-        'Descrição CID': row.descricao_cid,
-        'Dias': row.numero_dias_atestado,
-        'Horas': row.numero_horas_atestado
-    }));
+    // Exporta todas as colunas da planilha original
+    const data = filteredData.map(row => {
+        const exportRow = {};
+        todasColunas.forEach(col => {
+            exportRow[formatColumnName(col)] = row[col] || '';
+        });
+        return exportRow;
+    });
     
     const csv = convertToCSV(data);
     downloadCSV(csv, 'dados_atestados.csv');
@@ -537,9 +716,10 @@ function downloadCSV(csv, filename) {
 
 function showError(message) {
     const tbody = document.getElementById('tableBody');
+    const colspan = todasColunas.length || 12;
     tbody.innerHTML = `
         <tr>
-            <td colspan="11" style="text-align: center; padding: 40px; color: #dc3545;">
+            <td colspan="${colspan}" style="text-align: center; padding: 40px; color: #dc3545;">
                 <i class="fas fa-exclamation-triangle"></i> ${message}
             </td>
         </tr>

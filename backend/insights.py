@@ -19,19 +19,20 @@ class InsightsEngine:
         # 1. TOP CID mais frequente
         top_cid = self.db.query(
             Atestado.cid,
-            Atestado.descricao_cid,
+            Atestado.diagnostico,
             func.count(Atestado.id).label('qtd')
         ).join(Upload).filter(
             Upload.client_id == client_id,
-            Atestado.cid != ''
-        ).group_by(Atestado.cid, Atestado.descricao_cid).order_by(func.count(Atestado.id).desc()).first()
+            Atestado.cid != '',
+            Atestado.cid.isnot(None)
+        ).group_by(Atestado.cid, Atestado.diagnostico).order_by(func.count(Atestado.id).desc()).first()
         
         if top_cid and top_cid.qtd > 0:
             insights.append({
                 'tipo': 'alerta',
                 'icone': '🩺',
                 'titulo': f'CID {top_cid.cid} - Mais Frequente',
-                'descricao': f'{top_cid.descricao_cid or "Doença não especificada"} aparece em {top_cid.qtd} atestados ({self._percentual(top_cid.qtd, client_id)}% do total)',
+                'descricao': f'{top_cid.diagnostico or "Doença não especificada"} aparece em {top_cid.qtd} atestados ({self._percentual(top_cid.qtd, client_id)}% do total)',
                 'recomendacao': self._get_recomendacao_cid(top_cid.cid)
             })
         
@@ -99,10 +100,10 @@ class InsightsEngine:
         
         # 5. Dias perdidos alto
         total_dias = self.db.query(
-            func.sum(Atestado.dias_perdidos)
+            func.sum(Atestado.dias_atestados)
         ).join(Upload).filter(
             Upload.client_id == client_id,
-            Atestado.tipo_info_atestado == 1
+            (Atestado.dias_atestados > 0) | (Atestado.dias_perdidos > 0)
         ).scalar() or 0
         
         if total_dias > 500:

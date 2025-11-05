@@ -34,14 +34,20 @@ echo Iniciando servidor...
 echo ========================================
 echo.
 echo ✓ Servidor iniciando na porta 8000
-echo ✓ Acesse: http://localhost:8000
+echo ✓ Abrindo navegador automaticamente...
 echo.
 echo Pressione Ctrl+C para parar o servidor
 echo.
 
 cd /d "%~dp0"
+
+REM Aguarda 3 segundos e abre o navegador
+start "" "http://localhost:8000"
+
+REM Inicia o servidor
 python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 echo.
 echo Servidor encerrado.
 pause
+

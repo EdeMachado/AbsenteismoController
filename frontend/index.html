@@ -30,6 +30,10 @@
                     <i class="fas fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
+                <a href="/clientes" class="nav-item">
+                    <i class="fas fa-building"></i>
+                    <span>🏢 Clientes</span>
+                </a>
                 <a href="/upload" class="nav-item">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <span>📤 Upload Planilha</span>
@@ -81,67 +85,83 @@
                 
                 <!-- Filters -->
                 <div class="filters">
-                    <div class="filters-grid">
-                        <div class="filter-group">
-                            <label class="filter-label">Funcionário</label>
-                            <select id="filtroFuncionario" class="filter-input">
-                                <option value="">Todos</option>
-                            </select>
+                    <div class="filters-grid" style="display: grid; grid-template-columns: 140px 140px 1fr 1fr 120px; gap: 12px; align-items: end;">
+                        <div class="filter-group" style="margin: 0;">
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Mês Início</label>
+                            <input type="month" id="mesInicio" class="filter-input" style="padding: 8px 10px;">
                         </div>
-                        <div class="filter-group">
-                            <label class="filter-label">Setor</label>
-                            <select id="filtroSetor" class="filter-input">
-                                <option value="">Todos</option>
-                            </select>
+                        <div class="filter-group" style="margin: 0;">
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Mês Fim</label>
+                            <input type="month" id="mesFim" class="filter-input" style="padding: 8px 10px;">
                         </div>
-                        <div class="filter-group">
-                            <label class="filter-label">Mês Início</label>
-                            <input type="month" id="mesInicio" class="filter-input">
+                        <!-- Funcionários -->
+                        <div class="filter-group" style="margin: 0;">
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Funcionários</label>
+                            <div class="multiselect-dropdown" style="position: relative;">
+                                <div class="multiselect-trigger" onclick="toggleDropdown('funcionarios')" style="padding: 8px 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 38px;">
+                                    <span id="funcionariosText" style="color: #6c757d; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">Selecione...</span>
+                                    <i class="fas fa-chevron-down" style="color: #6c757d; transition: transform 0.3s; margin-left: 8px; flex-shrink: 0;" id="funcionariosIcon"></i>
+                                </div>
+                                <div id="dropdownFuncionarios" class="multiselect-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; margin-top: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                    <div style="padding: 8px; border-bottom: 1px solid #dee2e6; display: flex; gap: 8px;">
+                                        <button type="button" onclick="selecionarTodos('funcionarios')" style="flex: 1; padding: 6px; border: 1px solid #1a237e; color: #1a237e; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                            Todos
+                                        </button>
+                                        <button type="button" onclick="desselecionarTodos('funcionarios')" style="flex: 1; padding: 6px; border: 1px solid #6c757d; color: #6c757d; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                            Nenhum
+                                        </button>
+                                    </div>
+                                    <div id="checkboxesFuncionarios" style="padding: 8px;">
+                                        <div style="text-align: center; padding: 20px; color: #6c757d;">
+                                            <i class="fas fa-spinner fa-spin"></i> Carregando...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="filter-group">
-                            <label class="filter-label">Mês Fim</label>
-                            <input type="month" id="mesFim" class="filter-input">
+                        
+                        <!-- Setores -->
+                        <div class="filter-group" style="margin: 0;">
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Setores</label>
+                            <div class="multiselect-dropdown" style="position: relative;">
+                                <div class="multiselect-trigger" onclick="toggleDropdown('setores')" style="padding: 8px 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 38px;">
+                                    <span id="setoresText" style="color: #6c757d; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">Selecione...</span>
+                                    <i class="fas fa-chevron-down" style="color: #6c757d; transition: transform 0.3s; margin-left: 8px; flex-shrink: 0;" id="setoresIcon"></i>
+                                </div>
+                                <div id="dropdownSetores" class="multiselect-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; margin-top: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                    <div style="padding: 8px; border-bottom: 1px solid #dee2e6; display: flex; gap: 8px;">
+                                        <button type="button" onclick="selecionarTodos('setores')" style="flex: 1; padding: 6px; border: 1px solid #1a237e; color: #1a237e; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                            Todos
+                                        </button>
+                                        <button type="button" onclick="desselecionarTodos('setores')" style="flex: 1; padding: 6px; border: 1px solid #6c757d; color: #6c757d; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                            Nenhum
+                                        </button>
+                                    </div>
+                                    <div id="checkboxesSetores" style="padding: 8px;">
+                                        <div style="text-align: center; padding: 20px; color: #6c757d;">
+                                            <i class="fas fa-spinner fa-spin"></i> Carregando...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="filter-group" style="display: flex; align-items: flex-end;">
-                            <button class="btn btn-primary" onclick="aplicarFiltros()">
+                        
+                        <div class="filter-group" style="margin: 0;">
+                            <button class="btn btn-primary" onclick="aplicarFiltros()" style="width: 100%; padding: 8px 16px; font-size: 13px;">
                                 <i class="fas fa-filter"></i>
-                                Aplicar Filtros
+                                Aplicar
                             </button>
                         </div>
                     </div>
                 </div>
                 
                 <!-- KPI Cards -->
-                <div class="cards-grid">
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">Atestados DIAS</div>
-                                <div class="card-value" id="atestadosDias">-</div>
-                            </div>
-                            <div class="card-icon primary">
-                                <i class="fas fa-calendar-day"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">Atestados HORAS</div>
-                                <div class="card-value" id="atestadosHoras">-</div>
-                            </div>
-                            <div class="card-icon info">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
+                <div class="cards-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
                     <div class="card">
                         <div class="card-header">
                             <div>
                                 <div class="card-title">Dias Perdidos</div>
-                                <div class="card-value" id="diasPerdidos">-</div>
+                                <div class="card-value" id="cardDiasPerdidos">-</div>
                             </div>
                             <div class="card-icon warning">
                                 <i class="fas fa-calendar-times"></i>
@@ -153,7 +173,7 @@
                         <div class="card-header">
                             <div>
                                 <div class="card-title">Horas Perdidas</div>
-                                <div class="card-value" id="horasPerdidas">-</div>
+                                <div class="card-value" id="cardHorasPerdidas">-</div>
                             </div>
                             <div class="card-icon danger">
                                 <i class="fas fa-hourglass-half"></i>
@@ -162,40 +182,40 @@
                     </div>
                 </div>
                 
-                <!-- Charts Grid - Estilo Power BI -->
-                <div style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
+                <!-- Charts Grid - Layout Otimizado -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
                     <!-- TOP CIDs -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">TOP 10 Doenças mais Frequentes</h3>
                             <p class="chart-subtitle">Principais causas de afastamento (exceto exames/doações)</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 320px;">
+                        <div class="chart-wrapper" style="height: 350px;">
                             <canvas id="chartCids"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Evolução Mensal -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Evolução Mensal - Últimos 12 Meses</h3>
+                            <p class="chart-subtitle">Tendência de atestados e dias perdidos</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartEvolucao"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
                     <!-- TOP Setores -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">TOP 5 Setores</h3>
                             <p class="chart-subtitle">Setores com mais atestados</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 250px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartSetores"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Tipo de Atestado -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Tipo de Atestado</h3>
-                            <p class="chart-subtitle">Dias vs Horas</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 250px;">
-                            <canvas id="chartTipoAtestado"></canvas>
                         </div>
                     </div>
                     
@@ -205,7 +225,7 @@
                             <h3 class="chart-title">Por Gênero</h3>
                             <p class="chart-subtitle">Masculino vs Feminino</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 250px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartGenero"></canvas>
                         </div>
                     </div>
@@ -216,20 +236,129 @@
                             <h3 class="chart-title">Dias por Doença</h3>
                             <p class="chart-subtitle">Total de dias perdidos</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 250px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartMediaCid"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Evolução Mensal -->
-                <div class="chart-container">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Evolução Mensal - Últimos 12 Meses</h3>
-                        <p class="chart-subtitle">Tendência de atestados e dias perdidos</p>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Dias Perdidos por Funcionários -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Dias Perdidos por Funcionários</h3>
+                            <p class="chart-subtitle">TOP 10 funcionários com mais dias perdidos</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartFuncionariosDias"></canvas>
+                        </div>
                     </div>
-                    <div class="chart-wrapper" style="height: 320px;">
-                        <canvas id="chartEvolucao"></canvas>
+                    
+                    <!-- Evolução por Setor -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Evolução de Dias Perdidos por Setor</h3>
+                            <p class="chart-subtitle">Tendência dos principais setores</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartEvolucaoSetor"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Escalas com mais Atestados -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Escalas (Horários) com mais Atestados</h3>
+                            <p class="chart-subtitle">TOP 10 escalas com maior incidência</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartEscalas"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Motivos de Incidência -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Motivos de Incidência com mais Atestados</h3>
+                            <p class="chart-subtitle">Distribuição percentual dos motivos</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartMotivos"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Dias Perdidos por Centro de Custo (Setor) -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Dias Perdidos por Centro de Custo</h3>
+                            <p class="chart-subtitle">TOP 10 setores</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartCentroCusto"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Distribuição de Dias por Atestado -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Distribuição de Dias por Atestado</h3>
+                            <p class="chart-subtitle">Histograma de frequência</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartDistribuicaoDias"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Média de Dias por CID -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Média de Dias por CID</h3>
+                            <p class="chart-subtitle">Doenças com maior média de dias</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartMediaCidDias"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Dias Perdidos por Setor e Gênero -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Dias Perdidos por Setor e Gênero</h3>
+                            <p class="chart-subtitle">Comparativo entre gêneros por setor</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartSetorGenero"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Comparativo Dias vs Horas -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Comparativo: Dias vs Horas Perdidas</h3>
+                            <p class="chart-subtitle">Por setor</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartComparativoDiasHoras"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Frequência de Atestados por Funcionário -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Frequência de Atestados por Funcionário</h3>
+                            <p class="chart-subtitle">Distribuição de funcionários por número de atestados</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartFrequenciaAtestados"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -237,5 +366,18 @@
     </div>
     
     <script src="/static/js/dashboard.js"></script>
+    <script>
+        // Fecha dropdowns ao clicar fora
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.multiselect-dropdown')) {
+                document.querySelectorAll('.multiselect-dropdown-content').forEach(dd => {
+                    dd.style.display = 'none';
+                });
+                document.querySelectorAll('.multiselect-dropdown i').forEach(icon => {
+                    icon.style.transform = 'rotate(0deg)';
+                });
+            }
+        });
+    </script>
 </body>
 </html>

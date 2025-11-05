@@ -11,9 +11,25 @@ class Client(Base):
     __tablename__ = "clients"
     
     id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String(200), nullable=False)
+    nome = Column(String(200), nullable=False)  # Razão Social
     cnpj = Column(String(18), unique=True, nullable=True)
+    nome_fantasia = Column(String(200), nullable=True)
+    inscricao_estadual = Column(String(20), nullable=True)
+    inscricao_municipal = Column(String(20), nullable=True)
+    cep = Column(String(10), nullable=True)
+    endereco = Column(String(300), nullable=True)
+    numero = Column(String(20), nullable=True)
+    complemento = Column(String(100), nullable=True)
+    bairro = Column(String(100), nullable=True)
+    cidade = Column(String(100), nullable=True)
+    estado = Column(String(2), nullable=True)
+    telefone = Column(String(20), nullable=True)
+    email = Column(String(200), nullable=True)
+    situacao = Column(String(50), nullable=True)  # ATIVA, BAIXADA, etc.
+    data_abertura = Column(Date, nullable=True)
+    atividade_principal = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relationships
     uploads = relationship("Upload", back_populates="client", cascade="all, delete-orphan")
@@ -40,27 +56,37 @@ class Atestado(Base):
     id = Column(Integer, primary_key=True, index=True)
     upload_id = Column(Integer, ForeignKey("uploads.id"), nullable=False)
     
-    # Dados do funcionário
+    # Campos da planilha padronizada
+    nomecompleto = Column(String(200), nullable=True)  # NOMECOMPLETO
+    descricao_atestad = Column(String(500), nullable=True)  # DESCRIÇÃO ATESTAD
+    dias_atestados = Column(Float, default=0)  # DIAS ATESTADOS
+    cid = Column(String(10), nullable=True)  # CID
+    diagnostico = Column(String(500), nullable=True)  # DIAGNÓSTICO
+    centro_custo = Column(String(100), nullable=True)  # CENTROCUST
+    setor = Column(String(100), nullable=True)  # setor
+    motivo_atestado = Column(String(200), nullable=True)  # motivo atestado
+    escala = Column(String(50), nullable=True)  # escala
+    horas_dia = Column(Float, default=0)  # Horas/dia
+    horas_perdi = Column(Float, default=0)  # Horas perdi
+    
+    # Campos legados (para compatibilidade)
     nome_funcionario = Column(String(200), nullable=True)
     cpf = Column(String(14), nullable=True)
     matricula = Column(String(50), nullable=True)
-    setor = Column(String(100), nullable=True)
     cargo = Column(String(100), nullable=True)
-    genero = Column(String(1), nullable=True)  # M/F
-    
-    # Dados do atestado
+    genero = Column(String(1), nullable=True)
     data_afastamento = Column(Date, nullable=True)
     data_retorno = Column(Date, nullable=True)
-    tipo_info_atestado = Column(Integer, nullable=True)  # 1=Dias, 3=Horas
-    tipo_atestado = Column(String(50), nullable=True)  # Dias, Horas, etc
-    cid = Column(String(10), nullable=True)
+    tipo_info_atestado = Column(Integer, nullable=True)
+    tipo_atestado = Column(String(50), nullable=True)
     descricao_cid = Column(String(500), nullable=True)
-    
-    # Métricas
     numero_dias_atestado = Column(Float, default=0)
     numero_horas_atestado = Column(Float, default=0)
     dias_perdidos = Column(Float, default=0)
     horas_perdidas = Column(Float, default=0)
+    
+    # Dados originais da planilha (JSON com todas as colunas)
+    dados_originais = Column(Text, nullable=True)  # JSON com todas as colunas originais
     
     # Metadata
     created_at = Column(DateTime, default=datetime.now)

@@ -112,11 +112,13 @@
         }
         
         .table-container {
-            overflow-x: auto;
+            overflow-x: scroll;
             overflow-y: auto;
             max-height: 70vh;
             scrollbar-width: thick;
             scrollbar-color: #00bcf2 #f1f1f1;
+            /* Garante que a barra horizontal sempre apareça */
+            width: 100%;
         }
         
         .table-container::-webkit-scrollbar {
@@ -144,8 +146,11 @@
         }
         
         table {
-            width: 100%;
+            width: max-content;
+            min-width: 100%;
             border-collapse: collapse;
+            /* Força a tabela a ter largura suficiente para scroll horizontal */
+            white-space: nowrap;
         }
         
         th, td {
@@ -153,6 +158,8 @@
             text-align: left;
             border-bottom: 1px solid #dee2e6;
             white-space: nowrap;
+            /* Garante que as células não quebrem */
+            min-width: 100px;
         }
         
         th {
@@ -336,6 +343,8 @@
                     <i class="fas fa-table"></i> Dados dos Atestados
                     <div style="float: right; font-size: 12px; color: #6c757d; margin-top: 4px;">
                         <i class="fas fa-keyboard"></i> Use as setas para navegar, Enter para editar, Home/End para início/fim
+                        <br>
+                        <i class="fas fa-arrows-alt-h"></i> Use a barra de rolagem horizontal para ver todas as colunas
                     </div>
                 </div>
                 <div class="table-container">

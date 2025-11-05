@@ -2,21 +2,28 @@
 FastAPI Main Application - AbsenteismoController v2.0
 """
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Form
+from typing import List
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import desc, nullslast
 from typing import Optional, List
 import os
 import shutil
 import json
 from datetime import datetime
+from collections import OrderedDict
+import pandas as pd
 
 from .database import get_db, init_db
 from .models import Client, Upload, Atestado
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
+import requests
+import re
+from pydantic import BaseModel
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -283,30 +290,456 @@ async def dashboard(
     client_id: int = 1,
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
+    funcionario: Optional[List[str]] = Query(None),
+    setor: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Dashboard principal"""
-    analytics = Analytics(db)
-    insights_engine = InsightsEngine(db)
-    
-    metricas = analytics.metricas_gerais(client_id, mes_inicio, mes_fim)
-    top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim)
-    top_setores = analytics.top_setores(client_id, 5, mes_inicio, mes_fim)
-    evolucao = analytics.evolucao_mensal(client_id, 12)
-    distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim)
-    insights = insights_engine.gerar_insights(client_id)
-    
-    resultado = {
-        "metricas": metricas,
-        "top_cids": top_cids,
-        "top_setores": top_setores,
-        "evolucao_mensal": evolucao,
-        "distribuicao_genero": distribuicao_genero,
-        "insights": insights
-    }
-    
-    # Corrige encoding antes de retornar
-    return corrigir_encoding_json(resultado)
+    try:
+        analytics = Analytics(db)
+        insights_engine = InsightsEngine(db)
+        
+        # Trata cada métrica individualmente para não quebrar tudo se uma falhar
+        try:
+            metricas = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular métricas gerais: {e}")
+            metricas = {
+                "total_atestados_dias": 0,
+                "total_dias_perdidos": 0,
+                "total_horas_perdidas": 0
+            }
+        
+        try:
+            top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top CIDs: {e}")
+            top_cids = []
+        
+        try:
+            top_setores = analytics.top_setores(client_id, 5, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top setores: {e}")
+            top_setores = []
+        
+        try:
+            evolucao = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular evolução mensal: {e}")
+            evolucao = []
+        
+        try:
+            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de gênero: {e}")
+            distribuicao_genero = []
+        
+        try:
+            top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top funcionários: {e}")
+            top_funcionarios = []
+        
+        try:
+            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top escalas: {e}")
+            top_escalas = []
+        
+        try:
+            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top motivos: {e}")
+            top_motivos = []
+        
+        try:
+            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular dias por centro de custo: {e}")
+            dias_centro_custo = []
+        
+        try:
+            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de dias: {e}")
+            distribuicao_dias = []
+        
+        try:
+            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular média por CID: {e}")
+            media_cid = []
+        
+        try:
+            evolucao_setor = analytics.evolucao_por_setor(client_id, 12, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular evolução por setor: {e}")
+            evolucao_setor = {}
+        
+        try:
+            comparativo_dias_horas = analytics.comparativo_dias_horas(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular comparativo dias/horas: {e}")
+            comparativo_dias_horas = []
+        
+        try:
+            frequencia_atestados = analytics.frequencia_atestados_por_funcionario(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular frequência de atestados: {e}")
+            frequencia_atestados = []
+        
+        try:
+            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular dias por setor e gênero: {e}")
+            dias_setor_genero = []
+        
+        try:
+            insights = insights_engine.gerar_insights(client_id)
+        except Exception as e:
+            print(f"Erro ao gerar insights: {e}")
+            insights = []
+        
+        resultado = {
+            "metricas": metricas,
+            "top_cids": top_cids,
+            "top_setores": top_setores,
+            "evolucao_mensal": evolucao,
+            "distribuicao_genero": distribuicao_genero,
+            "top_funcionarios": top_funcionarios,
+            "top_escalas": top_escalas,
+            "top_motivos": top_motivos,
+            "dias_centro_custo": dias_centro_custo,
+            "distribuicao_dias": distribuicao_dias,
+            "media_cid": media_cid,
+            "evolucao_setor": evolucao_setor,
+            "comparativo_dias_horas": comparativo_dias_horas,
+            "frequencia_atestados": frequencia_atestados,
+            "dias_setor_genero": dias_setor_genero,
+            "insights": insights
+        }
+        
+        # Corrige encoding antes de retornar
+        return corrigir_encoding_json(resultado)
+        
+    except Exception as e:
+        import traceback
+        error_detail = str(e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao carregar dashboard: {error_detail}")
+
+@app.get("/api/filtros")
+async def obter_filtros(
+    client_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Retorna lista de funcionários e setores para preencher os filtros"""
+    try:
+        # Busca funcionários únicos
+        funcionarios = db.query(Atestado.nomecompleto).join(Upload).filter(
+            Upload.client_id == client_id,
+            Atestado.nomecompleto != '',
+            Atestado.nomecompleto.isnot(None)
+        ).distinct().order_by(Atestado.nomecompleto).all()
+        
+        # Busca setores únicos
+        setores = db.query(Atestado.setor).join(Upload).filter(
+            Upload.client_id == client_id,
+            Atestado.setor != '',
+            Atestado.setor.isnot(None)
+        ).distinct().order_by(Atestado.setor).all()
+        
+        return {
+            "funcionarios": [f[0] for f in funcionarios if f[0]],
+            "setores": [s[0] for s in setores if s[0]]
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar filtros: {str(e)}")
+
+# ==================== MÓDULO CLIENTES ====================
+
+class ClienteCreate(BaseModel):
+    nome: str
+    cnpj: Optional[str] = None
+    nome_fantasia: Optional[str] = None
+    inscricao_estadual: Optional[str] = None
+    inscricao_municipal: Optional[str] = None
+    cep: Optional[str] = None
+    endereco: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+    situacao: Optional[str] = None
+    data_abertura: Optional[str] = None
+    atividade_principal: Optional[str] = None
+
+@app.get("/api/clientes")
+async def listar_clientes(db: Session = Depends(get_db)):
+    """Lista todos os clientes"""
+    try:
+        clientes = db.query(Client).order_by(Client.nome).all()
+        return [
+            {
+                "id": c.id,
+                "nome": c.nome,
+                "cnpj": c.cnpj,
+                "nome_fantasia": c.nome_fantasia,
+                "cidade": c.cidade,
+                "estado": c.estado,
+                "telefone": c.telefone,
+                "email": c.email,
+                "situacao": c.situacao,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "total_uploads": len(c.uploads)
+            }
+            for c in clientes
+        ]
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao listar clientes: {str(e)}")
+
+@app.get("/api/clientes/{cliente_id}")
+async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    """Obtém um cliente específico"""
+    try:
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        return {
+            "id": cliente.id,
+            "nome": cliente.nome,
+            "cnpj": cliente.cnpj,
+            "nome_fantasia": cliente.nome_fantasia,
+            "inscricao_estadual": cliente.inscricao_estadual,
+            "inscricao_municipal": cliente.inscricao_municipal,
+            "cep": cliente.cep,
+            "endereco": cliente.endereco,
+            "numero": cliente.numero,
+            "complemento": cliente.complemento,
+            "bairro": cliente.bairro,
+            "cidade": cliente.cidade,
+            "estado": cliente.estado,
+            "telefone": cliente.telefone,
+            "email": cliente.email,
+            "situacao": cliente.situacao,
+            "data_abertura": cliente.data_abertura.isoformat() if cliente.data_abertura else None,
+            "atividade_principal": cliente.atividade_principal,
+            "created_at": cliente.created_at.isoformat() if cliente.created_at else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao obter cliente: {str(e)}")
+
+@app.post("/api/clientes")
+async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
+    """Cria um novo cliente"""
+    try:
+        # Verifica se CNPJ já existe
+        if cliente.cnpj:
+            cnpj_limpo = re.sub(r'\D', '', cliente.cnpj)
+            cliente_existente = db.query(Client).filter(Client.cnpj == cnpj_limpo).first()
+            if cliente_existente:
+                raise HTTPException(status_code=400, detail="CNPJ já cadastrado")
+        
+        # Converte data_abertura se fornecida
+        data_abertura = None
+        if cliente.data_abertura:
+            try:
+                data_abertura = datetime.strptime(cliente.data_abertura, '%Y-%m-%d').date()
+            except:
+                pass
+        
+        novo_cliente = Client(
+            nome=cliente.nome,
+            cnpj=re.sub(r'\D', '', cliente.cnpj) if cliente.cnpj else None,
+            nome_fantasia=cliente.nome_fantasia,
+            inscricao_estadual=cliente.inscricao_estadual,
+            inscricao_municipal=cliente.inscricao_municipal,
+            cep=cliente.cep,
+            endereco=cliente.endereco,
+            numero=cliente.numero,
+            complemento=cliente.complemento,
+            bairro=cliente.bairro,
+            cidade=cliente.cidade,
+            estado=cliente.estado,
+            telefone=cliente.telefone,
+            email=cliente.email,
+            situacao=cliente.situacao,
+            data_abertura=data_abertura,
+            atividade_principal=cliente.atividade_principal
+        )
+        
+        db.add(novo_cliente)
+        db.commit()
+        db.refresh(novo_cliente)
+        
+        return {
+            "id": novo_cliente.id,
+            "nome": novo_cliente.nome,
+            "cnpj": novo_cliente.cnpj,
+            "message": "Cliente criado com sucesso"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao criar cliente: {str(e)}")
+
+@app.put("/api/clientes/{cliente_id}")
+async def atualizar_cliente(cliente_id: int, cliente: ClienteCreate, db: Session = Depends(get_db)):
+    """Atualiza um cliente"""
+    try:
+        cliente_db = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente_db:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        # Verifica se CNPJ já existe em outro cliente
+        if cliente.cnpj:
+            cnpj_limpo = re.sub(r'\D', '', cliente.cnpj)
+            cliente_existente = db.query(Client).filter(
+                Client.cnpj == cnpj_limpo,
+                Client.id != cliente_id
+            ).first()
+            if cliente_existente:
+                raise HTTPException(status_code=400, detail="CNPJ já cadastrado em outro cliente")
+        
+        # Atualiza campos
+        cliente_db.nome = cliente.nome
+        cliente_db.cnpj = re.sub(r'\D', '', cliente.cnpj) if cliente.cnpj else None
+        cliente_db.nome_fantasia = cliente.nome_fantasia
+        cliente_db.inscricao_estadual = cliente.inscricao_estadual
+        cliente_db.inscricao_municipal = cliente.inscricao_municipal
+        cliente_db.cep = cliente.cep
+        cliente_db.endereco = cliente.endereco
+        cliente_db.numero = cliente.numero
+        cliente_db.complemento = cliente.complemento
+        cliente_db.bairro = cliente.bairro
+        cliente_db.cidade = cliente.cidade
+        cliente_db.estado = cliente.estado
+        cliente_db.telefone = cliente.telefone
+        cliente_db.email = cliente.email
+        cliente_db.situacao = cliente.situacao
+        if cliente.data_abertura:
+            try:
+                cliente_db.data_abertura = datetime.strptime(cliente.data_abertura, '%Y-%m-%d').date()
+            except:
+                pass
+        cliente_db.atividade_principal = cliente.atividade_principal
+        cliente_db.updated_at = datetime.now()
+        
+        db.commit()
+        db.refresh(cliente_db)
+        
+        return {
+            "id": cliente_db.id,
+            "nome": cliente_db.nome,
+            "message": "Cliente atualizado com sucesso"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar cliente: {str(e)}")
+
+@app.delete("/api/clientes/{cliente_id}")
+async def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    """Deleta um cliente"""
+    try:
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        # Verifica se tem uploads
+        if len(cliente.uploads) > 0:
+            raise HTTPException(status_code=400, detail="Não é possível deletar cliente com uploads cadastrados")
+        
+        db.delete(cliente)
+        db.commit()
+        
+        return {"message": "Cliente deletado com sucesso"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar cliente: {str(e)}")
+
+@app.get("/api/buscar-cnpj/{cnpj}")
+async def buscar_cnpj(cnpj: str):
+    """Busca dados da empresa por CNPJ usando ReceitaWS"""
+    try:
+        # Remove caracteres não numéricos
+        cnpj_limpo = re.sub(r'\D', '', cnpj)
+        
+        if len(cnpj_limpo) != 14:
+            raise HTTPException(status_code=400, detail="CNPJ deve ter 14 dígitos")
+        
+        # API ReceitaWS (gratuita, sem autenticação)
+        url = f"https://www.receitaws.com.br/v1/cnpj/{cnpj_limpo}"
+        
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Verifica se a API retornou erro
+            if 'status' in data and data['status'] == 'ERROR':
+                raise HTTPException(status_code=404, detail=data.get('message', 'CNPJ não encontrado'))
+            
+            # Formata os dados retornados
+            resultado = {
+                "nome": data.get('nome', ''),
+                "cnpj": data.get('cnpj', ''),
+                "nome_fantasia": data.get('fantasia', ''),
+                "inscricao_estadual": data.get('inscricao_estadual', ''),
+                "inscricao_municipal": data.get('inscricao_municipal', ''),
+                "cep": data.get('cep', '').replace('-', '') if data.get('cep') else '',
+                "endereco": data.get('logradouro', ''),
+                "numero": data.get('numero', ''),
+                "complemento": data.get('complemento', ''),
+                "bairro": data.get('bairro', ''),
+                "cidade": data.get('municipio', ''),
+                "estado": data.get('uf', ''),
+                "telefone": data.get('telefone', ''),
+                "email": data.get('email', ''),
+                "situacao": data.get('situacao', ''),
+                "data_abertura": data.get('abertura', ''),
+                "atividade_principal": data.get('atividade_principal', [{}])[0].get('text', '') if data.get('atividade_principal') else ''
+            }
+            
+            return resultado
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(status_code=503, detail=f"Erro ao consultar ReceitaWS: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao processar dados do CNPJ: {str(e)}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar CNPJ: {str(e)}")
+
+@app.get("/clientes")
+async def pagina_clientes():
+    """Página de gerenciamento de clientes"""
+    return FileResponse("frontend/clientes.html")
 
 @app.get("/api/preview/{upload_id}")
 async def preview_data(
@@ -505,53 +938,137 @@ async def listar_todos_dados(
     db: Session = Depends(get_db)
 ):
     """Lista todos os dados com filtros"""
-    query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
-    
-    if upload_id:
-        query = query.filter(Upload.id == upload_id)
-    
-    atestados = query.order_by(Atestado.data_afastamento.desc()).all()
-    
-    # Estatísticas
-    atestados_dias = [a for a in atestados if a.tipo_info_atestado == 1]
-    atestados_horas = [a for a in atestados if a.tipo_info_atestado == 3]
-    
-    estatisticas = {
-        'total_registros': len(atestados),
-        'total_atestados_dias': len(atestados_dias),
-        'total_atestados_horas': len(atestados_horas),
-        'total_dias_perdidos': sum(a.dias_perdidos for a in atestados_dias)
-    }
-    
-    # Dados
-    dados = [
-        {
-            'id': a.id,
-            'upload_id': a.upload_id,
-            'nome_funcionario': a.nome_funcionario,
-            'cpf': a.cpf,
-            'matricula': a.matricula,
-            'setor': a.setor,
-            'cargo': a.cargo,
-            'genero': a.genero,
-            'data_afastamento': a.data_afastamento.isoformat() if a.data_afastamento else None,
-            'data_retorno': a.data_retorno.isoformat() if a.data_retorno else None,
-            'tipo_info_atestado': a.tipo_info_atestado,
-            'tipo_atestado': a.tipo_atestado,
-            'cid': a.cid,
-            'descricao_cid': a.descricao_cid,
-            'numero_dias_atestado': a.numero_dias_atestado,
-            'numero_horas_atestado': a.numero_horas_atestado,
-            'dias_perdidos': a.dias_perdidos,
-            'horas_perdidas': a.horas_perdidas
+    try:
+        query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
+        
+        if upload_id:
+            query = query.filter(Upload.id == upload_id)
+        
+        # Ordena por data_afastamento, mas trata caso seja None
+        try:
+            # Usa nullslast para colocar None no final
+            atestados = query.order_by(nullslast(desc(Atestado.data_afastamento))).all()
+        except Exception as e:
+            print(f"Erro na ordenação, tentando sem ordenação: {e}")
+            # Se houver erro na ordenação, tenta sem ordenação
+            atestados = query.all()
+        
+        # Estatísticas - usa os novos campos da planilha padronizada
+        estatisticas = {
+            'total_registros': len(atestados),
+            'total_atestados_dias': sum((a.dias_atestados or 0) for a in atestados),  # Soma dos dias_atestados
+            'total_dias_perdidos': sum((a.dias_atestados or 0) for a in atestados)  # Mesmo valor de total_atestados_dias
         }
-        for a in atestados
-    ]
-    
-    return corrigir_encoding_json({
-        'dados': dados,
-        'estatisticas': estatisticas
-    })
+        
+        # Dados - inclui todas as colunas originais da planilha
+        dados = []
+        todas_colunas_ordenadas = []  # Lista ordenada para manter ordem
+        todas_colunas_set = set()  # Set para verificar se já adicionou
+        
+        for a in atestados:
+            try:
+                # Parse dos dados originais (JSON)
+                # Usa object_pairs_hook para manter ordem
+                dados_originais = {}
+                if a.dados_originais:
+                    try:
+                        # Parse JSON mantendo ordem (Python 3.7+ mantém ordem, mas garantimos)
+                        dados_originais = json.loads(a.dados_originais, object_pairs_hook=OrderedDict)
+                        if isinstance(dados_originais, dict):
+                            # Adiciona colunas na ordem que aparecem no dict (ordem original da planilha)
+                            for col in dados_originais.keys():
+                                if col not in todas_colunas_set:
+                                    todas_colunas_ordenadas.append(col)
+                                    todas_colunas_set.add(col)
+                    except Exception as e:
+                        print(f"Erro ao parse JSON dados_originais: {e}")
+                        dados_originais = {}
+                
+                # Cria registro com os novos campos da planilha padronizada
+                registro = {
+                    'id': a.id,
+                    'upload_id': a.upload_id,
+                    # Campos principais da planilha padronizada
+                    'nomecompleto': a.nomecompleto or '',
+                    'descricao_atestad': a.descricao_atestad or '',
+                    'dias_atestados': float(a.dias_atestados) if a.dias_atestados else 0,
+                    'cid': a.cid or '',
+                    'diagnostico': a.diagnostico or '',
+                    'centro_custo': a.centro_custo or '',
+                    'setor': a.setor or '',
+                    'motivo_atestado': a.motivo_atestado or '',
+                    'escala': a.escala or '',
+                    'horas_dia': float(a.horas_dia) if a.horas_dia else 0,
+                    'horas_perdi': float(a.horas_perdi) if a.horas_perdi else 0,
+                    # Campos legados (para compatibilidade)
+                    'nome_funcionario': a.nome_funcionario or a.nomecompleto or '',
+                    'cpf': a.cpf or '',
+                    'matricula': a.matricula or '',
+                    'cargo': a.cargo or '',
+                    'genero': a.genero or '',
+                    'data_afastamento': a.data_afastamento.isoformat() if a.data_afastamento else None,
+                    'data_retorno': a.data_retorno.isoformat() if a.data_retorno else None,
+                    'tipo_info_atestado': a.tipo_info_atestado,
+                    'tipo_atestado': a.tipo_atestado or '',
+                    'descricao_cid': a.descricao_cid or a.diagnostico or '',
+                    'numero_dias_atestado': float(a.numero_dias_atestado) if a.numero_dias_atestado else (float(a.dias_atestados) if a.dias_atestados else 0),
+                    'numero_horas_atestado': float(a.numero_horas_atestado) if a.numero_horas_atestado else (float(a.horas_dia) if a.horas_dia else 0),
+                    'dias_perdidos': float(a.dias_perdidos) if a.dias_perdidos else (float(a.dias_atestados) if a.dias_atestados else 0),
+                    'horas_perdidas': float(a.horas_perdidas) if a.horas_perdidas else (float(a.horas_perdi) if a.horas_perdi else 0),
+                }
+                
+                # Adiciona TODAS as colunas originais da planilha na ordem original
+                # Usa OrderedDict para garantir ordem
+                registro_final = OrderedDict()
+                
+                # Adiciona colunas originais PRIMEIRO na ordem que aparecem (ordem da planilha)
+                for col_original in dados_originais.keys():
+                    registro_final[col_original] = dados_originais[col_original]
+                
+                # Depois adiciona campos processados (para compatibilidade)
+                for key in registro.keys():
+                    if key != 'dados_originais' and key not in registro_final:
+                        registro_final[key] = registro[key]
+                
+                dados.append(dict(registro_final))  # Converte para dict normal
+            except Exception as e:
+                print(f"Erro ao processar registro {a.id}: {e}")
+                continue
+        
+        # ORDEM EXATA DA PLANILHA - usa a ordem que veio dos dados originais
+        # Se não tiver colunas originais, usa a ordem padrão
+        if todas_colunas_ordenadas:
+            # Usa a ordem que veio dos dados originais (primeira ocorrência)
+            todas_colunas_list = todas_colunas_ordenadas
+        else:
+            # Fallback para ordem padrão
+            todas_colunas_list = [
+                'nomecompleto',      # 1. NOMECOMPLETO
+                'descricao_atestad', # 2. DESCRIÇÃO ATESTAD
+                'dias_atestados',    # 3. DIAS ATESTADOS
+                'cid',               # 4. CID
+                'diagnostico',       # 5. DIAGNÓSTICO
+                'centro_custo',      # 6. CENTROCUST
+                'setor',             # 7. setor
+                'motivo_atestado',   # 8. motivo atestado
+                'escala',            # 9. escala
+                'horas_dia',         # 10. Horas/dia
+                'horas_perdi'        # 11. Horas perdi
+            ]
+        
+        resultado = {
+            'dados': dados,
+            'estatisticas': estatisticas,
+            'colunas_originais': todas_colunas_list  # Lista de todas as colunas da planilha
+        }
+        
+        return corrigir_encoding_json(resultado)
+        
+    except Exception as e:
+        import traceback
+        error_detail = str(e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao carregar dados: {error_detail}")
 
 @app.get("/api/dados/{atestado_id}")
 async def obter_dado(
