@@ -120,7 +120,7 @@
                 
                 <!-- Export Options -->
                 <div class="export-grid">
-                    <div class="export-card" onclick="exportarPDF()">
+                    <div class="export-card" onclick="exportarPDF(event)">
                         <div class="export-icon pdf">
                             <i class="fas fa-file-pdf"></i>
                         </div>
@@ -130,7 +130,7 @@
                         </div>
                     </div>
                     
-                    <div class="export-card" onclick="exportarExcel()">
+                    <div class="export-card" onclick="exportarExcel(event)">
                         <div class="export-icon excel">
                             <i class="fas fa-file-excel"></i>
                         </div>
@@ -140,7 +140,7 @@
                         </div>
                     </div>
                     
-                    <div class="export-card" onclick="exportarPowerPoint()">
+                    <div class="export-card" onclick="exportarPowerPoint(event)">
                         <div class="export-icon pptx">
                             <i class="fas fa-file-powerpoint"></i>
                         </div>
@@ -194,8 +194,13 @@
             }
         });
         
-        async function exportarPDF() {
+        async function exportarPDF(event) {
             try {
+                // Verificar autenticação
+                if (typeof checkAuth === 'function' && !checkAuth()) {
+                    return;
+                }
+                
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
@@ -207,16 +212,54 @@
                 }
                 if (upload) url += `&upload_id=${upload}`;
                 
-                // Mostrar loading
-                const btn = event.target.closest('.export-card');
-                const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i><br>Gerando PDF...</div>';
-                btn.style.pointerEvents = 'none';
+                // Encontrar o botão que foi clicado
+                let btn = null;
+                if (event) {
+                    // event.currentTarget é o elemento com o onclick
+                    if (event.currentTarget && event.currentTarget.classList.contains('export-card')) {
+                        btn = event.currentTarget;
+                    } else if (event.target) {
+                        // Se clicou em um elemento dentro, busca o card pai
+                        btn = event.target.closest('.export-card');
+                    }
+                }
+                // Fallback: buscar o primeiro export-card para PDF
+                if (!btn) {
+                    btn = document.querySelector('.export-card[onclick*="exportarPDF"]');
+                }
                 
-                // Fazer download
-                const response = await fetch(url);
+                const originalHTML = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i><br>Gerando PDF...</div>';
+                    btn.style.pointerEvents = 'none';
+                }
+                
+                // Obter token de autenticação
+                const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
+                
+                if (!token) {
+                    alert('Você precisa estar logado para exportar relatórios.');
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                // Preparar headers
+                const headers = {
+                    'Authorization': `Bearer ${token}`
+                };
+                
+                // Fazer download com autenticação
+                const response = await fetch(url, {
+                    headers: headers
+                });
+                
                 if (!response.ok) {
-                    throw new Error('Erro ao gerar PDF');
+                    if (response.status === 401) {
+                        alert('Sessão expirada. Por favor, faça login novamente.');
+                        window.location.href = '/login';
+                        return;
+                    }
+                    throw new Error(`Erro ao gerar PDF: ${response.status} ${response.statusText}`);
                 }
                 
                 const blob = await response.blob();
@@ -230,21 +273,32 @@
                 window.URL.revokeObjectURL(downloadUrl);
                 
                 // Restaurar botão
-                btn.innerHTML = originalHTML;
-                btn.style.pointerEvents = 'auto';
+                if (btn) {
+                    btn.innerHTML = originalHTML;
+                    btn.style.pointerEvents = 'auto';
+                }
                 
             } catch (error) {
                 console.error('Erro:', error);
-                alert('Erro ao exportar PDF. Verifique se você está logado.');
+                alert(`Erro ao exportar PDF: ${error.message}`);
+                
                 // Restaurar botão
-                const btn = event.target.closest('.export-card');
-                btn.innerHTML = btn.innerHTML.replace(/<div.*?<\/div>/, '');
-                btn.style.pointerEvents = 'auto';
+                const btn = document.querySelector('.export-card[onclick*="exportarPDF"]');
+                if (btn) {
+                    const originalHTML = btn.getAttribute('data-original-html') || '<i class="fas fa-file-pdf"></i><br>Exportar PDF';
+                    btn.innerHTML = originalHTML;
+                    btn.style.pointerEvents = 'auto';
+                }
             }
         }
         
-        async function exportarExcel() {
+        async function exportarExcel(event) {
             try {
+                // Verificar autenticação
+                if (typeof checkAuth === 'function' && !checkAuth()) {
+                    return;
+                }
+                
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
@@ -256,16 +310,54 @@
                 }
                 if (upload) url += `&upload_id=${upload}`;
                 
-                // Mostrar loading
-                const btn = event.target.closest('.export-card');
-                const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i><br>Gerando Excel...</div>';
-                btn.style.pointerEvents = 'none';
+                // Encontrar o botão que foi clicado
+                let btn = null;
+                if (event) {
+                    // event.currentTarget é o elemento com o onclick
+                    if (event.currentTarget && event.currentTarget.classList.contains('export-card')) {
+                        btn = event.currentTarget;
+                    } else if (event.target) {
+                        // Se clicou em um elemento dentro, busca o card pai
+                        btn = event.target.closest('.export-card');
+                    }
+                }
+                // Fallback: buscar o primeiro export-card para Excel
+                if (!btn) {
+                    btn = document.querySelector('.export-card[onclick*="exportarExcel"]');
+                }
                 
-                // Fazer download
-                const response = await fetch(url);
+                const originalHTML = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i><br>Gerando Excel...</div>';
+                    btn.style.pointerEvents = 'none';
+                }
+                
+                // Obter token de autenticação
+                const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
+                
+                if (!token) {
+                    alert('Você precisa estar logado para exportar relatórios.');
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                // Preparar headers
+                const headers = {
+                    'Authorization': `Bearer ${token}`
+                };
+                
+                // Fazer download com autenticação
+                const response = await fetch(url, {
+                    headers: headers
+                });
+                
                 if (!response.ok) {
-                    throw new Error('Erro ao gerar Excel');
+                    if (response.status === 401) {
+                        alert('Sessão expirada. Por favor, faça login novamente.');
+                        window.location.href = '/login';
+                        return;
+                    }
+                    throw new Error(`Erro ao gerar Excel: ${response.status} ${response.statusText}`);
                 }
                 
                 const blob = await response.blob();
@@ -279,21 +371,121 @@
                 window.URL.revokeObjectURL(downloadUrl);
                 
                 // Restaurar botão
-                btn.innerHTML = originalHTML;
-                btn.style.pointerEvents = 'auto';
+                if (btn) {
+                    btn.innerHTML = originalHTML;
+                    btn.style.pointerEvents = 'auto';
+                }
                 
             } catch (error) {
                 console.error('Erro:', error);
-                alert('Erro ao exportar Excel. Verifique se você está logado.');
+                alert(`Erro ao exportar Excel: ${error.message}`);
+                
                 // Restaurar botão
-                const btn = event.target.closest('.export-card');
-                btn.innerHTML = btn.innerHTML.replace(/<div.*?<\/div>/, '');
-                btn.style.pointerEvents = 'auto';
+                const btn = document.querySelector('.export-card[onclick*="exportarExcel"]');
+                if (btn) {
+                    const originalHTML = btn.getAttribute('data-original-html') || '<i class="fas fa-file-excel"></i><br>Exportar Excel';
+                    btn.innerHTML = originalHTML;
+                    btn.style.pointerEvents = 'auto';
+                }
             }
         }
         
-        async function exportarPowerPoint() {
-            alert('Funcionalidade de export PowerPoint será implementada em breve!');
+        async function exportarPowerPoint(event) {
+            try {
+                // Verificar autenticação
+                if (typeof checkAuth === 'function' && !checkAuth()) {
+                    return;
+                }
+                
+                const periodo = document.getElementById('periodoRelatorio').value;
+                const upload = document.getElementById('uploadRelatorio').value;
+                
+                let url = '/api/export/pptx?client_id=1';
+                if (periodo) {
+                    url += `&mes=${periodo}`;
+                } else if (mesInicio && mesFim) {
+                    url += `&mes_inicio=${mesInicio}&mes_fim=${mesFim}`;
+                }
+                if (upload) url += `&upload_id=${upload}`;
+                
+                // Encontrar o botão que foi clicado
+                let btn = null;
+                if (event) {
+                    // event.currentTarget é o elemento com o onclick
+                    if (event.currentTarget && event.currentTarget.classList.contains('export-card')) {
+                        btn = event.currentTarget;
+                    } else if (event.target) {
+                        // Se clicou em um elemento dentro, busca o card pai
+                        btn = event.target.closest('.export-card');
+                    }
+                }
+                // Fallback: buscar o primeiro export-card para PowerPoint
+                if (!btn) {
+                    btn = document.querySelector('.export-card[onclick*="exportarPowerPoint"]');
+                }
+                
+                const originalHTML = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i><br>Gerando PowerPoint...</div>';
+                    btn.style.pointerEvents = 'none';
+                }
+                
+                // Obter token de autenticação
+                const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
+                
+                if (!token) {
+                    alert('Você precisa estar logado para exportar relatórios.');
+                    window.location.href = '/login';
+                    return;
+                }
+                
+                // Preparar headers
+                const headers = {
+                    'Authorization': `Bearer ${token}`
+                };
+                
+                // Fazer download com autenticação
+                const response = await fetch(url, {
+                    headers: headers
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        alert('Sessão expirada. Por favor, faça login novamente.');
+                        window.location.href = '/login';
+                        return;
+                    }
+                    throw new Error(`Erro ao gerar PowerPoint: ${response.status} ${response.statusText}`);
+                }
+                
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `apresentacao_absenteismo_${new Date().toISOString().split('T')[0]}.pptx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+                
+                // Restaurar botão
+                if (btn) {
+                    btn.innerHTML = originalHTML;
+                    btn.style.pointerEvents = 'auto';
+                }
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                alert(`Erro ao exportar PowerPoint: ${error.message}`);
+                
+                // Restaurar botão
+                const btn = document.querySelector('.export-card[onclick*="exportarPowerPoint"]');
+                if (btn) {
+                    const originalHTML = btn.getAttribute('data-original-html') || '<i class="fas fa-file-powerpoint"></i><br>Exportar PowerPoint';
+                    btn.innerHTML = originalHTML;
+                    btn.style.pointerEvents = 'auto';
+                }
+            }
         }
         
         // Carregar uploads
