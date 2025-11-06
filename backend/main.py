@@ -1408,11 +1408,66 @@ async def export_excel(
         analytics = Analytics(db)
         report_gen = ReportGenerator()
         
-        # Busca dados e métricas
+        # Busca todos os dados (igual ao PDF)
         metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
-        top_cids = analytics.top_cids(client_id, mes_inicio, mes_fim, None, None)
-        top_funcionarios = analytics.top_funcionarios(client_id, mes_inicio, mes_fim, None, None)
-        top_setores = analytics.top_setores(client_id, mes_inicio, mes_fim, None, None)
+        top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, None, None)
+        top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, None, None)
+        top_setores = analytics.top_setores(client_id, 10, mes_inicio, mes_fim, None, None)
+        
+        # Busca outros dados
+        evolucao_mensal = []
+        try:
+            evolucao_mensal = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        distribuicao_genero = []
+        try:
+            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        top_escalas = []
+        try:
+            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        top_motivos = []
+        try:
+            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        dias_centro_custo = []
+        try:
+            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        distribuicao_dias = []
+        try:
+            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        media_cid = []
+        try:
+            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        top_cids_dias = []
+        try:
+            top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        dias_setor_genero = []
+        try:
+            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, None, None)
+        except:
+            pass
         
         # Busca dados completos
         query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
@@ -1446,14 +1501,16 @@ async def export_excel(
         dados_relatorio = {
             'top_cids': top_cids,
             'top_funcionarios': top_funcionarios,
-            'top_setores': top_setores
-        }
-        
-        metricas_relatorio = {
-            **metricas_gerais,
-            'top_cids': top_cids,
-            'top_funcionarios': top_funcionarios,
-            'top_setores': top_setores
+            'top_setores': top_setores,
+            'evolucao_mensal': evolucao_mensal,
+            'distribuicao_genero': distribuicao_genero,
+            'top_escalas': top_escalas,
+            'top_motivos': top_motivos,
+            'dias_centro_custo': dias_centro_custo,
+            'distribuicao_dias': distribuicao_dias,
+            'media_cid': media_cid,
+            'top_cids_dias': top_cids_dias,
+            'dias_setor_genero': dias_setor_genero
         }
         
         # Gerar arquivo
@@ -1465,7 +1522,7 @@ async def export_excel(
         
         # Usar gerador de relatórios
         periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
-        success = report_gen.generate_excel_report(filepath, dados, metricas_relatorio, periodo)
+        success = report_gen.generate_excel_report(filepath, dados, metricas_gerais, dados_relatorio, periodo)
         
         if not success:
             raise HTTPException(status_code=500, detail="Erro ao gerar relatório Excel")
@@ -1500,65 +1557,128 @@ async def export_pdf(
         # Busca dados e métricas (igual à apresentação)
         insights_engine = InsightsEngine(db)
         
+        # Busca todos os dados (igual à apresentação)
         metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
         top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, None, None)
         top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, None, None)
         top_setores = analytics.top_setores(client_id, 10, mes_inicio, mes_fim, None, None)
         
-        # Busca evolução mensal para gráfico
+        # Busca evolução mensal
         evolucao_mensal = []
         try:
             evolucao_mensal = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, None, None)
-        except:
-            pass
+        except Exception as e:
+            print(f"Erro ao calcular evolução mensal: {e}")
         
-        # Busca insights
+        # Busca distribuição por gênero
+        distribuicao_genero = []
+        try:
+            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de gênero: {e}")
+        
+        # Busca top escalas
+        top_escalas = []
+        try:
+            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular top escalas: {e}")
+        
+        # Busca top motivos
+        top_motivos = []
+        try:
+            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular top motivos: {e}")
+        
+        # Busca dias por centro de custo
+        dias_centro_custo = []
+        try:
+            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular dias por centro de custo: {e}")
+        
+        # Busca distribuição de dias
+        distribuicao_dias = []
+        try:
+            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de dias: {e}")
+        
+        # Busca média por CID
+        media_cid = []
+        try:
+            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular média por CID: {e}")
+        
+        # Busca top CIDs para dias (dias por doença)
+        top_cids_dias = []
+        try:
+            top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular top CIDs para dias: {e}")
+        
+        # Busca dias por setor e gênero
+        dias_setor_genero = []
+        try:
+            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular dias por setor e gênero: {e}")
+        
+        # Busca insights gerais
         insights = []
         try:
             insights = insights_engine.gerar_insights(client_id)
-            # Adiciona análises dos gráficos
-            if top_cids:
-                analise_cids = insights_engine.gerar_analise_grafico('top_cids', top_cids, metricas_gerais)
-                if analise_cids:
-                    partes = analise_cids.split('💡')
-                    insights.append({
-                        'tipo': 'analise',
-                        'icone': '📊',
-                        'titulo': 'Análise: TOP 10 Doenças Mais Frequentes',
-                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_cids.replace('**', ''),
-                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
-                    })
-            if top_funcionarios:
-                analise_func = insights_engine.gerar_analise_grafico('funcionarios_dias', top_funcionarios, metricas_gerais)
-                if analise_func:
-                    partes = analise_func.split('💡')
-                    insights.append({
-                        'tipo': 'analise',
-                        'icone': '👤',
-                        'titulo': 'Análise: Dias Perdidos por Funcionário',
-                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_func.replace('**', ''),
-                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
-                    })
-            if evolucao_mensal:
-                analise_evol = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_mensal, metricas_gerais)
-                if analise_evol:
-                    partes = analise_evol.split('💡')
-                    insights.append({
-                        'tipo': 'analise',
-                        'icone': '📈',
-                        'titulo': 'Análise: Evolução Mensal',
-                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_evol.replace('**', ''),
-                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
-                    })
         except Exception as e:
-            print(f"Erro ao gerar insights: {e}")
+            print(f"Erro ao gerar insights gerais: {e}")
+        
+        # Adiciona análises de todos os gráficos
+        tipos_graficos = [
+            ('top_cids', top_cids, '📊', 'TOP 10 Doenças Mais Frequentes'),
+            ('funcionarios_dias', top_funcionarios, '👤', 'Dias Perdidos por Funcionário'),
+            ('evolucao_mensal', evolucao_mensal, '📈', 'Evolução Mensal'),
+            ('top_setores', top_setores, '🏢', 'TOP 5 Setores'),
+            ('genero', distribuicao_genero, '👥', 'Distribuição por Gênero'),
+            ('dias_doenca', top_cids_dias, '🩺', 'Dias por Doença'),
+            ('escalas', top_escalas, '⏰', 'Escalas com Mais Atestados'),
+            ('motivos', top_motivos, '📋', 'Motivos de Incidência'),
+            ('centro_custo', dias_centro_custo, '💰', 'Dias Perdidos por Centro de Custo'),
+            ('distribuicao_dias', distribuicao_dias, '📊', 'Distribuição de Dias por Atestado'),
+            ('media_cid', media_cid, '📊', 'Média de Dias por CID'),
+            ('setor_genero', dias_setor_genero, '👥', 'Dias Perdidos por Setor e Gênero'),
+        ]
+        
+        for tipo_grafico, dados_grafico, icone, titulo in tipos_graficos:
+            if dados_grafico:
+                try:
+                    analise = insights_engine.gerar_analise_grafico(tipo_grafico, dados_grafico, metricas_gerais)
+                    if analise:
+                        partes = analise.split('💡')
+                        insights.append({
+                            'tipo': 'analise',
+                            'icone': icone,
+                            'titulo': f'Análise: {titulo}',
+                            'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
+                            'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                        })
+                except Exception as e:
+                    print(f"Erro ao gerar análise para {tipo_grafico}: {e}")
         
         # Preparar dados para relatório
         dados_relatorio = {
             'top_cids': top_cids,
             'top_funcionarios': top_funcionarios,
             'top_setores': top_setores,
-            'evolucao_mensal': evolucao_mensal
+            'evolucao_mensal': evolucao_mensal,
+            'distribuicao_genero': distribuicao_genero,
+            'top_escalas': top_escalas,
+            'top_motivos': top_motivos,
+            'dias_centro_custo': dias_centro_custo,
+            'distribuicao_dias': distribuicao_dias,
+            'media_cid': media_cid,
+            'top_cids_dias': top_cids_dias,
+            'dias_setor_genero': dias_setor_genero
         }
         
         # Gerar arquivo
@@ -1572,7 +1692,7 @@ async def export_pdf(
         periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
         
         # Gerar PDF com gráficos e insights
-        success = report_gen.generate_pdf_report(filepath, dados_relatorio, metricas_gerais, insights, periodo)
+        success = report_gen.generate_pdf_report(filepath, dados_relatorio, metricas_gerais, insights, periodo, insights_engine)
         
         if not success:
             raise HTTPException(status_code=500, detail="Erro ao gerar relatório PDF")
@@ -1588,6 +1708,177 @@ async def export_pdf(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao exportar PDF: {str(e)}")
+
+@app.get("/api/export/pptx")
+async def export_pptx(
+    client_id: int = 1,
+    mes: Optional[str] = None,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    upload_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Exporta apresentação completa para PowerPoint"""
+    try:
+        analytics = Analytics(db)
+        report_gen = ReportGenerator()
+        
+        # Busca dados e métricas (igual ao PDF)
+        insights_engine = InsightsEngine(db)
+        
+        # Busca todos os dados (igual ao PDF)
+        metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
+        top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, None, None)
+        top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, None, None)
+        top_setores = analytics.top_setores(client_id, 10, mes_inicio, mes_fim, None, None)
+        
+        # Busca evolução mensal
+        evolucao_mensal = []
+        try:
+            evolucao_mensal = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular evolução mensal: {e}")
+        
+        # Busca distribuição por gênero
+        distribuicao_genero = []
+        try:
+            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de gênero: {e}")
+        
+        # Busca top escalas
+        top_escalas = []
+        try:
+            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular top escalas: {e}")
+        
+        # Busca top motivos
+        top_motivos = []
+        try:
+            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular top motivos: {e}")
+        
+        # Busca dias por centro de custo
+        dias_centro_custo = []
+        try:
+            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular dias por centro de custo: {e}")
+        
+        # Busca distribuição de dias
+        distribuicao_dias = []
+        try:
+            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de dias: {e}")
+        
+        # Busca média por CID
+        media_cid = []
+        try:
+            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular média por CID: {e}")
+        
+        # Busca top CIDs para dias (dias por doença)
+        top_cids_dias = []
+        try:
+            top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular top CIDs para dias: {e}")
+        
+        # Busca dias por setor e gênero
+        dias_setor_genero = []
+        try:
+            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, None, None)
+        except Exception as e:
+            print(f"Erro ao calcular dias por setor e gênero: {e}")
+        
+        # Busca insights gerais
+        insights = []
+        try:
+            insights = insights_engine.gerar_insights(client_id)
+        except Exception as e:
+            print(f"Erro ao gerar insights gerais: {e}")
+        
+        # Adiciona análises de todos os gráficos
+        tipos_graficos = [
+            ('top_cids', top_cids, '📊', 'TOP 10 Doenças Mais Frequentes'),
+            ('funcionarios_dias', top_funcionarios, '👤', 'Dias Perdidos por Funcionário'),
+            ('evolucao_mensal', evolucao_mensal, '📈', 'Evolução Mensal'),
+            ('top_setores', top_setores, '🏢', 'TOP 5 Setores'),
+            ('genero', distribuicao_genero, '👥', 'Distribuição por Gênero'),
+            ('dias_doenca', top_cids_dias, '🩺', 'Dias por Doença'),
+            ('escalas', top_escalas, '⏰', 'Escalas com Mais Atestados'),
+            ('motivos', top_motivos, '📋', 'Motivos de Incidência'),
+            ('centro_custo', dias_centro_custo, '💰', 'Dias Perdidos por Centro de Custo'),
+            ('distribuicao_dias', distribuicao_dias, '📊', 'Distribuição de Dias por Atestado'),
+            ('media_cid', media_cid, '📊', 'Média de Dias por CID'),
+            ('setor_genero', dias_setor_genero, '👥', 'Dias Perdidos por Setor e Gênero'),
+        ]
+        
+        for tipo_grafico, dados_grafico, icone, titulo in tipos_graficos:
+            if dados_grafico:
+                try:
+                    analise = insights_engine.gerar_analise_grafico(tipo_grafico, dados_grafico, metricas_gerais)
+                    if analise:
+                        partes = analise.split('💡')
+                        insights.append({
+                            'tipo': 'analise',
+                            'icone': icone,
+                            'titulo': f'Análise: {titulo}',
+                            'texto': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
+                            'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
+                            'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                        })
+                except Exception as e:
+                    print(f"Erro ao gerar análise para {tipo_grafico}: {e}")
+        
+        # Preparar dados para relatório
+        dados_relatorio = {
+            'top_cids': top_cids,
+            'top_funcionarios': top_funcionarios,
+            'top_setores': top_setores,
+            'evolucao_mensal': evolucao_mensal,
+            'distribuicao_genero': distribuicao_genero,
+            'top_escalas': top_escalas,
+            'top_motivos': top_motivos,
+            'dias_centro_custo': dias_centro_custo,
+            'distribuicao_dias': distribuicao_dias,
+            'media_cid': media_cid,
+            'top_cids_dias': top_cids_dias,
+            'dias_setor_genero': dias_setor_genero
+        }
+        
+        # Gerar arquivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"apresentacao_absenteismo_{timestamp}.pptx"
+        filepath = os.path.join(EXPORTS_DIR, filename)
+        
+        os.makedirs(EXPORTS_DIR, exist_ok=True)
+        
+        # Gerar período
+        periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
+        
+        # Gerar PowerPoint com gráficos e insights
+        success = report_gen.generate_powerpoint_report(filepath, dados_relatorio, metricas_gerais, insights, periodo, insights_engine)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Erro ao gerar relatório PowerPoint")
+        
+        return FileResponse(
+            path=filepath,
+            filename=filename,
+            media_type='application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao exportar: {str(e)}")
 
 # ==================== ROUTES - COMPARATIVOS ====================
 
