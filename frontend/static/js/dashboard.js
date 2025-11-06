@@ -96,7 +96,13 @@ async function carregarDashboard() {
         // Renderiza cards
         renderizarCards(data.metricas || {});
         
-        // Renderiza gráficos
+        // Armazena alertas para o menu (não renderiza aqui)
+        window.alertasData = data.alertas || [];
+        if (typeof carregarAlertasMenu === 'function') {
+            carregarAlertasMenu();
+        }
+        
+        // Renderiza insights
         renderizarInsights(data.insights || []);
         renderizarChartCids(data.top_cids || []);
         renderizarChartSetores(data.top_setores || []);
@@ -197,10 +203,25 @@ function renderizarChartCids(dados) {
                     callbacks: {
                         title: function(context) {
                             const index = context[0].dataIndex;
-                            return `${dados[index].cid} - ${dados[index].descricao || 'Não especificado'}`;
+                            const item = dados[index];
+                            return `CID ${item.cid || 'N/A'}`;
                         },
                         label: function(context) {
-                            return `Atestados: ${context.parsed.x}`;
+                            const index = context.dataIndex;
+                            const item = dados[index];
+                            const diagnostico = item.descricao || item.diagnostico || 'Não especificado';
+                            return [
+                                `Diagnóstico: ${diagnostico}`,
+                                `Quantidade: ${item.quantidade || 0} atestados`
+                            ];
+                        },
+                        afterLabel: function(context) {
+                            const index = context.dataIndex;
+                            const item = dados[index];
+                            if (item.dias_perdidos) {
+                                return `Dias perdidos: ${item.dias_perdidos}`;
+                            }
+                            return '';
                         }
                     }
                 }
@@ -506,11 +527,14 @@ function renderizarChartMotivos(dados) {
                         generateLabels: function(chart) {
                             const data = chart.data;
                             if (data.labels.length && data.datasets.length) {
+                                const total = top10.reduce((sum, m) => sum + (m.quantidade || 0), 0);
                                 return data.labels.map((label, i) => {
                                     const dataset = data.datasets[0];
-                                    const value = dataset.data[i];
+                                    const motivo = top10[i];
+                                    const quantidade = motivo.quantidade || 0;
+                                    const percentual = total > 0 ? ((quantidade / total) * 100).toFixed(1) : 0;
                                     return {
-                                        text: `${label} (${value}%)`,
+                                        text: `${label} - ${percentual}% (${quantidade} atestados)`,
                                         fillStyle: dataset.backgroundColor[i],
                                         hidden: false,
                                         index: i
@@ -526,9 +550,12 @@ function renderizarChartMotivos(dados) {
                         label: function(context) {
                             const index = context.dataIndex;
                             const motivo = top10[index];
+                            const total = top10.reduce((sum, m) => sum + (m.quantidade || 0), 0);
+                            const percentual = total > 0 ? ((motivo.quantidade || 0) / total * 100).toFixed(1) : 0;
                             return [
-                                `Percentual: ${context.parsed}%`,
-                                `Quantidade: ${motivo.quantidade || 0} atestados`
+                                `Motivo: ${motivo.motivo || 'N/A'}`,
+                                `Quantidade: ${motivo.quantidade || 0} atestados`,
+                                `Percentual: ${percentual}%`
                             ];
                         }
                     }
@@ -632,7 +659,7 @@ function renderizarChartMediaCidDias(dados) {
             datasets: [{
                 label: 'Média de Dias',
                 data: dados.map(d => d.media_dias || 0),
-                backgroundColor: CORES_EMPRESA.primaryDarkest,
+                backgroundColor: CORES_EMPRESA.primary,  // Azul Marinho
                 borderRadius: 6
             }]
         },
@@ -877,7 +904,8 @@ function renderizarChartSetorGenero(dados) {
     
     const setores = setoresOrdenados.map(s => s.setor);
     const generos = ['M', 'F'];
-    const cores = { 'M': CORES_EMPRESA.masculino, 'F': CORES_EMPRESA.feminino };
+    // Azul Marinho para Masculino, Verde Oliva para Feminino
+    const cores = { 'M': CORES_EMPRESA.primary, 'F': CORES_EMPRESA.secondary };
     
     // Prepara dados com percentuais
     const datasets = generos.map(genero => {
@@ -1033,6 +1061,12 @@ async function aplicarFiltros() {
         renderizarChartComparativoDiasHoras(data.comparativo_dias_horas || []);
         renderizarChartFrequenciaAtestados(data.frequencia_atestados || []);
         renderizarChartSetorGenero(data.dias_setor_genero || []);
+        
+        // Armazena alertas para o menu
+        window.alertasData = data.alertas || [];
+        if (typeof carregarAlertasMenu === 'function') {
+            carregarAlertasMenu();
+        }
         
     } catch (error) {
         console.error('Erro ao aplicar filtros:', error);

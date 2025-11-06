@@ -3,243 +3,376 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apresentação - Absenteísmo Controller</title>
+    <title>Apresentação - AbsenteismoController</title>
     
+    <!-- Styles -->
     <link rel="stylesheet" href="/static/css/main.css">
+    
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     
     <style>
-        body { background: #1a1a2e; overflow: hidden; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a237e;
+            color: #333;
+            overflow: hidden;
+        }
+        
         .apresentacao-container {
             width: 100vw;
             height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: 40px;
-            color: white;
+            background: #F5F7FA;
         }
+        
         .apresentacao-header {
-            text-align: center;
-            margin-bottom: 30px;
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 100;
         }
-        .apresentacao-title {
-            font-size: 42px;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-        .apresentacao-subtitle {
+        
+        .apresentacao-header h1 {
             font-size: 20px;
-            color: rgba(255,255,255,0.7);
+            font-weight: 600;
         }
-        .slide {
-            display: none;
+        
+        .slide-indicator {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .apresentacao-content {
             flex: 1;
-            animation: fadeIn 0.5s;
-        }
-        .slide.active {
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            padding: 24px;
+            gap: 24px;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
-        .apresentacao-kpis {
+        
+        .slide-header {
+            padding: 20px 24px;
+            border-bottom: 2px solid #e0e0e0;
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+        }
+        
+        .slide-header h2 {
+            font-size: 24px;
+            color: #1a237e;
+            margin-bottom: 4px;
+        }
+        
+        .slide-header p {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .slide-body {
+            flex: 1;
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: 1fr;
+            grid-template-rows: 2fr 1fr;
+            gap: 24px;
+            padding: 24px;
+            overflow: hidden;
+        }
+        
+        .chart-container-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 100%;
+            max-height: 450px;
+            position: relative;
+        }
+        
+        .analise-container {
+            background: #f8f9fa;
+            border-left: 4px solid #556B2F;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+        
+        .analise-container h3 {
+            font-size: 18px;
+            color: #1a237e;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .analise-texto {
+            font-size: 15px;
+            line-height: 1.8;
+            color: #333;
+            white-space: pre-line;
+        }
+        
+        .analise-texto strong {
+            color: #1a237e;
+            font-weight: 600;
+        }
+        
+        .apresentacao-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn-nav {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .btn-nav:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .btn-nav:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-prev {
+            background: #556B2F;
+            color: white;
+        }
+        
+        .btn-next {
+            background: #1a237e;
+            color: white;
+        }
+        
+        .btn-exit {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #6c757d;
+        }
+        
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .kpis-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
-            margin-bottom: 30px;
+            padding: 20px;
         }
-        .apresentacao-kpi {
-            background: rgba(255,255,255,0.1);
-            border-radius: 16px;
-            padding: 28px;
+        
+        .kpi-card {
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
             text-align: center;
-            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
-        .apresentacao-kpi-value {
-            font-size: 44px;
+        
+        .kpi-card h3 {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+        
+        .kpi-card .valor {
+            font-size: 36px;
             font-weight: 700;
             margin-bottom: 8px;
         }
-        .apresentacao-kpi-label {
-            font-size: 14px;
-            color: rgba(255,255,255,0.7);
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        
+        .kpi-card .label {
+            font-size: 12px;
+            opacity: 0.8;
         }
-        .apresentacao-chart {
-            background: rgba(255,255,255,0.1);
-            border-radius: 16px;
-            padding: 32px;
-            backdrop-filter: blur(10px);
-            flex: 1;
-        }
-        .chart-title-pres {
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .btn-nav {
-            position: fixed;
-            bottom: 40px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: none;
-            padding: 16px 32px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            backdrop-filter: blur(10px);
-        }
-        .btn-nav:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        .btn-prev { left: 40px; }
-        .btn-next { right: 40px; }
-        .btn-exit {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .btn-exit:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        .slide-indicator {
-            position: fixed;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
+        
+        .acoes-content {
             display: flex;
-            gap: 12px;
+            flex-direction: column;
+            height: 100%;
+            padding: 40px;
+            overflow-y: auto;
         }
-        .dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.3);
+        
+        .acoes-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #6B8E23;
+        }
+        
+        .acoes-tab {
+            padding: 12px 24px;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+            font-size: 14px;
             cursor: pointer;
+            transition: all 0.3s;
         }
-        .dot.active {
-            background: rgba(255,255,255,0.9);
+        
+        .acoes-tab.active {
+            background: #6B8E23;
+            color: white;
+        }
+        
+        .acoes-tab.inactive {
+            background: white;
+            color: #1a237e;
+            border: 2px dashed #dee2e6;
+            border-bottom: none;
+        }
+        
+        .acoes-texto {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #333;
+            margin-bottom: 30px;
+            text-align: justify;
+        }
+        
+        .acoes-lista {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .acoes-lista li {
+            padding: 12px 0;
+            padding-left: 30px;
+            position: relative;
+            font-size: 16px;
+            line-height: 1.8;
+            color: #333;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .acoes-lista li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: #6B8E23;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #6c757d;
+        }
+        
+        .loading i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <button class="btn-exit" onclick="window.location.href='/'">
-        <i class="fas fa-times"></i> Sair da Apresentação
-    </button>
-    
     <div class="apresentacao-container">
         <div class="apresentacao-header">
-            <div class="apresentacao-title">Relatório de Absenteísmo</div>
-            <div class="apresentacao-subtitle">GrupoBiomed</div>
-        </div>
-        
-        <div class="apresentacao-kpis" style="grid-template-columns: repeat(4, 1fr);">
-            <div class="apresentacao-kpi">
-                <div class="apresentacao-kpi-value" id="presAtestadosDias">-</div>
-                <div class="apresentacao-kpi-label">Atestados DIAS</div>
-            </div>
-            <div class="apresentacao-kpi">
-                <div class="apresentacao-kpi-value" id="presAtestadosHoras">-</div>
-                <div class="apresentacao-kpi-label">Atestados HORAS</div>
-            </div>
-            <div class="apresentacao-kpi">
-                <div class="apresentacao-kpi-value" id="presDias">-</div>
-                <div class="apresentacao-kpi-label">Dias Perdidos</div>
-            </div>
-            <div class="apresentacao-kpi">
-                <div class="apresentacao-kpi-value" id="presHoras">-</div>
-                <div class="apresentacao-kpi-label">Horas Perdidas</div>
+            <h1>
+                <i class="fas fa-chart-line"></i>
+                Apresentação Executiva - Absenteísmo
+            </h1>
+            <div class="slide-indicator">
+                <span id="slideAtual">1</span> / <span id="totalSlides">0</span>
             </div>
         </div>
         
-        <div class="apresentacao-chart">
-            <canvas id="presChart"></canvas>
+        <div class="apresentacao-content">
+            <div id="slideContent" class="slide-content">
+                <div class="loading">
+                    <i class="fas fa-spinner"></i>
+                    <p>Carregando apresentação...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="apresentacao-controls">
+            <button class="btn-nav btn-prev" onclick="slideAnterior()" id="btnPrev">
+                <i class="fas fa-chevron-left"></i>
+                Anterior
+            </button>
+            <button class="btn-nav btn-exit" onclick="sairApresentacao()">
+                <i class="fas fa-times"></i>
+                Sair
+            </button>
+            <button class="btn-nav btn-next" onclick="proximoSlide()" id="btnNext">
+                Próximo
+                <i class="fas fa-chevron-right"></i>
+            </button>
         </div>
     </div>
     
-    <script>
-        let presChart;
-        
-        async function carregarApresentacao() {
-            try {
-                const response = await fetch('/api/dashboard?client_id=1');
-                const data = await response.json();
-                
-                document.getElementById('presAtestadosDias').textContent = data.metricas.total_atestados_dias;
-                document.getElementById('presAtestadosHoras').textContent = data.metricas.total_atestados_horas;
-                document.getElementById('presDias').textContent = Math.round(data.metricas.total_dias_perdidos);
-                document.getElementById('presHoras').textContent = Math.round(data.metricas.total_horas_perdidas).toLocaleString('pt-BR');
-                
-                const ctx = document.getElementById('presChart');
-                
-                if (presChart) presChart.destroy();
-                
-                presChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.evolucao_mensal.map(d => d.mes),
-                        datasets: [{
-                            label: 'Atestados',
-                            data: data.evolucao_mensal.map(d => d.quantidade),
-                            borderColor: '#4CAF50',
-                            backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 6,
-                            pointHoverRadius: 8,
-                            borderWidth: 3
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    color: 'rgba(255,255,255,0.7)',
-                                    font: { size: 16 }
-                                },
-                                grid: {
-                                    color: 'rgba(255,255,255,0.1)'
-                                }
-                            },
-                            x: {
-                                ticks: {
-                                    color: 'rgba(255,255,255,0.7)',
-                                    font: { size: 16 }
-                                },
-                                grid: {
-                                    color: 'rgba(255,255,255,0.1)'
-                                }
-                            }
-                        }
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Erro:', error);
-            }
-        }
-        
-        document.addEventListener('DOMContentLoaded', carregarApresentacao);
-    </script>
+    <script src="/static/js/apresentacao.js"></script>
 </body>
 </html>

@@ -58,28 +58,40 @@
             
             <nav class="sidebar-nav">
                 <a href="/" class="nav-item">
-                    <i class="fas fa-home"></i>
+                    <i class="fas fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
+                <a href="/clientes" class="nav-item">
+                    <i class="fas fa-building"></i>
+                    <span>🏢 Clientes</span>
+                </a>
+                <a href="/apresentacao" class="nav-item">
+                    <i class="fas fa-tv"></i>
+                    <span>📊 Apresentação</span>
+                </a>
                 <a href="/upload" class="nav-item">
-                    <i class="fas fa-upload"></i>
-                    <span>Upload</span>
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span>📤 Upload Planilha</span>
+                </a>
+                <a href="/dados_powerbi" class="nav-item">
+                    <i class="fas fa-table"></i>
+                    <span>📋 Meus Dados</span>
                 </a>
                 <a href="/funcionarios" class="nav-item">
                     <i class="fas fa-users"></i>
-                    <span>Funcionários</span>
+                    <span>👥 Funcionários</span>
                 </a>
                 <a href="/comparativos" class="nav-item">
                     <i class="fas fa-balance-scale"></i>
-                    <span>Comparativos</span>
+                    <span>⚖️ Comparativos</span>
                 </a>
-                <a href="/relatorios" class="nav-item active">
+                <a href="/relatorios" class="nav-item">
                     <i class="fas fa-file-alt"></i>
-                    <span>Relatórios</span>
+                    <span>📄 Relatórios</span>
                 </a>
-                <a href="/apresentacao" class="nav-item">
-                    <i class="fas fa-presentation-screen"></i>
-                    <span>Apresentação</span>
+                <a href="/configuracoes" class="nav-item">
+                    <i class="fas fa-cog"></i>
+                    <span>⚙️ Configurações</span>
                 </a>
             </nav>
         </aside>
@@ -166,24 +178,117 @@
         </main>
     </div>
     
+    <script src="/static/js/auth.js"></script>
     <script>
+        let mesInicio = null;
+        let mesFim = null;
+        
+        // Atualizar campos de período
+        document.getElementById('periodoRelatorio').addEventListener('change', function() {
+            if (this.value) {
+                mesInicio = this.value;
+                mesFim = this.value;
+            } else {
+                mesInicio = null;
+                mesFim = null;
+            }
+        });
+        
         async function exportarPDF() {
-            alert('Funcionalidade de export PDF será implementada em breve!');
+            try {
+                const periodo = document.getElementById('periodoRelatorio').value;
+                const upload = document.getElementById('uploadRelatorio').value;
+                
+                let url = '/api/export/pdf?client_id=1';
+                if (periodo) {
+                    url += `&mes=${periodo}`;
+                } else if (mesInicio && mesFim) {
+                    url += `&mes_inicio=${mesInicio}&mes_fim=${mesFim}`;
+                }
+                if (upload) url += `&upload_id=${upload}`;
+                
+                // Mostrar loading
+                const btn = event.target.closest('.export-card');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i><br>Gerando PDF...</div>';
+                btn.style.pointerEvents = 'none';
+                
+                // Fazer download
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Erro ao gerar PDF');
+                }
+                
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `relatorio_absenteismo_${new Date().toISOString().split('T')[0]}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+                
+                // Restaurar botão
+                btn.innerHTML = originalHTML;
+                btn.style.pointerEvents = 'auto';
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro ao exportar PDF. Verifique se você está logado.');
+                // Restaurar botão
+                const btn = event.target.closest('.export-card');
+                btn.innerHTML = btn.innerHTML.replace(/<div.*?<\/div>/, '');
+                btn.style.pointerEvents = 'auto';
+            }
         }
         
         async function exportarExcel() {
-            const periodo = document.getElementById('periodoRelatorio').value;
-            const upload = document.getElementById('uploadRelatorio').value;
-            
-            let url = '/api/export/excel?client_id=1';
-            if (periodo) url += `&mes=${periodo}`;
-            if (upload) url += `&upload_id=${upload}`;
-            
             try {
-                window.location.href = url;
+                const periodo = document.getElementById('periodoRelatorio').value;
+                const upload = document.getElementById('uploadRelatorio').value;
+                
+                let url = '/api/export/excel?client_id=1';
+                if (periodo) {
+                    url += `&mes=${periodo}`;
+                } else if (mesInicio && mesFim) {
+                    url += `&mes_inicio=${mesInicio}&mes_fim=${mesFim}`;
+                }
+                if (upload) url += `&upload_id=${upload}`;
+                
+                // Mostrar loading
+                const btn = event.target.closest('.export-card');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i><br>Gerando Excel...</div>';
+                btn.style.pointerEvents = 'none';
+                
+                // Fazer download
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Erro ao gerar Excel');
+                }
+                
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `relatorio_absenteismo_${new Date().toISOString().split('T')[0]}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+                
+                // Restaurar botão
+                btn.innerHTML = originalHTML;
+                btn.style.pointerEvents = 'auto';
+                
             } catch (error) {
                 console.error('Erro:', error);
-                alert('Erro ao exportar Excel');
+                alert('Erro ao exportar Excel. Verifique se você está logado.');
+                // Restaurar botão
+                const btn = event.target.closest('.export-card');
+                btn.innerHTML = btn.innerHTML.replace(/<div.*?<\/div>/, '');
+                btn.style.pointerEvents = 'auto';
             }
         }
         
@@ -198,6 +303,9 @@
                 const select = document.getElementById('uploadRelatorio');
                 select.innerHTML = '<option value="">Último upload</option>' +
                     uploads.map(u => `<option value="${u.id}">${u.filename} - ${u.mes_referencia}</option>`).join('');
+            })
+            .catch(error => {
+                console.error('Erro ao carregar uploads:', error);
             });
     </script>
 </body>

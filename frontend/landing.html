@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AbsenteismoController - Gestão de Absenteísmo</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #5c6bc0 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .landing-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        .landing-header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a237e;
+        }
+        
+        .logo i {
+            font-size: 32px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .btn-landing {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn-primary-landing {
+            background: #1a237e;
+            color: white;
+        }
+        
+        .btn-primary-landing:hover {
+            background: #283593;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
+        }
+        
+        .btn-secondary-landing {
+            background: white;
+            color: #1a237e;
+            border: 2px solid #1a237e;
+        }
+        
+        .btn-secondary-landing:hover {
+            background: #f5f5f5;
+        }
+        
+        /* Hero Section */
+        .hero {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 40px;
+            text-align: center;
+            color: white;
+        }
+        
+        .hero-content {
+            max-width: 900px;
+        }
+        
+        .hero h1 {
+            font-size: 56px;
+            font-weight: 800;
+            margin-bottom: 24px;
+            line-height: 1.2;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .hero p {
+            font-size: 22px;
+            margin-bottom: 40px;
+            line-height: 1.6;
+            opacity: 0.95;
+        }
+        
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        /* Features */
+        .features {
+            background: white;
+            padding: 80px 40px;
+        }
+        
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 42px;
+            color: #1a237e;
+            margin-bottom: 60px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            color: #1a237e;
+            margin-bottom: 20px;
+        }
+        
+        .feature-card h3 {
+            font-size: 24px;
+            color: #1a237e;
+            margin-bottom: 16px;
+        }
+        
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        /* Footer */
+        .landing-footer {
+            background: #1a237e;
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .landing-footer p {
+            opacity: 0.9;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 36px;
+            }
+            
+            .hero p {
+                font-size: 18px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-container">
+        <!-- Header -->
+        <header class="landing-header">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                <span>AbsenteismoController</span>
+            </div>
+            <div class="header-actions">
+                <a href="/login" class="btn-landing btn-secondary-landing">
+                    <i class="fas fa-sign-in-alt"></i> Entrar
+                </a>
+                <a href="/login" class="btn-landing btn-primary-landing">
+                    <i class="fas fa-rocket"></i> Começar Agora
+                </a>
+            </div>
+        </header>
+        
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Gestão Inteligente de Absenteísmo</h1>
+                <p>
+                    Sistema completo para análise, controle e gestão de absenteísmo empresarial. 
+                    Transforme dados em insights acionáveis para melhorar a saúde ocupacional da sua empresa.
+                </p>
+                <div class="hero-buttons">
+                    <a href="/login" class="btn-landing btn-primary-landing" style="font-size: 18px; padding: 16px 32px;">
+                        <i class="fas fa-arrow-right"></i> Acessar Sistema
+                    </a>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Features -->
+        <section class="features">
+            <div class="features-container">
+                <h2>Funcionalidades Principais</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <h3>Dashboard Interativo</h3>
+                        <p>Visualize métricas e indicadores em tempo real com gráficos interativos e análises detalhadas.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-file-upload"></i>
+                        </div>
+                        <h3>Upload Automático</h3>
+                        <p>Processamento inteligente de planilhas Excel com padronização e limpeza automática de dados.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h3>Análises IA</h3>
+                        <p>Insights automáticos e recomendações baseadas em inteligência artificial para gestão proativa.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3>Gestão de Clientes</h3>
+                        <p>Suporte multi-tenant para gerenciar múltiplos clientes com dados isolados e seguros.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-presentation"></i>
+                        </div>
+                        <h3>Apresentações</h3>
+                        <p>Modo apresentação profissional com slides automatizados e análises prontas para reuniões.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-filter"></i>
+                        </div>
+                        <h3>Filtros Avançados</h3>
+                        <p>Filtre por período, funcionários, setores e muito mais para análises precisas e personalizadas.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Footer -->
+        <footer class="landing-footer">
+            <p>&copy; 2025 AbsenteismoController - GrupoBiomed. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+</body>
+</html>
+

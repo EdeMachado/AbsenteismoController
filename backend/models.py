@@ -1,7 +1,7 @@
 """
 Database models
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Date
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -93,3 +93,28 @@ class Atestado(Base):
     
     # Relationships
     upload = relationship("Upload", back_populates="atestados")
+
+class User(Base):
+    """Usuário do sistema"""
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, nullable=False, index=True)
+    email = Column(String(200), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    nome_completo = Column(String(200), nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    last_login = Column(DateTime, nullable=True)
+    
+class Config(Base):
+    """Configurações do sistema"""
+    __tablename__ = "configs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    chave = Column(String(100), unique=True, nullable=False, index=True)
+    valor = Column(Text, nullable=True)
+    descricao = Column(String(500), nullable=True)
+    tipo = Column(String(50), default="string")  # string, number, boolean, json
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

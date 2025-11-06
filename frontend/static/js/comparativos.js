@@ -165,30 +165,38 @@ function renderizarGraficoComparativo(data) {
     
     if (chartComparativo) chartComparativo.destroy();
     
+    // Usa cores da empresa
+    const CORES_EMPRESA = {
+        primary: '#1a237e',  // Azul marinho
+        secondary: '#6B8E23'  // Verde oliva
+    };
+    
     chartComparativo = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['Atestados DIAS', 'Atestados HORAS', 'Dias Perdidos', 'Horas Perdidas'],
+            labels: ['Total Atestados', 'Atestados (Dias)', 'Dias Perdidos', 'Horas Perdidas'],
             datasets: [
                 {
-                    label: 'Período 1',
+                    label: `Período 1 (${data.periodo1.inicio} a ${data.periodo1.fim})`,
                     data: [
+                        data.periodo1.total_atestados,
                         data.periodo1.total_atestados_dias,
-                        data.periodo1.total_atestados_horas,
-                        data.periodo1.total_dias_perdidos,
-                        data.periodo1.total_horas_perdidas / 10  // Dividir para escala
+                        Math.round(data.periodo1.total_dias_perdidos),
+                        Math.round(data.periodo1.total_horas_perdidas)
                     ],
-                    backgroundColor: '#1976D2'
+                    backgroundColor: CORES_EMPRESA.primary,
+                    borderRadius: 6
                 },
                 {
-                    label: 'Período 2',
+                    label: `Período 2 (${data.periodo2.inicio} a ${data.periodo2.fim})`,
                     data: [
+                        data.periodo2.total_atestados,
                         data.periodo2.total_atestados_dias,
-                        data.periodo2.total_atestados_horas,
-                        data.periodo2.total_dias_perdidos,
-                        data.periodo2.total_horas_perdidas / 10
+                        Math.round(data.periodo2.total_dias_perdidos),
+                        Math.round(data.periodo2.total_horas_perdidas)
                     ],
-                    backgroundColor: '#FF9800'
+                    backgroundColor: CORES_EMPRESA.secondary,
+                    borderRadius: 6
                 }
             ]
         },
@@ -197,12 +205,43 @@ function renderizarGraficoComparativo(data) {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        font: { size: 12 },
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                // Formata números grandes
+                                if (context.parsed.y >= 1000) {
+                                    label += context.parsed.y.toLocaleString('pt-BR');
+                                } else {
+                                    label += context.parsed.y;
+                                }
+                            }
+                            return label;
+                        }
+                    }
                 }
             },
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            if (value >= 1000) {
+                                return value.toLocaleString('pt-BR');
+                            }
+                            return value;
+                        }
+                    }
                 }
             }
         }

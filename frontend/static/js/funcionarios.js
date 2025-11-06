@@ -55,6 +55,11 @@ function renderizarFuncionarios(dados) {
             <td>${Math.round(f.dias_perdidos)}</td>
             <td>${Math.round(f.horas_perdidas).toLocaleString('pt-BR')}</td>
             <td>${getBadge(f.quantidade)}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='/perfil_funcionario?nome=${encodeURIComponent(f.nome)}'" title="Ver Perfil">
+                    <i class="fas fa-user-circle"></i> Perfil
+                </button>
+            </td>
         </tr>
     `).join('');
 }

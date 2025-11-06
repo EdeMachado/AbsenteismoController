@@ -43,9 +43,10 @@ class Analytics:
         result = query.first()
         
         # Extrai valores (None vira 0)
-        total_dias = float(result.total_dias or 0) if result and result.total_dias else 0.0
-        total_horas = float(result.total_horas or 0) if result and result.total_horas else 0.0
-        total_registros = int(result.total_registros or 0) if result else 0
+        # Usa float() para garantir precisão, evita arredondar antes de retornar
+        total_dias = float(result.total_dias or 0) if result and result.total_dias is not None else 0.0
+        total_horas = float(result.total_horas or 0) if result and result.total_horas is not None else 0.0
+        total_registros = int(result.total_registros or 0) if result and result.total_registros is not None else 0
         
         # Conta funcionários únicos
         funcionarios_query = self.db.query(Atestado.nomecompleto).join(Upload).filter(
@@ -63,11 +64,14 @@ class Analytics:
         funcionarios_unicos = len(set([f[0] for f in funcionarios_query.all() if f[0]]))
         
         # Retorna métricas
+        # Para horas e dias, arredonda apenas para 2 decimais, mas preserva o valor exato para cálculos
+        # IMPORTANTE: Não usa round() que pode causar diferenças - deixa o frontend arredondar
         return {
-            'total_atestados_dias': round(total_dias, 2),
-            'total_dias_perdidos': round(total_dias, 2),  # Mesmo valor
-            'total_horas_perdidas': round(total_horas, 2),
-            'total_atestados': total_registros,
+            'total_atestados_dias': total_dias,  # Soma dos dias (pode ter decimais)
+            'total_dias_perdidos': total_dias,  # Mesmo valor
+            'total_horas_perdidas': total_horas,  # Soma das horas (pode ter decimais)
+            'total_atestados': total_registros,  # Número de registros (linhas da planilha)
+            'total_registros': total_registros,  # Alias para compatibilidade
             'funcionarios_afetados': funcionarios_unicos
         }
     

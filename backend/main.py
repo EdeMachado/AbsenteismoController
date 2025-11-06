@@ -17,13 +17,23 @@ from collections import OrderedDict
 import pandas as pd
 
 from .database import get_db, init_db
-from .models import Client, Upload, Atestado
+from .models import Client, Upload, Atestado, User, Config
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
+from .report_generator import ReportGenerator
+from .alerts import AlertasSystem
+from .auth import (
+    authenticate_user, create_access_token, get_current_active_user,
+    get_current_admin_user, get_config_value, set_config_value,
+    get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
+)
+from datetime import timedelta
 import requests
 import re
 from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Request
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -95,13 +105,54 @@ async def startup_event():
         client = Client(id=1, nome="GrupoBiomed", cnpj="00.000.000/0001-00")
         db.add(client)
         db.commit()
+    # Cria usuário admin padrão se não existir
+    admin = db.query(User).filter(User.username == "admin").first()
+    if not admin:
+        admin = User(
+            username="admin",
+            email="admin@grupobiomed.com",
+            password_hash=get_password_hash("admin123"),
+            nome_completo="Administrador",
+            is_active=True,
+            is_admin=True
+        )
+        db.add(admin)
+        db.commit()
+    # Configurações padrão
+    if not db.query(Config).filter(Config.chave == "nome_sistema").first():
+        set_config_value(db, "nome_sistema", "AbsenteismoController", "Nome do sistema", "string")
+        set_config_value(db, "empresa", "GrupoBiomed", "Nome da empresa", "string")
+        set_config_value(db, "email_contato", "contato@grupobiomed.com", "Email de contato", "string")
+        set_config_value(db, "tema_escuro", "false", "Tema escuro ativado", "boolean")
+        set_config_value(db, "itens_por_pagina", "50", "Itens por página", "number")
     db.close()
 
 # ==================== ROUTES - FRONTEND ====================
 
+@app.get("/landing", response_class=HTMLResponse)
+async def landing_page():
+    """Landing page - Página inicial"""
+    file_path = os.path.join(FRONTEND_DIR, "landing.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    """Página de login"""
+    file_path = os.path.join(FRONTEND_DIR, "login.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/configuracoes", response_class=HTMLResponse)
+async def configuracoes_page(current_user: User = Depends(get_current_active_user)):
+    """Página de configurações"""
+    file_path = os.path.join(FRONTEND_DIR, "configuracoes.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    """Página principal"""
+    """Página principal - Dashboard"""
     file_path = os.path.join(FRONTEND_DIR, "index.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
@@ -156,7 +207,7 @@ async def funcionarios_page():
         return HTMLResponse(content=f.read())
 
 @app.get("/comparativos", response_class=HTMLResponse)
-async def comparativos_page():
+async def comparativos_page(current_user: User = Depends(get_current_active_user)):
     """Página de comparativos"""
     file_path = os.path.join(FRONTEND_DIR, "comparativos.html")
     with open(file_path, "r", encoding="utf-8") as f:
@@ -198,6 +249,135 @@ async def auto_processor_page():
 async def health_check():
     """Health check"""
     return {"status": "ok", "version": "2.0.0"}
+
+# ==================== AUTHENTICATION API ====================
+
+@app.post("/api/auth/login")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Login de usuário"""
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Usuário ou senha incorretos",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "nome_completo": user.nome_completo,
+            "is_admin": user.is_admin
+        }
+    }
+
+@app.get("/api/auth/me")
+async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
+    """Retorna informações do usuário atual"""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "nome_completo": current_user.nome_completo,
+        "is_admin": current_user.is_admin,
+        "last_login": current_user.last_login.isoformat() if current_user.last_login else None
+    }
+
+@app.post("/api/auth/logout")
+async def logout(current_user: User = Depends(get_current_active_user)):
+    """Logout (client-side deve remover o token)"""
+    return {"message": "Logout realizado com sucesso"}
+
+# ==================== CONFIGURATIONS API ====================
+
+@app.get("/api/config")
+async def get_config(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Retorna todas as configurações"""
+    configs = db.query(Config).all()
+    result = {}
+    for config in configs:
+        result[config.chave] = {
+            "valor": get_config_value(db, config.chave),
+            "tipo": config.tipo,
+            "descricao": config.descricao
+        }
+    return result
+
+@app.get("/api/config/{chave}")
+async def get_config_value_api(chave: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Retorna valor de uma configuração específica"""
+    valor = get_config_value(db, chave)
+    return {"chave": chave, "valor": valor}
+
+@app.put("/api/config/{chave}")
+async def update_config(
+    chave: str,
+    valor: str = Form(...),
+    descricao: str = Form(None),
+    tipo: str = Form("string"),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Atualiza uma configuração (apenas admin)"""
+    set_config_value(db, chave, valor, descricao, tipo)
+    return {"message": f"Configuração {chave} atualizada com sucesso"}
+
+# ==================== USERS API ====================
+
+@app.get("/api/users")
+async def list_users(current_user: User = Depends(get_current_admin_user), db: Session = Depends(get_db)):
+    """Lista todos os usuários (apenas admin)"""
+    users = db.query(User).all()
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "nome_completo": u.nome_completo,
+            "is_active": u.is_active,
+            "is_admin": u.is_admin,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "last_login": u.last_login.isoformat() if u.last_login else None
+        }
+        for u in users
+    ]
+
+@app.post("/api/users")
+async def create_user(
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    nome_completo: str = Form(None),
+    is_admin: bool = Form(False),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Cria novo usuário (apenas admin)"""
+    # Verifica se usuário já existe
+    existing = db.query(User).filter(
+        (User.username == username) | (User.email == email)
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Usuário ou email já existe")
+    
+    user = User(
+        username=username,
+        email=email,
+        password_hash=get_password_hash(password),
+        nome_completo=nome_completo,
+        is_admin=is_admin,
+        is_active=True
+    )
+    db.add(user)
+    db.commit()
+    return {"message": "Usuário criado com sucesso", "user_id": user.id}
 
 @app.post("/api/upload")
 async def upload_file(
@@ -400,6 +580,14 @@ async def dashboard(
             print(f"Erro ao gerar insights: {e}")
             insights = []
         
+        # Busca alertas
+        try:
+            alertas_system = AlertasSystem(db)
+            alertas = alertas_system.detectar_alertas(client_id, mes_inicio, mes_fim)
+        except Exception as e:
+            print(f"Erro ao detectar alertas: {e}")
+            alertas = []
+        
         resultado = {
             "metricas": metricas,
             "top_cids": top_cids,
@@ -416,7 +604,8 @@ async def dashboard(
             "comparativo_dias_horas": comparativo_dias_horas,
             "frequencia_atestados": frequencia_atestados,
             "dias_setor_genero": dias_setor_genero,
-            "insights": insights
+            "insights": insights,
+            "alertas": alertas
         }
         
         # Corrige encoding antes de retornar
@@ -457,6 +646,32 @@ async def obter_filtros(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao buscar filtros: {str(e)}")
+
+@app.get("/api/alertas")
+async def obter_alertas(
+    client_id: int = 1,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Retorna alertas automáticos do sistema"""
+    try:
+        alertas_system = AlertasSystem(db)
+        alertas = alertas_system.detectar_alertas(client_id, mes_inicio, mes_fim)
+        return {
+            "alertas": alertas,
+            "total": len(alertas),
+            "por_severidade": {
+                "alta": len([a for a in alertas if a['severidade'] == 'alta']),
+                "media": len([a for a in alertas if a['severidade'] == 'media']),
+                "baixa": len([a for a in alertas if a['severidade'] == 'baixa'])
+            }
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar alertas: {str(e)}")
 
 # ==================== MÓDULO CLIENTES ====================
 
@@ -741,6 +956,314 @@ async def pagina_clientes():
     """Página de gerenciamento de clientes"""
     return FileResponse("frontend/clientes.html")
 
+@app.get("/apresentacao")
+async def pagina_apresentacao():
+    """Página de apresentação de gráficos"""
+    return FileResponse("frontend/apresentacao.html")
+
+@app.get("/api/apresentacao")
+async def dados_apresentacao(
+    client_id: int = 1,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    funcionario: Optional[List[str]] = Query(None),
+    setor: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Retorna todos os dados necessários para a apresentação com análises IA"""
+    try:
+        analytics = Analytics(db)
+        insights_engine = InsightsEngine(db)
+        
+        # Busca todas as métricas e dados (igual ao dashboard)
+        try:
+            metricas = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular métricas gerais: {e}")
+            metricas = {
+                "total_atestados_dias": 0,
+                "total_dias_perdidos": 0,
+                "total_horas_perdidas": 0
+            }
+        
+        try:
+            top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top CIDs: {e}")
+            top_cids = []
+        
+        try:
+            top_setores = analytics.top_setores(client_id, 5, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top setores: {e}")
+            top_setores = []
+        
+        try:
+            evolucao = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular evolução mensal: {e}")
+            evolucao = []
+        
+        try:
+            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de gênero: {e}")
+            distribuicao_genero = []
+        
+        try:
+            top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top funcionários: {e}")
+            top_funcionarios = []
+        
+        try:
+            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top escalas: {e}")
+            top_escalas = []
+        
+        try:
+            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top motivos: {e}")
+            top_motivos = []
+        
+        try:
+            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular dias por centro de custo: {e}")
+            dias_centro_custo = []
+        
+        try:
+            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição de dias: {e}")
+            distribuicao_dias = []
+        
+        try:
+            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular média por CID: {e}")
+            media_cid = []
+        
+        try:
+            top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular top CIDs para dias: {e}")
+            top_cids_dias = []
+        
+        try:
+            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular dias por setor e gênero: {e}")
+            dias_setor_genero = []
+        
+        # Gera análises IA para cada gráfico
+        slides = []
+        
+        # Slide 0: Título/Capa
+        slides.append({
+            "id": 0,
+            "tipo": "capa",
+            "titulo": "Capa",
+            "subtitulo": "",
+            "dados": None,
+            "analise": None
+        })
+        
+        # Slide 1: KPIs
+        if metricas:
+            slides.append({
+                "id": 1,
+                "tipo": "kpis",
+                "titulo": "Indicadores Principais",
+                "subtitulo": "Visão geral do absenteísmo",
+                "dados": metricas,
+                "analise": insights_engine.gerar_analise_grafico('kpis', None, metricas)
+            })
+        
+        # Slide 2: Dias Perdidos por Funcionário
+        if top_funcionarios:
+            slides.append({
+                "id": 2,
+                "tipo": "funcionarios_dias",
+                "titulo": "Dias Perdidos por Funcionário",
+                "subtitulo": "TOP 10 funcionários com maior índice",
+                "dados": top_funcionarios,
+                "analise": insights_engine.gerar_analise_grafico('funcionarios_dias', top_funcionarios, metricas)
+            })
+        
+        # Slide 3: TOP 10 CIDs
+        if top_cids:
+            slides.append({
+                "id": 3,
+                "tipo": "top_cids",
+                "titulo": "TOP 10 Doenças mais Frequentes",
+                "subtitulo": "Principais causas de afastamento",
+                "dados": top_cids,
+                "analise": insights_engine.gerar_analise_grafico('top_cids', top_cids, metricas)
+            })
+        
+        # Slide 4: Evolução Mensal
+        if evolucao:
+            slides.append({
+                "id": 4,
+                "tipo": "evolucao_mensal",
+                "titulo": "Evolução Mensal",
+                "subtitulo": "Últimos 12 meses",
+                "dados": evolucao,
+                "analise": insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao, metricas)
+            })
+        
+        # Slide 5: TOP 5 Setores
+        if top_setores:
+            slides.append({
+                "id": 5,
+                "tipo": "top_setores",
+                "titulo": "TOP 5 Setores",
+                "subtitulo": "Setores com mais atestados",
+                "dados": top_setores,
+                "analise": insights_engine.gerar_analise_grafico('top_setores', top_setores, metricas)
+            })
+        
+        # Slide 6: Por Gênero
+        if distribuicao_genero:
+            slides.append({
+                "id": 6,
+                "tipo": "genero",
+                "titulo": "Distribuição por Gênero",
+                "subtitulo": "Masculino vs Feminino",
+                "dados": distribuicao_genero,
+                "analise": insights_engine.gerar_analise_grafico('genero', distribuicao_genero, metricas)
+            })
+        
+        # Slide 7: Dias por Doença
+        if top_cids_dias:
+            slides.append({
+                "id": 7,
+                "tipo": "dias_doenca",
+                "titulo": "Dias por Doença",
+                "subtitulo": "Total de dias perdidos",
+                "dados": top_cids_dias,
+                "analise": insights_engine.gerar_analise_grafico('dias_doenca', top_cids_dias, metricas)
+            })
+        
+        # Slide 8: Escalas
+        if top_escalas:
+            slides.append({
+                "id": 8,
+                "tipo": "escalas",
+                "titulo": "Escalas com mais Atestados",
+                "subtitulo": "TOP 10 escalas com maior incidência",
+                "dados": top_escalas,
+                "analise": insights_engine.gerar_analise_grafico('escalas', top_escalas, metricas)
+            })
+        
+        # Slide 9: Motivos
+        if top_motivos:
+            slides.append({
+                "id": 9,
+                "tipo": "motivos",
+                "titulo": "Motivos de Incidência",
+                "subtitulo": "Distribuição percentual dos motivos",
+                "dados": top_motivos,
+                "analise": insights_engine.gerar_analise_grafico('motivos', top_motivos, metricas)
+            })
+        
+        # Slide 10: Centro de Custo
+        if dias_centro_custo:
+            slides.append({
+                "id": 10,
+                "tipo": "centro_custo",
+                "titulo": "Dias Perdidos por Centro de Custo",
+                "subtitulo": "TOP 10 setores",
+                "dados": dias_centro_custo,
+                "analise": insights_engine.gerar_analise_grafico('centro_custo', dias_centro_custo, metricas)
+            })
+        
+        # Slide 11: Distribuição de Dias
+        if distribuicao_dias:
+            slides.append({
+                "id": 11,
+                "tipo": "distribuicao_dias",
+                "titulo": "Distribuição de Dias por Atestado",
+                "subtitulo": "Histograma de frequência",
+                "dados": distribuicao_dias,
+                "analise": insights_engine.gerar_analise_grafico('distribuicao_dias', distribuicao_dias, metricas)
+            })
+        
+        # Slide 12: Média por CID
+        if media_cid:
+            slides.append({
+                "id": 12,
+                "tipo": "media_cid",
+                "titulo": "Média de Dias por CID",
+                "subtitulo": "Doenças com maior média de dias",
+                "dados": media_cid,
+                "analise": insights_engine.gerar_analise_grafico('media_cid', media_cid, metricas)
+            })
+        
+        # Slide 13: Setor e Gênero
+        if dias_setor_genero:
+            slides.append({
+                "id": 13,
+                "tipo": "setor_genero",
+                "titulo": "Dias Perdidos por Setor e Gênero",
+                "subtitulo": "Comparativo entre gêneros por setor",
+                "dados": dias_setor_genero,
+                "analise": insights_engine.gerar_analise_grafico('setor_genero', dias_setor_genero, metricas)
+            })
+        
+        # Slide 14: Ações - Introdução
+        slides.append({
+            "id": 14,
+            "tipo": "acoes_intro",
+            "titulo": "Ações",
+            "subtitulo": "Intervenções junto aos colaboradores",
+            "dados": None,
+            "analise": None
+        })
+        
+        # Slide 15: Ações - Saúde Física
+        slides.append({
+            "id": 15,
+            "tipo": "acoes_saude_fisica",
+            "titulo": "Ações – Saúde Física",
+            "subtitulo": "Promoção da saúde preventiva",
+            "dados": None,
+            "analise": None
+        })
+        
+        # Slide 16: Ações - Saúde Emocional
+        slides.append({
+            "id": 16,
+            "tipo": "acoes_saude_emocional",
+            "titulo": "Ações – Saúde Emocional",
+            "subtitulo": "Bem-estar psicológico e emocional",
+            "dados": None,
+            "analise": None
+        })
+        
+        # Slide 17: Ações - Saúde Social
+        slides.append({
+            "id": 17,
+            "tipo": "acoes_saude_social",
+            "titulo": "Ações – Saúde Social",
+            "subtitulo": "Integração e relacionamento interpessoal",
+            "dados": None,
+            "analise": None
+        })
+        
+        return {
+            "slides": slides,
+            "total_slides": len(slides)
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar apresentação: {str(e)}")
+
 @app.get("/api/preview/{upload_id}")
 async def preview_data(
     upload_id: int,
@@ -874,60 +1397,383 @@ async def delete_upload(
 async def export_excel(
     client_id: int = 1,
     mes: Optional[str] = None,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
     upload_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Exporta dados tratados para Excel"""
-    import pandas as pd
-    from datetime import datetime
-    
-    query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
-    
-    if upload_id:
-        query = query.filter(Upload.id == upload_id)
-    elif mes:
-        query = query.filter(Upload.mes_referencia == mes)
-    
-    atestados = query.all()
-    
-    if not atestados:
-        raise HTTPException(status_code=404, detail="Nenhum dado encontrado")
-    
-    # Converter para DataFrame
-    dados = []
-    for a in atestados:
-        dados.append({
-            'Nome': a.nome_funcionario,
-            'CPF': a.cpf,
-            'Setor': a.setor,
-            'Cargo': a.cargo,
-            'Gênero': a.genero,
-            'Data Afastamento': a.data_afastamento,
-            'Data Retorno': a.data_retorno,
-            'Tipo': a.tipo_atestado,
-            'CID': a.cid,
-            'Descrição CID': a.descricao_cid,
-            'Dias Atestado': a.numero_dias_atestado,
-            'Horas Atestado': a.numero_horas_atestado,
-            'Dias Perdidos': a.dias_perdidos,
-            'Horas Perdidas': a.horas_perdidas
-        })
-    
-    df = pd.DataFrame(dados)
-    
-    # Salvar arquivo
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"absenteismo_tratado_{timestamp}.xlsx"
-    filepath = os.path.join(EXPORTS_DIR, filename)
-    
-    os.makedirs(EXPORTS_DIR, exist_ok=True)
-    df.to_excel(filepath, index=False)
-    
-    return FileResponse(
-        path=filepath,
-        filename=filename,
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    """Exporta relatório completo para Excel"""
+    try:
+        analytics = Analytics(db)
+        report_gen = ReportGenerator()
+        
+        # Busca dados e métricas
+        metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
+        top_cids = analytics.top_cids(client_id, mes_inicio, mes_fim, None, None)
+        top_funcionarios = analytics.top_funcionarios(client_id, mes_inicio, mes_fim, None, None)
+        top_setores = analytics.top_setores(client_id, mes_inicio, mes_fim, None, None)
+        
+        # Busca dados completos
+        query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
+        if upload_id:
+            query = query.filter(Upload.id == upload_id)
+        elif mes:
+            query = query.filter(Upload.mes_referencia == mes)
+        elif mes_inicio and mes_fim:
+            query = query.filter(Upload.mes_referencia >= mes_inicio, Upload.mes_referencia <= mes_fim)
+        
+        atestados = query.all()
+        
+        if not atestados:
+            raise HTTPException(status_code=404, detail="Nenhum dado encontrado")
+        
+        # Converter para lista de dicionários
+        dados = []
+        for a in atestados:
+            dados.append({
+                'Nome': a.nomecompleto or a.nome_funcionario,
+                'Setor': a.setor,
+                'CID': a.cid,
+                'Diagnóstico': a.diagnostico or a.descricao_cid,
+                'Dias Atestados': a.dias_atestados or 0,
+                'Horas Perdidas': a.horas_perdi or 0,
+                'Motivo': a.motivo_atestado,
+                'Escala': a.escala,
+            })
+        
+        # Preparar dados para relatório
+        dados_relatorio = {
+            'top_cids': top_cids,
+            'top_funcionarios': top_funcionarios,
+            'top_setores': top_setores
+        }
+        
+        metricas_relatorio = {
+            **metricas_gerais,
+            'top_cids': top_cids,
+            'top_funcionarios': top_funcionarios,
+            'top_setores': top_setores
+        }
+        
+        # Gerar arquivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"relatorio_absenteismo_{timestamp}.xlsx"
+        filepath = os.path.join(EXPORTS_DIR, filename)
+        
+        os.makedirs(EXPORTS_DIR, exist_ok=True)
+        
+        # Usar gerador de relatórios
+        periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
+        success = report_gen.generate_excel_report(filepath, dados, metricas_relatorio, periodo)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Erro ao gerar relatório Excel")
+        
+        return FileResponse(
+            path=filepath,
+            filename=filename,
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao exportar: {str(e)}")
+
+@app.get("/api/export/pdf")
+async def export_pdf(
+    client_id: int = 1,
+    mes: Optional[str] = None,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    upload_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Exporta relatório completo para PDF"""
+    try:
+        analytics = Analytics(db)
+        report_gen = ReportGenerator()
+        
+        # Busca dados e métricas (igual à apresentação)
+        insights_engine = InsightsEngine(db)
+        
+        metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
+        top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, None, None)
+        top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, None, None)
+        top_setores = analytics.top_setores(client_id, 10, mes_inicio, mes_fim, None, None)
+        
+        # Busca evolução mensal para gráfico
+        evolucao_mensal = []
+        try:
+            evolucao_mensal = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, None, None)
+        except:
+            pass
+        
+        # Busca insights
+        insights = []
+        try:
+            insights = insights_engine.gerar_insights(client_id)
+            # Adiciona análises dos gráficos
+            if top_cids:
+                analise_cids = insights_engine.gerar_analise_grafico('top_cids', top_cids, metricas_gerais)
+                if analise_cids:
+                    partes = analise_cids.split('💡')
+                    insights.append({
+                        'tipo': 'analise',
+                        'icone': '📊',
+                        'titulo': 'Análise: TOP 10 Doenças Mais Frequentes',
+                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_cids.replace('**', ''),
+                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                    })
+            if top_funcionarios:
+                analise_func = insights_engine.gerar_analise_grafico('funcionarios_dias', top_funcionarios, metricas_gerais)
+                if analise_func:
+                    partes = analise_func.split('💡')
+                    insights.append({
+                        'tipo': 'analise',
+                        'icone': '👤',
+                        'titulo': 'Análise: Dias Perdidos por Funcionário',
+                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_func.replace('**', ''),
+                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                    })
+            if evolucao_mensal:
+                analise_evol = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_mensal, metricas_gerais)
+                if analise_evol:
+                    partes = analise_evol.split('💡')
+                    insights.append({
+                        'tipo': 'analise',
+                        'icone': '📈',
+                        'titulo': 'Análise: Evolução Mensal',
+                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_evol.replace('**', ''),
+                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                    })
+        except Exception as e:
+            print(f"Erro ao gerar insights: {e}")
+        
+        # Preparar dados para relatório
+        dados_relatorio = {
+            'top_cids': top_cids,
+            'top_funcionarios': top_funcionarios,
+            'top_setores': top_setores,
+            'evolucao_mensal': evolucao_mensal
+        }
+        
+        # Gerar arquivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"relatorio_absenteismo_{timestamp}.pdf"
+        filepath = os.path.join(EXPORTS_DIR, filename)
+        
+        os.makedirs(EXPORTS_DIR, exist_ok=True)
+        
+        # Gerar período
+        periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
+        
+        # Gerar PDF com gráficos e insights
+        success = report_gen.generate_pdf_report(filepath, dados_relatorio, metricas_gerais, insights, periodo)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Erro ao gerar relatório PDF")
+        
+        return FileResponse(
+            path=filepath,
+            filename=filename,
+            media_type='application/pdf'
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao exportar PDF: {str(e)}")
+
+# ==================== ROUTES - COMPARATIVOS ====================
+
+@app.get("/api/relatorios/comparativo")
+async def comparativo_periodos(
+    client_id: int = 1,
+    periodo1_inicio: str = Query(...),
+    periodo1_fim: str = Query(...),
+    periodo2_inicio: str = Query(...),
+    periodo2_fim: str = Query(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Compara dois períodos e retorna métricas e variações"""
+    try:
+        analytics = Analytics(db)
+        
+        # Busca métricas do período 1
+        metricas_p1 = analytics.metricas_gerais(client_id, periodo1_inicio, periodo1_fim, None, None)
+        
+        # Busca métricas do período 2
+        metricas_p2 = analytics.metricas_gerais(client_id, periodo2_inicio, periodo2_fim, None, None)
+        
+        # Calcula variações percentuais
+        def calcular_variacao(valor1, valor2):
+            if valor1 == 0:
+                return 100.0 if valor2 > 0 else 0.0
+            return ((valor2 - valor1) / valor1) * 100
+        
+        variacoes = {
+            'atestados': calcular_variacao(
+                metricas_p1.get('total_atestados', 0),
+                metricas_p2.get('total_atestados', 0)
+            ),
+            'dias': calcular_variacao(
+                metricas_p1.get('total_dias_perdidos', 0),
+                metricas_p2.get('total_dias_perdidos', 0)
+            ),
+            'horas': calcular_variacao(
+                metricas_p1.get('total_horas_perdidas', 0),
+                metricas_p2.get('total_horas_perdidas', 0)
+            ),
+            'taxa': calcular_variacao(
+                metricas_p1.get('total_atestados', 0) or 1,
+                metricas_p2.get('total_atestados', 0) or 1
+            )
+        }
+        
+        # Formata resposta
+        resultado = {
+            'periodo1': {
+                'inicio': periodo1_inicio,
+                'fim': periodo1_fim,
+                'total_atestados': metricas_p1.get('total_atestados', 0),
+                'total_atestados_dias': metricas_p1.get('total_atestados_dias', 0),
+                'total_atestados_horas': metricas_p1.get('total_atestados_horas', 0),
+                'total_dias_perdidos': metricas_p1.get('total_dias_perdidos', 0),
+                'total_horas_perdidas': metricas_p1.get('total_horas_perdidas', 0),
+            },
+            'periodo2': {
+                'inicio': periodo2_inicio,
+                'fim': periodo2_fim,
+                'total_atestados': metricas_p2.get('total_atestados', 0),
+                'total_atestados_dias': metricas_p2.get('total_atestados_dias', 0),
+                'total_atestados_horas': metricas_p2.get('total_atestados_horas', 0),
+                'total_dias_perdidos': metricas_p2.get('total_dias_perdidos', 0),
+                'total_horas_perdidas': metricas_p2.get('total_horas_perdidas', 0),
+            },
+            'variacoes': variacoes
+        }
+        
+        return resultado
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar comparativo: {str(e)}")
+
+# ==================== ROUTES - PERFIL FUNCIONÁRIO ====================
+
+@app.get("/perfil_funcionario", response_class=HTMLResponse)
+async def perfil_funcionario_page(current_user: User = Depends(get_current_active_user)):
+    """Página de perfil de funcionário"""
+    file_path = os.path.join(FRONTEND_DIR, "perfil_funcionario.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/api/funcionario/perfil")
+async def perfil_funcionario(
+    nome: str = Query(...),
+    client_id: int = 1,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Retorna perfil completo de um funcionário"""
+    try:
+        analytics = Analytics(db)
+        
+        # Busca todos os atestados do funcionário
+        query = db.query(Atestado).join(Upload).filter(
+            Upload.client_id == client_id,
+            (Atestado.nomecompleto == nome) | (Atestado.nome_funcionario == nome)
+        ).order_by(Upload.mes_referencia.desc(), Atestado.id.desc())
+        
+        atestados = query.all()
+        
+        if not atestados:
+            raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+        
+        # Primeiro registro para pegar informações gerais
+        primeiro = atestados[0]
+        
+        # Calcula totais
+        total_atestados = len(atestados)
+        total_dias = sum(a.dias_atestados or 0 for a in atestados)
+        total_horas = sum(a.horas_perdi or 0 for a in atestados)
+        media_dias = total_dias / total_atestados if total_atestados > 0 else 0
+        
+        # Evolução mensal
+        evolucao_mensal = {}
+        for a in atestados:
+            # Busca o upload relacionado
+            upload = db.query(Upload).filter(Upload.id == a.upload_id).first()
+            mes = upload.mes_referencia if upload else None
+            if mes:
+                if mes not in evolucao_mensal:
+                    evolucao_mensal[mes] = {'dias_perdidos': 0, 'quantidade': 0}
+                evolucao_mensal[mes]['dias_perdidos'] += a.dias_atestados or 0
+                evolucao_mensal[mes]['quantidade'] += 1
+        
+        evolucao_lista = [{'mes': mes, 'dias_perdidos': dados['dias_perdidos'], 'quantidade': dados['quantidade']} 
+                         for mes, dados in sorted(evolucao_mensal.items())]
+        
+        # TOP CIDs
+        cids_count = {}
+        for a in atestados:
+            cid = a.cid or 'N/A'
+            if cid not in cids_count:
+                cids_count[cid] = {
+                    'cid': cid,
+                    'descricao': a.diagnostico or a.descricao_cid or '',
+                    'quantidade': 0,
+                    'dias_perdidos': 0
+                }
+            cids_count[cid]['quantidade'] += 1
+            cids_count[cid]['dias_perdidos'] += a.dias_atestados or 0
+        
+        top_cids = sorted(cids_count.values(), key=lambda x: x['quantidade'], reverse=True)
+        
+        # Histórico
+        historico = []
+        for a in atestados[:50]:  # Últimos 50 registros
+            # Busca o upload relacionado
+            upload = db.query(Upload).filter(Upload.id == a.upload_id).first()
+            historico.append({
+                'data_afastamento': a.data_afastamento.strftime('%d/%m/%Y') if a.data_afastamento else None,
+                'mes_referencia': upload.mes_referencia if upload else None,
+                'cid': a.cid,
+                'diagnostico': a.diagnostico or a.descricao_cid,
+                'descricao': a.descricao_cid,
+                'dias_atestados': a.dias_atestados or 0,
+                'horas_perdi': a.horas_perdi or 0,
+                'motivo_atestado': a.motivo_atestado,
+                'setor': a.setor
+            })
+        
+        return {
+            'nome': primeiro.nomecompleto or primeiro.nome_funcionario or nome,
+            'setor': primeiro.setor,
+            'genero': primeiro.genero,
+            'total_atestados': total_atestados,
+            'total_dias_perdidos': total_dias,
+            'total_horas_perdidas': total_horas,
+            'media_dias_per_atestado': media_dias,
+            'total_registros': total_atestados,
+            'evolucao_mensal': evolucao_lista,
+            'top_cids': top_cids,
+            'historico': historico
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar perfil: {str(e)}")
 
 # ==================== ROUTES - GESTÃO DE DADOS ====================
 
