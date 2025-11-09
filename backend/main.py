@@ -13,10 +13,11 @@ import os
 import shutil
 import json
 from datetime import datetime
+import uuid
 from collections import OrderedDict
 import pandas as pd
 
-from .database import get_db, init_db
+from .database import get_db, init_db, run_migrations
 from .models import Client, Upload, Atestado, User, Config
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
@@ -90,6 +91,25 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 EXPORTS_DIR = os.path.join(BASE_DIR, "exports")
+LOGOS_DIR = os.path.join(FRONTEND_DIR, "static", "logos")
+
+def remover_logo_arquivo(caminho: Optional[str]):
+    """Remove arquivo de logo do disco, se existir e estiver na pasta permitida."""
+    if not caminho:
+        return
+    caminho_relativo = caminho.lstrip('/')
+    arquivo_path = os.path.abspath(os.path.join(BASE_DIR, caminho_relativo.replace('/', os.sep)))
+    logos_dir_abs = os.path.abspath(LOGOS_DIR)
+    try:
+        if os.path.commonpath([arquivo_path, logos_dir_abs]) != logos_dir_abs:
+            return
+    except ValueError:
+        return
+    if os.path.exists(arquivo_path):
+        try:
+            os.remove(arquivo_path)
+        except OSError:
+            pass
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
@@ -98,6 +118,8 @@ app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static"))
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    run_migrations()
+    os.makedirs(LOGOS_DIR, exist_ok=True)
     # Cria cliente padrão se não existir
     db = next(get_db())
     client = db.query(Client).filter(Client.id == 1).first()
@@ -382,15 +404,15 @@ async def create_user(
 @app.post("/api/upload")
 async def upload_file(
     file: UploadFile = File(...),
-    client_id: int = 1,
+    client_id: int = Form(1),
     db: Session = Depends(get_db)
 ):
     """Upload de planilha"""
     try:
         # Salva arquivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{timestamp}_{file.filename}"
-        file_path = os.path.join(UPLOADS_DIR, filename)
+        saved_filename = f"{timestamp}_{file.filename}"
+        file_path = os.path.join(UPLOADS_DIR, saved_filename)
         
         os.makedirs(UPLOADS_DIR, exist_ok=True)
         
@@ -418,7 +440,7 @@ async def upload_file(
         # Cria registro de upload
         upload = Upload(
             client_id=client_id,
-            filename=file.filename,
+            filename=saved_filename,
             mes_referencia=mes_ref,
             total_registros=len(registros)
         )
@@ -679,6 +701,7 @@ class ClienteCreate(BaseModel):
     nome: str
     cnpj: Optional[str] = None
     nome_fantasia: Optional[str] = None
+    logo_url: Optional[str] = None
     inscricao_estadual: Optional[str] = None
     inscricao_municipal: Optional[str] = None
     cep: Optional[str] = None
@@ -710,7 +733,9 @@ async def listar_clientes(db: Session = Depends(get_db)):
                 "telefone": c.telefone,
                 "email": c.email,
                 "situacao": c.situacao,
+                "logo_url": c.logo_url,
                 "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
                 "total_uploads": len(c.uploads)
             }
             for c in clientes
@@ -745,6 +770,7 @@ async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
             "telefone": cliente.telefone,
             "email": cliente.email,
             "situacao": cliente.situacao,
+            "logo_url": cliente.logo_url,
             "data_abertura": cliente.data_abertura.isoformat() if cliente.data_abertura else None,
             "atividade_principal": cliente.atividade_principal,
             "created_at": cliente.created_at.isoformat() if cliente.created_at else None
@@ -755,6 +781,111 @@ async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao obter cliente: {str(e)}")
+
+@app.post("/api/clientes/{cliente_id}/clonar_dados")
+async def clonar_dados_cliente(
+    cliente_id: int,
+    origem_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    """Replica dados (uploads + atestados) de um cliente origem para o cliente destino."""
+    try:
+        if cliente_id == origem_id:
+            raise HTTPException(status_code=400, detail="Cliente destino e origem não podem ser o mesmo.")
+
+        destino = db.query(Client).filter(Client.id == cliente_id).first()
+        if not destino:
+            raise HTTPException(status_code=404, detail="Cliente destino não encontrado.")
+
+        origem = db.query(Client).filter(Client.id == origem_id).first()
+        if not origem:
+            raise HTTPException(status_code=404, detail="Cliente origem não encontrado.")
+
+        if len(destino.uploads) > 0:
+            raise HTTPException(status_code=400, detail="Cliente destino já possui dados cadastrados.")
+
+        uploads_origem = db.query(Upload).filter(Upload.client_id == origem_id).all()
+        if not uploads_origem:
+            raise HTTPException(status_code=400, detail="Cliente origem não possui dados para replicar.")
+
+        total_uploads = 0
+        total_atestados = 0
+
+        for upload in uploads_origem:
+            novo_nome_arquivo = upload.filename
+            if upload.filename:
+                caminho_origem = os.path.join(UPLOADS_DIR, upload.filename)
+                if os.path.exists(caminho_origem):
+                    base, ext = os.path.splitext(upload.filename)
+                    novo_nome_arquivo = f"clone_{destino.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex}{ext}"
+                    os.makedirs(UPLOADS_DIR, exist_ok=True)
+                    try:
+                        shutil.copy2(caminho_origem, os.path.join(UPLOADS_DIR, novo_nome_arquivo))
+                    except Exception as copia_erro:
+                        print(f"Não foi possível copiar arquivo {upload.filename}: {copia_erro}")
+                        novo_nome_arquivo = upload.filename
+
+            novo_upload = Upload(
+                client_id=destino.id,
+                filename=novo_nome_arquivo,
+                mes_referencia=upload.mes_referencia,
+                data_upload=datetime.now(),
+                total_registros=upload.total_registros
+            )
+            db.add(novo_upload)
+            db.flush()
+            total_uploads += 1
+
+            for atestado in upload.atestados:
+                novo_atestado = Atestado(
+                    upload_id=novo_upload.id,
+                    nomecompleto=atestado.nomecompleto,
+                    descricao_atestad=atestado.descricao_atestad,
+                    dias_atestados=atestado.dias_atestados,
+                    cid=atestado.cid,
+                    diagnostico=atestado.diagnostico,
+                    centro_custo=atestado.centro_custo,
+                    setor=atestado.setor,
+                    motivo_atestado=atestado.motivo_atestado,
+                    escala=atestado.escala,
+                    horas_dia=atestado.horas_dia,
+                    horas_perdi=atestado.horas_perdi,
+                    nome_funcionario=atestado.nome_funcionario,
+                    cpf=atestado.cpf,
+                    matricula=atestado.matricula,
+                    cargo=atestado.cargo,
+                    genero=atestado.genero,
+                    data_afastamento=atestado.data_afastamento,
+                    data_retorno=atestado.data_retorno,
+                    tipo_info_atestado=atestado.tipo_info_atestado,
+                    tipo_atestado=atestado.tipo_atestado,
+                    descricao_cid=atestado.descricao_cid,
+                    numero_dias_atestado=atestado.numero_dias_atestado,
+                    numero_horas_atestado=atestado.numero_horas_atestado,
+                    dias_perdidos=atestado.dias_perdidos,
+                    horas_perdidas=atestado.horas_perdidas,
+                    dados_originais=atestado.dados_originais
+                )
+                db.add(novo_atestado)
+                total_atestados += 1
+
+        destino.updated_at = datetime.now()
+        db.commit()
+        db.refresh(destino)
+
+        return {
+            "message": "Dados replicados com sucesso.",
+            "total_uploads": len(destino.uploads),
+            "total_atestados": total_atestados
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao clonar dados: {str(e)}")
 
 @app.post("/api/clientes")
 async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
@@ -775,10 +906,15 @@ async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
             except:
                 pass
         
+        logo_url = None
+        if cliente.logo_url:
+            logo_url = cliente.logo_url.strip() or None
+
         novo_cliente = Client(
             nome=cliente.nome,
             cnpj=re.sub(r'\D', '', cliente.cnpj) if cliente.cnpj else None,
             nome_fantasia=cliente.nome_fantasia,
+            logo_url=logo_url,
             inscricao_estadual=cliente.inscricao_estadual,
             inscricao_municipal=cliente.inscricao_municipal,
             cep=cliente.cep,
@@ -832,6 +968,16 @@ async def atualizar_cliente(cliente_id: int, cliente: ClienteCreate, db: Session
                 raise HTTPException(status_code=400, detail="CNPJ já cadastrado em outro cliente")
         
         # Atualiza campos
+        logo_url_novo = cliente.logo_url
+        if logo_url_novo is not None:
+            logo_url_novo = logo_url_novo.strip()
+            if not logo_url_novo:
+                if cliente_db.logo_url:
+                    remover_logo_arquivo(cliente_db.logo_url)
+                cliente_db.logo_url = None
+            else:
+                cliente_db.logo_url = logo_url_novo
+
         cliente_db.nome = cliente.nome
         cliente_db.cnpj = re.sub(r'\D', '', cliente.cnpj) if cliente.cnpj else None
         cliente_db.nome_fantasia = cliente.nome_fantasia
@@ -871,6 +1017,75 @@ async def atualizar_cliente(cliente_id: int, cliente: ClienteCreate, db: Session
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao atualizar cliente: {str(e)}")
 
+@app.post("/api/clientes/{cliente_id}/logo")
+async def upload_logo_cliente(
+    cliente_id: int,
+    arquivo: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Realiza upload/atualização do logo de um cliente."""
+    try:
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+        if not arquivo:
+            raise HTTPException(status_code=400, detail="Arquivo de logo não enviado")
+
+        conteudo = await arquivo.read()
+        if not conteudo:
+            raise HTTPException(status_code=400, detail="Arquivo inválido")
+
+        tamanho_max = 1 * 1024 * 1024  # 1 MB
+        if len(conteudo) > tamanho_max:
+            raise HTTPException(status_code=400, detail="Logo deve ter no máximo 1 MB")
+
+        extensao = os.path.splitext(arquivo.filename or '')[1].lower()
+        if not extensao:
+            tipo = (arquivo.content_type or '').lower()
+            mapa_extensoes = {
+                "image/png": ".png",
+                "image/jpeg": ".jpg",
+                "image/jpg": ".jpg",
+                "image/webp": ".webp",
+                "image/svg+xml": ".svg"
+            }
+            extensao = mapa_extensoes.get(tipo, '')
+
+        extensoes_permitidas = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+        if extensao not in extensoes_permitidas:
+            raise HTTPException(status_code=400, detail="Formato de logo não suportado (use PNG, JPG, SVG ou WEBP)")
+
+        os.makedirs(LOGOS_DIR, exist_ok=True)
+        nome_arquivo = f"cliente_{cliente_id}_{uuid.uuid4().hex}{extensao}"
+        caminho_destino = os.path.join(LOGOS_DIR, nome_arquivo)
+
+        with open(caminho_destino, "wb") as destino:
+            destino.write(conteudo)
+
+        novo_logo_url = f"/static/logos/{nome_arquivo}"
+
+        if cliente.logo_url and cliente.logo_url != novo_logo_url:
+            remover_logo_arquivo(cliente.logo_url)
+
+        cliente.logo_url = novo_logo_url
+        cliente.updated_at = datetime.now()
+        db.commit()
+        db.refresh(cliente)
+
+        return {
+            "logo_url": cliente.logo_url,
+            "message": "Logo atualizado com sucesso"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar logo: {str(e)}")
+
 @app.delete("/api/clientes/{cliente_id}")
 async def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):
     """Deleta um cliente"""
@@ -881,7 +1096,7 @@ async def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):
         
         # Verifica se tem uploads
         if len(cliente.uploads) > 0:
-            raise HTTPException(status_code=400, detail="Não é possível deletar cliente com uploads cadastrados")
+            raise HTTPException(status_code=400, detail="Cliente possui dados. Utilize o arquivo morto.")
         
         db.delete(cliente)
         db.commit()
@@ -894,6 +1109,71 @@ async def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao deletar cliente: {str(e)}")
+
+@app.post("/api/clientes/{cliente_id}/arquivar")
+async def arquivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    """Move um cliente para o arquivo morto (mantém dados)"""
+    try:
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+        if len(cliente.uploads) == 0:
+            raise HTTPException(status_code=400, detail="Cliente não possui dados para arquivar. Utilize a exclusão.")
+
+        cliente.situacao = "ARQUIVO MORTO"
+        cliente.updated_at = datetime.now()
+        db.commit()
+        db.refresh(cliente)
+
+        return {
+            "message": "Cliente movido para arquivo morto.",
+            "cliente": {
+                "id": cliente.id,
+                "situacao": cliente.situacao,
+                "updated_at": cliente.updated_at.isoformat() if cliente.updated_at else None,
+                "total_uploads": len(cliente.uploads)
+            }
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao mover para arquivo morto: {str(e)}")
+
+@app.post("/api/clientes/{cliente_id}/ativar")
+async def ativar_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    """Reativa um cliente anteriormente arquivado"""
+    try:
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+        cliente.situacao = "ATIVO"
+        cliente.updated_at = datetime.now()
+        db.commit()
+        db.refresh(cliente)
+
+        return {
+            "message": "Cliente reativado com sucesso.",
+            "cliente": {
+                "id": cliente.id,
+                "situacao": cliente.situacao,
+                "updated_at": cliente.updated_at.isoformat() if cliente.updated_at else None,
+                "total_uploads": len(cliente.uploads)
+            }
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao reativar cliente: {str(e)}")
 
 @app.get("/api/buscar-cnpj/{cnpj}")
 async def buscar_cnpj(cnpj: str):
@@ -2339,7 +2619,7 @@ async def analyze_file(
 async def process_file_with_config(
     file: UploadFile = File(...),
     config: str = Form(...),
-    client_id: int = 1,
+    client_id: int = Form(1),
     db: Session = Depends(get_db)
 ):
     """Processa arquivo com configurações das colunas"""

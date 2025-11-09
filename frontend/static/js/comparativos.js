@@ -4,6 +4,17 @@
 
 let chartComparativo;
 
+document.addEventListener('DOMContentLoaded', () => {
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (!clientId) {
+        alert('Selecione um cliente na aba "Clientes" para visualizar os comparativos.');
+        return;
+    }
+    carregarVisaoGeral(clientId);
+    carregarSetores(clientId);
+    carregarFaltas(clientId);
+});
+
 function setComparacao(tipo) {
     const hoje = new Date();
     let p1Inicio, p1Fim, p2Inicio, p2Fim;
@@ -59,7 +70,12 @@ async function compararPeriodos() {
     }
     
     try {
-        const url = `/api/relatorios/comparativo?client_id=1&periodo1_inicio=${p1Inicio}&periodo1_fim=${p1Fim}&periodo2_inicio=${p2Inicio}&periodo2_fim=${p2Fim}`;
+        const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+        if (!clientId) {
+            alert('Selecione um cliente para gerar o comparativo.');
+            return;
+        }
+        const url = `/api/relatorios/comparativo?client_id=${clientId}&periodo1_inicio=${p1Inicio}&periodo1_fim=${p1Fim}&periodo2_inicio=${p2Inicio}&periodo2_fim=${p2Fim}`;
         const response = await fetch(url);
         const data = await response.json();
         

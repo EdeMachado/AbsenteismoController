@@ -5,10 +5,16 @@
 // Carrega alertas e exibe badge
 async function carregarAlertasMenu() {
     try {
+        const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+        if (!clientId) {
+            document.getElementById('alertasBadge')?.style.setProperty('display', 'none');
+            window.alertasData = [];
+            return;
+        }
         const mesInicio = document.getElementById('mesInicio')?.value || '';
         const mesFim = document.getElementById('mesFim')?.value || '';
         
-        let url = '/api/alertas?client_id=1';
+        let url = `/api/alertas?client_id=${clientId}`;
         if (mesInicio) url += `&mes_inicio=${encodeURIComponent(mesInicio)}`;
         if (mesFim) url += `&mes_fim=${encodeURIComponent(mesFim)}`;
         

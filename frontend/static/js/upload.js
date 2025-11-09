@@ -3,10 +3,17 @@
  */
 
 let selectedFile = null;
+let currentClient = {
+    id: null,
+    name: '',
+    cnpj: '',
+    logo: ''
+};
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadUploads();
+    initializeClientContext();
     setupDragDrop();
+    loadUploads();
 });
 
 function setupDragDrop() {
@@ -44,6 +51,11 @@ function unhighlight(e) {
 function handleDrop(e) {
     const dt = e.dataTransfer;
     const files = dt.files;
+
+    if (!currentClient.id) {
+        alert('Selecione um cliente na aba "Clientes" antes de enviar planilhas.');
+        return;
+    }
     
     if (files.length > 0) {
         selectedFile = files[0];
@@ -52,6 +64,11 @@ function handleDrop(e) {
 }
 
 function handleFileSelect(event) {
+    if (!currentClient.id) {
+        alert('Selecione um cliente na aba "Clientes" antes de enviar planilhas.');
+        event.target.value = '';
+        return;
+    }
     const files = event.target.files;
     if (files.length > 0) {
         selectedFile = files[0];
@@ -60,7 +77,7 @@ function handleFileSelect(event) {
 }
 
 function showFileSelected() {
-    if (!selectedFile) return;
+    if (!selectedFile || !currentClient.id) return;
     
     document.getElementById('fileName').textContent = selectedFile.name;
     document.getElementById('fileSize').textContent = formatFileSize(selectedFile.size);
@@ -80,10 +97,15 @@ async function uploadFile() {
         alert('Selecione um arquivo primeiro');
         return;
     }
+
+    if (!currentClient.id) {
+        alert('Selecione um cliente na aba "Clientes" antes de enviar planilhas.');
+        return;
+    }
     
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('client_id', 1);
+    formData.append('client_id', currentClient.id);
     
     // Show progress
     document.getElementById('progressContainer').style.display = 'block';
@@ -143,11 +165,25 @@ async function uploadFile() {
 }
 
 async function loadUploads() {
+    const tbody = document.getElementById('uploadsTableBody');
+    if (!currentClient.id) {
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-secondary);">
+                        Selecione um cliente para visualizar o histórico de uploads.
+                    </td>
+                </tr>
+            `;
+        }
+        return;
+    }
+
     try {
-        const response = await fetch('/api/uploads?client_id=1');
+        const response = await fetch(`/api/uploads?client_id=${currentClient.id}`);
         const uploads = await response.json();
         
-        const tbody = document.getElementById('uploadsTableBody');
+        if (!tbody) return;
         
         if (uploads.length === 0) {
             tbody.innerHTML = `
@@ -225,6 +261,90 @@ function formatMesReferencia(mes) {
 function formatDateTime(dateStr) {
     const date = new Date(dateStr);
     return date.toLocaleString('pt-BR');
+}
+
+function initializeClientContext() {
+    const storedId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    const numericId = Number(storedId);
+    currentClient = {
+        id: Number.isFinite(numericId) && numericId > 0 ? numericId : null,
+        name: localStorage.getItem('cliente_nome') || '',
+        cnpj: localStorage.getItem('cliente_cnpj') || '',
+        logo: localStorage.getItem('cliente_logo_url') || ''
+    };
+    renderCurrentClientBanner();
+    setUploadAvailability(Boolean(currentClient.id));
+}
+
+function renderCurrentClientBanner() {
+    const banner = document.getElementById('currentClientBanner');
+    if (!banner) return;
+
+    if (!currentClient.id) {
+        banner.classList.add('warning');
+        banner.innerHTML = `
+            <div class="current-client-warning">
+                <div class="warning-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="warning-content">
+                    <strong>Nenhum cliente selecionado</strong>
+                    <span>Escolha um cliente em "Clientes" para enviar a planilha correta.</span>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="window.location.href='/clientes'">
+                <i class="fas fa-users"></i> Selecionar cliente
+            </button>
+        `;
+        return;
+    }
+
+    banner.classList.remove('warning');
+    const displayCnpj = formatDisplayCnpj(currentClient.cnpj);
+    const avatarContent = currentClient.logo
+        ? `<img src="${currentClient.logo}" alt="Logo ${currentClient.name}" onerror="this.remove();">`
+        : getInitials(currentClient.name);
+
+    banner.innerHTML = `
+        <div class="current-client-info">
+            <div class="client-avatar">${avatarContent}</div>
+            <div class="current-client-text">
+                <strong>${currentClient.name || 'Cliente selecionado'}</strong>
+                ${displayCnpj ? `<span class="current-client-meta">${displayCnpj}</span>` : ''}
+            </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/clientes'">
+            <i class="fas fa-exchange-alt"></i> Trocar
+        </button>
+    `;
+}
+
+function setUploadAvailability(enabled) {
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    if (!uploadZone || !fileInput) return;
+
+    if (enabled) {
+        uploadZone.classList.remove('disabled');
+        fileInput.disabled = false;
+    } else {
+        cancelFile();
+        uploadZone.classList.add('disabled');
+        fileInput.disabled = true;
+    }
+}
+
+function getInitials(name) {
+    if (!name) return 'CL';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'CL';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function formatDisplayCnpj(value) {
+    if (!value) return '';
+    const onlyDigits = value.replace(/\D/g, '');
+    if (onlyDigits.length !== 14) return value;
+    return onlyDigits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 }
 
 

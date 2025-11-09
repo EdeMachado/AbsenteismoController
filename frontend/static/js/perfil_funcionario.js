@@ -25,8 +25,13 @@ async function carregarPerfil() {
     }
     
     try {
+        const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+        if (!clientId) {
+            alert('Selecione um cliente na aba "Clientes" para acessar o perfil do funcionário.');
+            return;
+        }
         // Busca dados do funcionário
-        const response = await fetch(`/api/funcionario/perfil?nome=${encodeURIComponent(nomeFuncionario)}&client_id=1`);
+        const response = await fetch(`/api/funcionario/perfil?nome=${encodeURIComponent(nomeFuncionario)}&client_id=${clientId}`);
         
         if (!response.ok) {
             throw new Error('Erro ao carregar dados');
@@ -199,20 +204,12 @@ function renderizarHistorico(historico) {
 }
 
 // Inicialização
-document.addEventListener('DOMContentLoaded', () => {
-    if (typeof checkAuth === 'function' && checkAuth()) {
-        carregarPerfil();
-    } else if (typeof isAuthenticated === 'function' && isAuthenticated()) {
-        carregarPerfil();
-    } else {
-        // Aguarda auth.js carregar
-        setTimeout(() => {
-            if (typeof checkAuth === 'function' && checkAuth()) {
-                carregarPerfil();
-            } else {
-                window.location.href = '/login';
-            }
-        }, 500);
+document.addEventListener('DOMContentLoaded', async () => {
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (!clientId) {
+        alert('Selecione um cliente na aba "Clientes" para acessar o perfil do funcionário.');
+        return;
     }
+    await carregarPerfil();
 });
 

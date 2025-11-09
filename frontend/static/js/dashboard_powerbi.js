@@ -2,6 +2,7 @@
 let powerbiCharts = {};
 let powerbiData = [];
 let powerbiFilters = {};
+let currentClientId = null;
 
 // Cores PowerBI
 const POWERBI_COLORS = [
@@ -10,22 +11,17 @@ const POWERBI_COLORS = [
     '#5f27cd', '#00d2d3', '#ff9f43', '#10ac84'
 ];
 
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 Iniciando Dashboard PowerBI...');
-    
-    // Carrega dados
-    await loadPowerbiData();
-    
-    // Inicializa filtros
-    initializeFilters();
-    
-    // Cria gráficos
-    createAllCharts();
-    
-    // Atualiza estatísticas
-    updateStats();
-    
-    console.log('✅ Dashboard PowerBI carregado!');
+// ==================== INICIALIZAÇÃO ====================
+
+document.addEventListener('DOMContentLoaded', () => {
+    currentClientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (!currentClientId) {
+        alert('Selecione um cliente na aba "Clientes" para visualizar os indicadores PowerBI.');
+        return;
+    }
+    carregarResumo(currentClientId);
+    carregarComparativos(currentClientId);
+    carregarTendencias(currentClientId);
 });
 
 // ==================== CARREGAMENTO DE DADOS ====================
@@ -33,8 +29,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadPowerbiData() {
     try {
         console.log('📊 Carregando dados...');
-        
-        const response = await fetch('/api/dados/todos?client_id=1');
+        if (!currentClientId) return;
+        const response = await fetch(`/api/dados/todos?client_id=${currentClientId}`);
         const data = await response.json();
         
         powerbiData = data;

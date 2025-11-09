@@ -95,24 +95,17 @@
                             </div>
                         </div>
                     </div>
-                    <button class="btn btn-secondary btn-icon" onclick="recarregarDados()">
-                        <i class="fas fa-sync"></i>
-                    </button>
-                    <a href="/upload" class="btn btn-primary">
-                        <i class="fas fa-plus"></i>
-                        Novo Upload
-                    </a>
                 </div>
             </header>
             
             <div class="content">
-                <!-- Insights Automáticos -->
-                <div id="insightsSection" style="display: none; margin-bottom: 24px;">
-                    <h2 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-lightbulb" style="color: #FF9800;"></i>
+                 <!-- Insights Automáticos -->
+                <div id="insightsSection" class="insights-section" style="display: none;">
+                    <h2 class="insights-title">
+                        <i class="fas fa-lightbulb"></i>
                         Análises e Insights
                     </h2>
-                    <div id="insightsContainer" style="display: grid; gap: 16px;"></div>
+                    <div id="insightsContainer" class="insights-container"></div>
                 </div>
                 
                 <!-- Filters -->
@@ -415,10 +408,11 @@
         // Carrega alertas do menu
         async function carregarAlertasMenu() {
             try {
+                const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
                 const mesInicio = document.getElementById('mesInicio')?.value || '';
                 const mesFim = document.getElementById('mesFim')?.value || '';
                 
-                let url = '/api/alertas?client_id=1';
+                let url = `/api/alertas?client_id=${clientId}`;
                 if (mesInicio) url += `&mes_inicio=${encodeURIComponent(mesInicio)}`;
                 if (mesFim) url += `&mes_fim=${encodeURIComponent(mesFim)}`;
                 

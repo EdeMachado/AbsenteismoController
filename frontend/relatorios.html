@@ -204,7 +204,8 @@
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
-                let url = '/api/export/pdf?client_id=1';
+                const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
+                let url = `/api/export/pdf?client_id=${clientId}`;
                 if (periodo) {
                     url += `&mes=${periodo}`;
                 } else if (mesInicio && mesFim) {
@@ -302,7 +303,8 @@
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
-                let url = '/api/export/excel?client_id=1';
+                const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
+                let url = `/api/export/excel?client_id=${clientId}`;
                 if (periodo) {
                     url += `&mes=${periodo}`;
                 } else if (mesInicio && mesFim) {
@@ -400,7 +402,8 @@
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
-                let url = '/api/export/pptx?client_id=1';
+                const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
+                let url = `/api/export/pptx?client_id=${clientId}`;
                 if (periodo) {
                     url += `&mes=${periodo}`;
                 } else if (mesInicio && mesFim) {
@@ -489,7 +492,9 @@
         }
         
         // Carregar uploads
-        fetch('/api/uploads?client_id=1')
+        (function carregarUploadsSelect() {
+            const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
+            fetch(`/api/uploads?client_id=${clientId}`)
             .then(res => res.json())
             .then(uploads => {
                 const select = document.getElementById('uploadRelatorio');
@@ -499,6 +504,7 @@
             .catch(error => {
                 console.error('Erro ao carregar uploads:', error);
             });
+        })();
     </script>
 </body>
 </html>

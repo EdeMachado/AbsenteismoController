@@ -1,6 +1,111 @@
 /**
- * Sistema de autenticação
+ * Sistema de autenticação e layout do painel
  */
+
+const DEFAULT_THEME = {
+    primary: '#1a237e',
+    primaryDark: '#0d47a1',
+    primaryLight: '#3949ab',
+    secondary: '#556B2F',
+    secondaryLight: '#6B8E23',
+    background: '#F5F7FA',
+    logo: null
+};
+
+const SIDEBAR_MENU_ITEMS = [
+    { path: '/', icon: 'fas fa-gauge-high', label: 'Dashboard' },
+    { path: '/dados_powerbi', icon: 'fas fa-table', label: 'Meus Dados' },
+    { path: '/upload', icon: 'fas fa-cloud-arrow-up', label: 'Upload Mensal' },
+    { path: '/apresentacao', icon: 'fas fa-tv', label: 'Apresentação' },
+    { path: '/relatorios', icon: 'fas fa-chart-pie', label: 'Relatórios' },
+    { path: '/funcionarios', icon: 'fas fa-user-group', label: 'Funcionários' },
+    { path: '/comparativos', icon: 'fas fa-chart-column', label: 'Comparativos' },
+    { path: '/configuracoes', icon: 'fas fa-gear', label: 'Configurações' }
+];
+
+function normalizePath(path) {
+    if (!path) return '/';
+    if (path.length > 1 && path.endsWith('/')) {
+        return path.slice(0, -1);
+    }
+    return path;
+}
+
+function getCurrentPath() {
+    return normalizePath(window.location.pathname);
+}
+
+function getCurrentClientId(defaultId = null) {
+    const stored = Number(localStorage.getItem('cliente_selecionado'));
+    return Number.isFinite(stored) && stored > 0 ? stored : defaultId;
+}
+
+window.getCurrentClientId = getCurrentClientId;
+
+function renderSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    const currentPath = getCurrentPath();
+    const clientId = getCurrentClientId(null);
+    const clienteNome = localStorage.getItem('cliente_nome') || '';
+    const clienteCnpj = localStorage.getItem('cliente_cnpj');
+    const clienteInicial = gerarIniciais(clienteNome || 'Cliente');
+    const theme = applyCurrentClientTheme();
+
+    sidebar.innerHTML = `
+        <div class="sidebar-scroll">
+            <div class="sidebar-scroll-inner">
+                <div class="sidebar-header">
+                    <div class="sidebar-brand">
+                        <span class="sidebar-brand-icon"><i class="fas fa-chart-line"></i></span>
+                        <div class="sidebar-brand-info">
+                            <strong>AbsenteismoController</strong>
+                            <span>Inteligência GrupoBioMed</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="sidebar-current-client ${clienteNome ? '' : 'empty'}">
+                    <div class="sidebar-current-client-main">
+                        <div class="client-avatar">
+                            ${(() => {
+                                const logoUrl = localStorage.getItem('cliente_logo_url');
+                                if (logoUrl) {
+                                    return `<img src="${logoUrl}" alt="Logo ${clienteNome || ''}" onerror="this.remove();" />`;
+                                }
+                                return clienteNome ? clienteInicial : '<i class="fas fa-briefcase"></i>';
+                            })()}
+                        </div>
+                        <div class="client-info">
+                            <span class="client-label">${clienteNome ? 'Cliente atual' : 'Nenhum cliente selecionado'}</span>
+                            <strong>${clienteNome || 'Selecione um cliente'}</strong>
+                            ${clienteNome && clienteCnpj ? `<span class="client-meta">${formatarCNPJ(clienteCnpj)}</span>` : ''}
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="trocarCliente(event)">
+                        <i class="fas fa-arrows-rotate"></i> Trocar cliente
+                    </button>
+                </div>
+                <nav class="sidebar-nav no-title">
+                    ${SIDEBAR_MENU_ITEMS.map(item => {
+                        const itemPath = normalizePath(item.path);
+                        const isActive = currentPath === itemPath || (itemPath !== '/' && currentPath.startsWith(itemPath));
+                        return `
+                            <a href="${item.path}" class="nav-item${isActive ? ' active' : ''}">
+                                <span class="nav-item-icon"><i class="${item.icon}"></i></span>
+                                <span class="nav-item-text">
+                                    <span class="nav-item-title">${item.label}</span>
+                                </span>
+                                <i class="fas fa-angle-right nav-item-chevron"></i>
+                            </a>
+                        `;
+                    }).join('')}
+                </nav>
+            </div>
+        </div>
+        <div class="sidebar-bottom"></div>
+    `;
+}
 
 // Verifica se está autenticado
 function isAuthenticated() {
@@ -89,21 +194,58 @@ window.fetch = function(url, options = {}) {
 
 // Exibe informações do usuário
 function displayUserInfo() {
-    const user = getCurrentUser();
-    if (user) {
-        const userNameElements = document.querySelectorAll('#userName');
-        userNameElements.forEach(el => {
-            el.textContent = user.nome_completo || user.username;
-        });
-        
-        // Mostra seção admin se for admin
-        if (isAdmin()) {
-            const adminSection = document.getElementById('adminSection');
-            if (adminSection) {
-                adminSection.style.display = 'block';
-            }
+    renderHeaderUser();
+    if (isAdmin()) {
+        const adminSection = document.getElementById('adminSection');
+        if (adminSection) {
+            adminSection.style.display = 'block';
         }
     }
+}
+
+function renderHeaderUser() {
+    const headerActions = document.querySelector('.header .header-actions') || document.querySelector('.header');
+    if (!headerActions) return;
+
+    let container = headerActions.querySelector('#headerUserWidget');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'headerUserWidget';
+        container.className = 'header-user-widget';
+        headerActions.appendChild(container);
+    }
+
+    const user = getCurrentUser();
+    if (!user) {
+        container.innerHTML = `
+            <a href="/login" class="btn btn-secondary btn-sm header-login-btn">
+                <i class="fas fa-sign-in-alt"></i> Entrar
+            </a>
+        `;
+        return;
+    }
+
+    const initials = getUserInitials(user);
+    container.innerHTML = `
+        <div class="header-user-info">
+            <div class="header-user-avatar">${initials}</div>
+            <div class="header-user-text">
+                <strong>${user.nome_completo || user.username}</strong>
+                ${user.email ? `<span>${user.email}</span>` : ''}
+            </div>
+            <button class="btn btn-secondary btn-sm header-logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+    `;
+}
+
+function getUserInitials(user) {
+    const source = (user && (user.nome_completo || user.username || '')).trim();
+    if (!source) return 'US';
+    const parts = source.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 // Verifica autenticação ao carregar página (exceto login e landing)
@@ -113,8 +255,78 @@ if (!window.location.pathname.includes('/login') &&
     if (!checkAuth()) {
         // Redireciona para login
     } else {
-        // Exibe informações do usuário
-        document.addEventListener('DOMContentLoaded', displayUserInfo);
+        const boot = () => {
+            applyCurrentClientTheme();
+            renderSidebar();
+            displayUserInfo();
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', boot, { once: true });
+        } else {
+            boot();
+        }
     }
 }
+
+function getStoredClientTheme() {
+    try {
+        const stored = localStorage.getItem('cliente_tema');
+        return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+        console.warn('Tema de cliente inválido:', error);
+        return null;
+    }
+}
+
+function setThemeVariables(theme) {
+    const root = document.documentElement;
+    const finalTheme = { ...DEFAULT_THEME, ...(theme || {}) };
+    
+    root.style.setProperty('--primary', finalTheme.primary);
+    root.style.setProperty('--primary-dark', finalTheme.primaryDark || finalTheme.primary);
+    root.style.setProperty('--primary-light', finalTheme.primaryLight || finalTheme.primary);
+    root.style.setProperty('--secondary', finalTheme.secondary || DEFAULT_THEME.secondary);
+    root.style.setProperty('--secondary-light', finalTheme.secondaryLight || DEFAULT_THEME.secondaryLight);
+    if (finalTheme.background) {
+        root.style.setProperty('--background', finalTheme.background);
+    }
+}
+
+function applyCurrentClientTheme() {
+    const theme = getStoredClientTheme() || DEFAULT_THEME;
+    setThemeVariables(theme);
+    return theme;
+}
+
+function gerarIniciais(nome) {
+    if (!nome) return 'C';
+    const partes = nome.split(' ').filter(Boolean);
+    if (partes.length === 1) {
+        return partes[0].substring(0, 2).toUpperCase();
+    }
+    return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+}
+
+function formatarCNPJ(cnpj) {
+    if (!cnpj) return '';
+    const limpo = cnpj.replace(/\D/g, '');
+    if (limpo.length !== 14) return cnpj;
+    return limpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
+function trocarCliente(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    localStorage.removeItem('cliente_selecionado');
+    localStorage.removeItem('cliente_nome');
+    localStorage.removeItem('cliente_cnpj');
+    localStorage.removeItem('cliente_tema');
+    window.location.href = '/clientes';
+}
+
+window.applyCurrentClientTheme = applyCurrentClientTheme;
+window.trocarCliente = trocarCliente;
 

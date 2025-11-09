@@ -10,18 +10,38 @@ let todasColunas = []; // Todas as colunas da planilha original
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
-    loadData();
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (!clientId) {
+        showError('Selecione um cliente na aba "Clientes" para visualizar e editar os dados.');
+        renderEmptyTable();
+        updateStats();
+        return;
+    }
+    loadData(clientId);
     setupEventListeners();
 });
 
+function renderEmptyTable() {
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="12" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    Selecione um cliente na aba "Clientes" para carregar os dados.
+                </td>
+            </tr>
+        `;
+    }
+}
+
 // Carregar dados
-async function loadData() {
+async function loadData(clientId) {
     try {
         // Verifica se há upload_id na URL
         const urlParams = new URLSearchParams(window.location.search);
         const uploadId = urlParams.get('upload_id');
         
-        let url = '/api/dados/todos?client_id=1';
+        let url = `/api/dados/todos?client_id=${clientId}`;
         if (uploadId) {
             url += `&upload_id=${uploadId}`;
         }

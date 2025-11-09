@@ -1,7 +1,7 @@
 """
 Database configuration and session management
 """
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -34,3 +34,15 @@ def get_db():
 def init_db():
     """Initialize database tables"""
     Base.metadata.create_all(bind=engine)
+
+def ensure_column(table_name: str, column_name: str, column_definition: str):
+    """Ensure a column exists in a table, adding it if missing (SQLite only)."""
+    with engine.connect() as connection:
+        result = connection.execute(text(f"PRAGMA table_info({table_name})"))
+        columns = [row[1] for row in result]
+        if column_name not in columns:
+            connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"))
+
+def run_migrations():
+    """Apply lightweight schema adjustments not covered by Base metadata."""
+    ensure_column("clients", "logo_url", "VARCHAR(500)")

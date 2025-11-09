@@ -28,6 +28,7 @@ class Client(Base):
     situacao = Column(String(50), nullable=True)  # ATIVA, BAIXADA, etc.
     data_abertura = Column(Date, nullable=True)
     atividade_principal = Column(String(500), nullable=True)
+    logo_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     

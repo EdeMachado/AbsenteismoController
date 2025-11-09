@@ -46,6 +46,8 @@ let chartComparativoDiasHoras = null;
 let chartFrequenciaAtestados = null;
 let chartSetorGenero = null;
 
+const getClientId = () => (typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null);
+
 // ==================== INICIALIZAÇÃO ====================
 document.addEventListener('DOMContentLoaded', async () => {
     await carregarFiltros();
@@ -55,6 +57,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ==================== CARREGAR DASHBOARD ====================
 async function carregarDashboard() {
     try {
+        const clientId = getClientId();
+        if (!clientId) {
+            alert('Selecione um cliente na aba "Clientes" para visualizar o dashboard.');
+            return;
+        }
+
         // Pega valores dos filtros (se existirem)
         const mesInicio = document.getElementById('mesInicio')?.value || '';
         const mesFim = document.getElementById('mesFim')?.value || '';
@@ -71,7 +79,7 @@ async function carregarDashboard() {
             .map(cb => cb.value)
             .filter(v => v);
         
-        let url = '/api/dashboard?client_id=1';
+        let url = `/api/dashboard?client_id=${clientId}`;
         if (mesInicio) url += `&mes_inicio=${encodeURIComponent(mesInicio)}`;
         if (mesFim) url += `&mes_fim=${encodeURIComponent(mesFim)}`;
         
@@ -1009,6 +1017,12 @@ function renderizarChartSetorGenero(dados) {
 
 // ==================== FILTROS ====================
 async function aplicarFiltros() {
+    const clientId = getClientId();
+    if (!clientId) {
+        alert('Selecione um cliente na aba "Clientes" para aplicar filtros.');
+        return;
+    }
+
     const mesInicio = document.getElementById('mesInicio')?.value || '';
     const mesFim = document.getElementById('mesFim')?.value || '';
     
@@ -1024,7 +1038,7 @@ async function aplicarFiltros() {
         .map(option => option.value)
         .filter(v => v);
     
-    let url = '/api/dashboard?client_id=1';
+    let url = `/api/dashboard?client_id=${clientId}`;
     if (mesInicio) url += `&mes_inicio=${encodeURIComponent(mesInicio)}`;
     if (mesFim) url += `&mes_fim=${encodeURIComponent(mesFim)}`;
     
@@ -1103,7 +1117,15 @@ function limparFiltros() {
 
 async function carregarFiltros() {
     try {
-        const response = await fetch('/api/filtros?client_id=1');
+        const clientId = getClientId();
+        if (!clientId) {
+            const containerFuncionarios = document.getElementById('checkboxesFuncionarios');
+            const containerSetores = document.getElementById('checkboxesSetores');
+            if (containerFuncionarios) containerFuncionarios.innerHTML = '<div style="text-align: center; padding: 20px; color: #6c757d;">Selecione um cliente para ver funcionários.</div>';
+            if (containerSetores) containerSetores.innerHTML = '<div style="text-align: center; padding: 20px; color: #6c757d;">Selecione um cliente para ver setores.</div>';
+            return;
+        }
+        const response = await fetch(`/api/filtros?client_id=${clientId}`);
         if (!response.ok) throw new Error('Erro ao carregar filtros');
         
         const data = await response.json();

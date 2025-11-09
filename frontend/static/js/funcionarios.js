@@ -4,31 +4,26 @@
 
 let funcionariosData = [];
 
-document.addEventListener('DOMContentLoaded', () => {
-    carregarFuncionarios();
-    setupSearch();
+document.addEventListener('DOMContentLoaded', async () => {
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (!clientId) {
+        alert('Selecione um cliente na aba "Clientes" para visualizar os funcionários.');
+        return;
+    }
+    await carregarFuncionarios(clientId);
+    configurarPesquisa();
 });
 
-async function carregarFuncionarios() {
+async function carregarFuncionarios(clientIdParam) {
     try {
-        const response = await fetch('/api/analises/funcionarios?client_id=1');
-        const data = await response.json();
-        
-        funcionariosData = data;
-        renderizarFuncionarios(data);
-        renderizarResumo(data);
-        carregarSetores(data);
-        carregarFuncionariosDropdown(data);
-        
+        const clientId = clientIdParam ?? (typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null);
+        if (!clientId) return;
+        const response = await fetch(`/api/funcionarios?client_id=${clientId}`);
+        const dados = await response.json();
+        renderizarLista(dados);
     } catch (error) {
-        console.error('Erro:', error);
-        document.getElementById('funcionariosTableBody').innerHTML = `
-            <tr>
-                <td colspan="7" style="text-align: center; color: var(--danger);">
-                    Erro ao carregar dados. Faça um upload primeiro.
-                </td>
-            </tr>
-        `;
+        console.error('Erro ao carregar funcionários:', error);
+        mostrarMensagem('Erro ao carregar funcionários', 'erro');
     }
 }
 
@@ -109,7 +104,12 @@ function aplicarFiltrosFuncionarios() {
     const setor = document.getElementById('filtroSetor').value;
     const periodo = document.getElementById('filtroPeriodo').value;
     
-    let url = '/api/analises/funcionarios?client_id=1';
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (!clientId) {
+        alert('Selecione um cliente para aplicar filtros de funcionários.');
+        return;
+    }
+    let url = `/api/analises/funcionarios?client_id=${clientId}`;
     if (periodo) {
         url += `&mes_inicio=${periodo}&mes_fim=${periodo}`;
     }

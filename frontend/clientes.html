@@ -12,24 +12,655 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        .clientes-container {
-            max-width: 1400px;
-            margin: 0 auto;
+        .clientes-page {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
         }
         
-        .clientes-header {
+        .clientes-hero {
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            border-radius: 28px;
+            padding: 36px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
+            box-shadow: 0 24px 60px rgba(26, 35, 126, 0.28);
+        }
+
+        .clientes-hero-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 520px;
+        }
+        
+        .clientes-hero h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+        }
+        
+        .clientes-hero p {
+            margin: 8px 0 0;
+            font-size: 16px;
+            max-width: 520px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .btn-hero {
+            background: #2e7d32;
+            color: #fff;
+            padding: 14px 28px;
+            border-radius: 999px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            letter-spacing: 0.04em;
+            box-shadow: 0 8px 20px rgba(46, 125, 50, 0.35);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .btn-hero:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(46, 125, 50, 0.45);
+        }
+        
+        .clientes-snapshot {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+        }
+        
+        .snapshot-card {
+            position: relative;
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 20px 24px;
+            box-shadow: 0 18px 38px rgba(26, 35, 126, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
+            min-height: 140px;
+        }
+        
+        .snapshot-card::after {
+            content: "";
+            position: absolute;
+            top: -48px;
+            right: -48px;
+            width: 140px;
+            height: 140px;
+            background: rgba(26, 35, 126, 0.08);
+            border-radius: 50%;
+        }
+        
+        .snapshot-card .label {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(26, 35, 126, 0.75);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .snapshot-card .label i {
+            font-size: 14px;
+        }
+        
+        .snapshot-card .value {
+            font-size: 34px;
+            font-weight: 700;
+            color: #1a237e;
+        }
+        
+        .snapshot-card .detail {
+            font-size: 14px;
+            color: #5f6368;
+            line-height: 1.4;
+            max-width: 90%;
+        }
+        
+        .snapshot-card.loading {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #5f6368;
+        }
+        
+        .snapshot-card.loading i {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .clientes-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .filter-chip {
+            background: rgba(26, 35, 126, 0.08);
+            border: none;
+            border-radius: 999px;
+            padding: 8px 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            color: #1a237e;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .filter-chip i {
+            font-size: 13px;
+        }
+        
+        .filter-chip:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(26, 35, 126, 0.16);
+            background: rgba(26, 35, 126, 0.12);
+        }
+        
+        .filter-chip.active {
+            background: #1a237e;
+            color: #fff;
+            box-shadow: 0 10px 22px rgba(26, 35, 126, 0.35);
+        }
+        
+        .filter-chip.active:hover {
+            background: #202f97;
+        }
+        
+        .clientes-secondary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 24px;
+            align-items: start;
+        }
+        
+        .clientes-alerts,
+        .clientes-highlights,
+        .clientes-help {
+            background: var(--surface);
+            border-radius: 22px;
+            box-shadow: 0 20px 40px rgba(26, 35, 126, 0.12);
+            padding: 26px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .clientes-alerts h3,
+        .clientes-highlights h3,
+        .clientes-help h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a237e;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.04em;
+        }
+        
+        .clientes-empty-sm {
+            text-align: center;
+            padding: 24px 12px;
+            color: #5f6368;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .clientes-empty-sm i {
+            font-size: 20px;
+            opacity: 0.7;
+        }
+        
+        .alert-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        
+        .alert-item {
+            display: flex;
+            gap: 14px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: #f6f7fb;
+            border-left: 4px solid #c5cae9;
+            align-items: flex-start;
+        }
+        
+        .alert-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: rgba(26, 35, 126, 0.12);
+            color: #1a237e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        
+        .alert-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .alert-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a237e;
+        }
+        
+        .alert-message {
+            font-size: 13px;
+            color: #424242;
+            line-height: 1.4;
+        }
+        
+        .alert-item.severity-alta {
+            border-left-color: #d32f2f;
+            background: rgba(211, 47, 47, 0.08);
+        }
+        
+        .alert-item.severity-alta .alert-icon {
+            background: rgba(211, 47, 47, 0.12);
+            color: #d32f2f;
+        }
+        
+        .alert-item.severity-media {
+            border-left-color: #f9a825;
+            background: rgba(249, 168, 37, 0.10);
+        }
+        
+        .alert-item.severity-media .alert-icon {
+            background: rgba(249, 168, 37, 0.16);
+            color: #f57f17;
+        }
+        
+        .alert-item.severity-baixa {
+            border-left-color: #4caf50;
+            background: rgba(76, 175, 80, 0.08);
+        }
+        
+        .alert-item.severity-baixa .alert-icon {
+            background: rgba(76, 175, 80, 0.16);
+            color: #2e7d32;
+        }
+        
+        .alert-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .highlights-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        
+        .highlights-list li {
+            background: #f6f7fb;
+            border-radius: 18px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .highlight-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1a237e;
+        }
+        
+        .highlight-desc {
+            font-size: 13px;
+            color: #4f4f4f;
+            line-height: 1.4;
+        }
+        
+        .clientes-help ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .clientes-help a {
+            color: #1a237e;
+            text-decoration: none;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            transition: background 0.2s ease;
+        }
+        
+        .clientes-help a:hover {
+            background: rgba(26, 35, 126, 0.08);
+        }
+        
+        .clientes-help i {
+            color: #3949ab;
+        }
+        
+        .clientes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        
+        .cliente-card {
+            background: var(--surface);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid transparent;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            min-height: 0;
+        }
+        
+        .cliente-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .cliente-card.selected {
+            border-color: var(--cliente-cor, var(--primary));
+            box-shadow: 0 16px 32px rgba(26, 35, 126, 0.22);
+        }
+        
+        .cliente-card-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: stretch;
+        }
+        
+        .cliente-card-identidade {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+        
+        .cliente-card-logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: var(--cliente-banner, linear-gradient(135deg, #1a237e, #3949ab));
+            color: #fff;
+            font-weight: 700;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 12px 26px rgba(26, 35, 126, 0.25);
+            flex-shrink: 0;
+        }
+        
+        .cliente-card-logo.has-image {
+            background: #fff;
+            border: 1px solid rgba(26, 35, 126, 0.12);
+            box-shadow: 0 8px 18px rgba(26, 35, 126, 0.15);
+        }
+        
+        .cliente-card-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: inherit;
+        }
+        
+        .cliente-card-logo span {
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        .cliente-card-titulos {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        
+        .cliente-card-titulos h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .cliente-card-titulos span {
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .cliente-card-highlights {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+            justify-content: flex-start;
+        }
+        
+        .cliente-card-highlight {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            background: rgba(26, 35, 126, 0.06);
+            padding: 8px 10px;
+            border-radius: 10px;
+            min-width: 110px;
+            box-shadow: 0 8px 18px rgba(26, 35, 126, 0.12);
+        }
+        
+        .cliente-card-highlight .label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+        
+        .cliente-card-highlight .value {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .cliente-card-highlight .value i {
+            color: var(--cliente-cor, var(--primary));
+        }
+        
+        .cliente-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .cliente-status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 600;
+            background: rgba(26, 35, 126, 0.08);
+            color: var(--cliente-cor, var(--primary));
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            width: fit-content;
+        }
+        
+        .cliente-status-chip.status-archive {
+            background: rgba(255, 193, 7, 0.18);
+            color: #f57c00;
+        }
+        
+        .cliente-status-chip.status-empty {
+            background: rgba(158, 158, 158, 0.18);
+            color: #616161;
+        }
+        
+        .cliente-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px 12px;
+        }
+        
+        .cliente-meta-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        
+        .cliente-meta-item span {
+            font-size: 10px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+        
+        .cliente-meta-item strong {
+            font-size: 12px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .cliente-card-actions {
+            margin-top: auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            gap: 8px;
         }
         
-        .clientes-table {
-            width: 100%;
-            background: white;
+        .cliente-card-actions-left {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .btn-card {
+            border: none;
             border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .btn-card-primary,
+        .btn-select,
+        .btn-card-enter {
+            background: var(--cliente-cor, var(--primary));
+            color: #fff;
+            box-shadow: 0 6px 12px rgba(26, 35, 126, 0.18);
+        }
+        
+        .btn-card-primary:hover,
+        .btn-select:hover,
+        .btn-card-enter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(26, 35, 126, 0.25);
+        }
+        
+        .btn-card-secondary {
+            background: var(--surface);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-card-secondary:hover {
+            transform: translateY(-2px);
+        }
+        
+        .clientes-empty {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .clientes-manage {
+            background: var(--surface);
+            border-radius: 20px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
             overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .clientes-manage-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--divider);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        
+        .clientes-manage-header h2 {
+            margin: 0;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .clientes-table table {
@@ -38,7 +669,7 @@
         }
         
         .clientes-table th {
-            background: #1a237e;
+            background: var(--primary);
             color: white;
             padding: 16px;
             text-align: left;
@@ -48,16 +679,20 @@
         
         .clientes-table td {
             padding: 14px 16px;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid var(--border);
             font-size: 14px;
-        }
-        
-        .clientes-table tr:hover {
-            background: #f8f9fa;
         }
         
         .clientes-table tr:last-child td {
             border-bottom: none;
+        }
+        
+        .clientes-table tr.selected-row {
+            background: rgba(26, 35, 126, 0.08);
+        }
+        
+        .clientes-table tr:hover {
+            background: var(--surface-hover);
         }
         
         .acoes-cell {
@@ -69,18 +704,27 @@
             padding: 6px 10px;
             font-size: 12px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
             transition: all 0.2s;
         }
         
+        .btn-icon-small:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
         .btn-edit {
-            background: #3949ab;
+            background: var(--primary-light);
             color: white;
         }
         
         .btn-edit:hover {
-            background: #1a237e;
+            background: var(--primary);
         }
         
         .btn-delete {
@@ -89,7 +733,31 @@
         }
         
         .btn-delete:hover {
-            background: #c82333;
+            background: #b71c1c;
+        }
+        
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 10px;
+        }
+
+        .btn-archive {
+            background: #ffa000;
+            color: #fff;
+        }
+
+        .btn-archive:hover {
+            background: #ff8f00;
+        }
+
+        .btn-reactivate {
+            background: #2e7d32;
+            color: #fff;
+        }
+
+        .btn-reactivate:hover {
+            background: #256627;
         }
         
         /* Modal */
@@ -188,6 +856,39 @@
             grid-column: 1 / -1;
         }
         
+        .form-section {
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(26, 35, 126, 0.08);
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .form-section-content {
+            flex: 1;
+            min-width: 240px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .form-section-content h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a237e;
+            letter-spacing: 0.03em;
+        }
+        
+        .form-section-content p {
+            margin: 0;
+            font-size: 13px;
+            color: #5f6368;
+            line-height: 1.5;
+        }
+        
         .form-label {
             display: block;
             margin-bottom: 6px;
@@ -219,6 +920,107 @@
         .form-input:disabled {
             background: #f8f9fa;
             cursor: not-allowed;
+        }
+        
+        .logo-upload {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .logo-preview {
+            width: 110px;
+            height: 110px;
+            border-radius: 24px;
+            background: rgba(26, 35, 126, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            color: #1a237e;
+            font-weight: 600;
+            text-transform: uppercase;
+            box-shadow: inset 0 0 0 1px rgba(26, 35, 126, 0.08);
+        }
+        
+        .logo-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .logo-preview .logo-preview-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #5f6368;
+            text-align: center;
+        }
+        
+        .logo-preview .logo-preview-empty i {
+            font-size: 20px;
+            color: #1a237e;
+        }
+        
+        .logo-preview .logo-preview-initials {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a237e;
+        }
+        
+        .logo-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-logo-upload {
+            position: relative;
+            overflow: hidden;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #1a237e;
+            color: #fff;
+            border-radius: 999px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 8px 16px rgba(26, 35, 126, 0.25);
+        }
+        
+        .btn-logo-upload input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        .btn-logo-remove {
+            background: rgba(229, 57, 53, 0.12);
+            color: #c62828;
+            border: none;
+            border-radius: 999px;
+            padding: 8px 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .form-hint {
+            display: block;
+            font-size: 11px;
+            color: #5f6368;
+            margin-top: 4px;
         }
         
         .cnpj-search-btn {
@@ -280,61 +1082,92 @@
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-logo">
-                    <i class="fas fa-chart-line"></i> AbsenteismoController
+<body class="clientes-body">
+    <main class="main-page no-sidebar">
+        <header class="header clientes-header">
+            <h1 class="header-title">Clientes</h1>
+            <div class="header-actions"></div>
+        </header>
+        <div class="clientes-page">
+            <section class="clientes-hero">
+                <div class="clientes-hero-info">
+                    <h1>AbsenteismoController</h1>
+                    <p>Monitore o absenteísmo das empresas do GrupoBioMed em uma plataforma única, rápida e organizada.</p>
                 </div>
-                <div class="sidebar-subtitle">GrupoBiomed</div>
+                <button class="btn-hero" onclick="abrirModalNovo()">
+                    <i class="fas fa-plus-circle"></i>
+                    Adicionar Novo Cliente
+                </button>
+            </section>
+
+            <section class="clientes-snapshot" id="clientesSnapshot">
+                <div class="snapshot-card loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <div>Carregando indicadores...</div>
             </div>
-            
-            <nav class="sidebar-nav">
-                <a href="/" class="nav-item">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="/clientes" class="nav-item active">
-                    <i class="fas fa-building"></i>
-                    <span>🏢 Clientes</span>
-                </a>
-                <a href="/upload" class="nav-item">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <span>📤 Upload Planilha</span>
-                </a>
-                <a href="/dados_powerbi" class="nav-item">
-                    <i class="fas fa-table"></i>
-                    <span>📋 Meus Dados</span>
-                </a>
-            </nav>
-        </aside>
-        
-        <!-- Main Content -->
-        <main class="main-content">
-            <header class="header">
-                <h1 class="header-title">Clientes</h1>
-                <div class="header-actions">
-                    <button class="btn btn-primary" onclick="abrirModalNovo()">
-                        <i class="fas fa-plus"></i>
-                        Novo Cliente
+            </section>
+
+            <section class="clientes-filters" id="clientesFilters">
+                <button class="filter-chip active" data-status="todos">
+                    <i class="fas fa-layer-group"></i> Todos
                     </button>
-                </div>
-            </header>
-            
-            <div class="content">
-                <div class="clientes-container">
-                    <div id="clientesTableContainer">
-                        <div class="empty-state">
-                            <i class="fas fa-spinner fa-spin"></i>
+                <button class="filter-chip" data-status="ativos">
+                    <i class="fas fa-check-circle"></i> Ativos
+                </button>
+                <button class="filter-chip" data-status="arquivo">
+                    <i class="fas fa-archive"></i> Arquivo Morto
+                </button>
+                <button class="filter-chip" data-status="sem-dados">
+                    <i class="fas fa-database"></i> Sem Dados
+                </button>
+            </section>
+
+            <section id="clientesCards" class="clientes-grid">
+                <div class="clientes-empty">
+                    <i class="fas fa-spinner fa-spin fa-2x" style="margin-bottom: 16px;"></i>
                             <p>Carregando clientes...</p>
+                </div>
+            </section>
+
+            <section class="clientes-secondary">
+                <div class="clientes-alerts" id="clientesAlertas">
+                    <h3><i class="fas fa-bell"></i> Alertas recentes</h3>
+                    <div class="clientes-empty-sm">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        <p>Buscando alertas...</p>
                         </div>
                     </div>
+
+                <div class="clientes-highlights" id="clientesHighlights">
+                    <h3><i class="fas fa-star"></i> Novidades</h3>
+                    <ul class="highlights-list">
+                        <li>
+                            <span class="highlight-title">Comparativos aprimorados</span>
+                            <span class="highlight-desc">Relatórios agora oferecem variações mês a mês automaticamente.</span>
+                        </li>
+                        <li>
+                            <span class="highlight-title">Exportação PowerPoint</span>
+                            <span class="highlight-desc">Apresentações com insights e gráficos prontos para reunião.</span>
+                        </li>
+                        <li>
+                            <span class="highlight-title">Arquivo morto inteligente</span>
+                            <span class="highlight-desc">Clientes com histórico podem ser arquivados sem perder dados.</span>
+                        </li>
+                    </ul>
                 </div>
+
+                <div class="clientes-help">
+                    <h3><i class="fas fa-life-ring"></i> Ajuda rápida</h3>
+                    <ul>
+                        <li><a href="#" onclick="alert('Em breve: tutorial interativo.'); return false;"><i class="fas fa-play-circle"></i> Como importar a planilha mensal</a></li>
+                        <li><a href="#" onclick="alert('Em breve: guia de alertas.'); return false;"><i class="fas fa-exclamation-circle"></i> Entendendo os alertas automáticos</a></li>
+                        <li><a href="#" onclick="alert('Em breve: fluxo de relatórios.'); return false;"><i class="fas fa-file-alt"></i> Gerar relatórios PowerPoint</a></li>
+                        <li><a href="#" onclick="alert('Em breve: suporte.'); return false;"><i class="fas fa-headset"></i> Contatar suporte GrupoBioMed</a></li>
+                    </ul>
             </div>
-        </main>
+            </section>
     </div>
+        </main>
     
     <!-- Modal de Cliente -->
     <div id="modalCliente" class="modal">
@@ -452,6 +1285,31 @@
                             <input type="email" id="email" class="form-input">
                         </div>
                     </div>
+
+                    <div class="form-section">
+                        <div class="logo-preview" id="logoPreview">
+                            <div class="logo-preview-empty">
+                                <i class="fas fa-image"></i>
+                                <span>Sem logo</span>
+                            </div>
+                        </div>
+                        <div class="form-section-content">
+                            <h3>Identidade visual</h3>
+                            <p>Defina o logo para personalizar cards, relatórios e a experiência do cliente.</p>
+                            <div class="logo-actions">
+                                <label class="btn-logo-upload">
+                                    <i class="fas fa-upload"></i>
+                                    Selecionar logo
+                                    <input type="file" id="logoArquivo" accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp">
+                                </label>
+                                <button type="button" class="btn-logo-remove" onclick="removerLogoSelecionado()">
+                                    <i class="fas fa-times"></i> Remover
+                                </button>
+                            </div>
+                            <span class="form-hint">Formatos PNG, JPG, SVG ou WEBP com até 1 MB. Use imagens com fundo transparente sempre que possível.</span>
+                            <input type="hidden" id="logoUrl" value="">
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -464,6 +1322,7 @@
         </div>
     </div>
     
+    <script src="/static/js/auth.js"></script>
     <script src="/static/js/clientes.js"></script>
 </body>
 </html>
