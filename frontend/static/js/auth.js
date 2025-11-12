@@ -2,6 +2,12 @@
  * Sistema de autenticação e layout do painel
  */
 
+// Tema escuro desabilitado - sempre remove o atributo
+(function() {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('tema_escuro', 'false');
+})();
+
 const DEFAULT_THEME = {
     primary: '#1a237e',
     primaryDark: '#0d47a1',
@@ -15,6 +21,7 @@ const DEFAULT_THEME = {
 const SIDEBAR_MENU_ITEMS = [
     { path: '/', icon: 'fas fa-gauge-high', label: 'Dashboard' },
     { path: '/dados_powerbi', icon: 'fas fa-table', label: 'Meus Dados' },
+    { path: '/produtividade', icon: 'fas fa-chart-line', label: 'Produtividade' },
     { path: '/upload', icon: 'fas fa-cloud-arrow-up', label: 'Upload Mensal' },
     { path: '/apresentacao', icon: 'fas fa-tv', label: 'Apresentação' },
     { path: '/relatorios', icon: 'fas fa-chart-pie', label: 'Relatórios' },
@@ -256,6 +263,9 @@ if (!window.location.pathname.includes('/login') &&
         // Redireciona para login
     } else {
         const boot = () => {
+            // Tema escuro desabilitado - sempre remove
+            document.documentElement.removeAttribute('data-theme');
+            localStorage.setItem('tema_escuro', 'false');
             applyCurrentClientTheme();
             renderSidebar();
             displayUserInfo();
@@ -297,6 +307,12 @@ function applyCurrentClientTheme() {
     const theme = getStoredClientTheme() || DEFAULT_THEME;
     setThemeVariables(theme);
     return theme;
+}
+
+// Tema escuro desabilitado - função sempre remove o tema
+function aplicarTemaEscuroGlobal() {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('tema_escuro', 'false');
 }
 
 function gerarIniciais(nome) {

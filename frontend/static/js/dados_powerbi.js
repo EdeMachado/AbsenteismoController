@@ -7,6 +7,10 @@ let allData = [];
 let filteredData = [];
 let activeFilters = {};
 let todasColunas = []; // Todas as colunas da planilha original
+let chartTendenciaMensal = null;
+let chartTendenciaAcumulado = null;
+let anoSelecionado = null;
+let mesSelecionado = null;
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -19,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     loadData(clientId);
     setupEventListeners();
+    carregarAnosDisponiveis();
 });
 
 function renderEmptyTable() {
@@ -132,10 +137,397 @@ async function loadData(clientId) {
         
         updateStats();
         renderTable();
+        carregarAnosDisponiveis();
         
     } catch (error) {
         console.error('Erro ao carregar dados:', error);
         showError('Erro ao carregar dados');
+    }
+}
+
+// Carregar anos disponíveis nos dados
+function carregarAnosDisponiveis() {
+    const anos = new Set();
+    allData.forEach(reg => {
+        if (reg.mes_referencia) {
+            const ano = reg.mes_referencia.split('-')[0];
+            if (ano) anos.add(ano);
+        }
+    });
+    
+    const anoSelect = document.getElementById('anoSelect');
+    if (!anoSelect) return;
+    
+    // Limpa opções existentes (exceto "Todos os anos")
+    while (anoSelect.children.length > 1) {
+        anoSelect.removeChild(anoSelect.lastChild);
+    }
+    
+    // Adiciona anos em ordem decrescente
+    Array.from(anos).sort((a, b) => b - a).forEach(ano => {
+        const option = document.createElement('option');
+        option.value = ano;
+        option.textContent = ano;
+        anoSelect.appendChild(option);
+    });
+}
+
+// Selecionar mês via aba
+function selecionarMes(mes) {
+    mesSelecionado = mes;
+    
+    // Atualiza o select de mês
+    const mesSelect = document.getElementById('mesSelect');
+    if (mesSelect) {
+        mesSelect.value = mes;
+    }
+    
+    // Atualiza visual das abas
+    document.querySelectorAll('.mes-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.mes === mes) {
+            tab.classList.add('active');
+        }
+    });
+    
+    atualizarPeriodo();
+}
+
+// Atualizar período (mês/ano)
+function atualizarPeriodo() {
+    const anoSelect = document.getElementById('anoSelect');
+    const mesSelect = document.getElementById('mesSelect');
+    
+    anoSelecionado = anoSelect ? anoSelect.value : null;
+    mesSelecionado = mesSelect ? mesSelect.value : null;
+    
+    // Atualiza visual das abas de mês
+    document.querySelectorAll('.mes-tab').forEach(tab => {
+        if (mesSelecionado && tab.dataset.mes === mesSelecionado) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
+    
+    // Se apenas ano foi selecionado (sem mês), mostra tendência anual E filtra tabela
+    if (anoSelecionado && !mesSelecionado) {
+        mostrarTendenciaAnual(anoSelecionado);
+        filtrarPorPeriodo(); // Filtra a tabela também
+    } else {
+        fecharTendencia();
+        filtrarPorPeriodo();
+    }
+}
+
+// Filtrar dados por período
+function filtrarPorPeriodo() {
+    filteredData = allData.filter(reg => {
+        if (!reg.mes_referencia) return false;
+        
+        const [ano, mes] = reg.mes_referencia.split('-');
+        
+        if (anoSelecionado && ano !== anoSelecionado) return false;
+        if (mesSelecionado && mes !== mesSelecionado) return false;
+        
+        return true;
+    });
+    
+    updateStats();
+    renderTable();
+}
+
+// Mostrar tendência anual
+async function mostrarTendenciaAnual(ano) {
+    const tendenciaDiv = document.getElementById('tendenciaAnual');
+    if (!tendenciaDiv) return;
+    
+    tendenciaDiv.classList.add('show');
+    
+    // Filtra dados do ano
+    const dadosAno = allData.filter(reg => {
+        if (!reg.mes_referencia) return false;
+        return reg.mes_referencia.startsWith(ano + '-');
+    });
+    
+    // Agrupa por mês
+    const dadosPorMes = {};
+    const meses = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    
+    meses.forEach(mes => {
+        dadosPorMes[mes] = {
+            registros: 0,
+            dias: 0,
+            horas: 0
+        };
+    });
+    
+    dadosAno.forEach(reg => {
+        const mes = reg.mes_referencia ? reg.mes_referencia.split('-')[1] : null;
+        if (mes && dadosPorMes[mes]) {
+            dadosPorMes[mes].registros++;
+            dadosPorMes[mes].dias += parseFloat(reg.dias_atestados || reg.numero_dias_atestado || 0);
+            dadosPorMes[mes].horas += parseFloat(reg.horas_perdi || reg.horas_perdidas || 0);
+        }
+    });
+    
+    // Prepara dados para gráficos
+    const labels = nomesMeses;
+    const dadosRegistros = meses.map(mes => dadosPorMes[mes].registros);
+    const dadosDias = meses.map(mes => dadosPorMes[mes].dias);
+    const dadosHoras = meses.map(mes => dadosPorMes[mes].horas);
+    
+    // Calcula acumulado
+    const acumuladoDias = [];
+    const acumuladoHoras = [];
+    let totalDias = 0;
+    let totalHoras = 0;
+    
+    meses.forEach(mes => {
+        totalDias += dadosPorMes[mes].dias;
+        totalHoras += dadosPorMes[mes].horas;
+        acumuladoDias.push(totalDias);
+        acumuladoHoras.push(totalHoras);
+    });
+    
+    // Cria gráfico de tendência mensal
+    criarGraficoTendenciaMensal(labels, dadosRegistros, dadosDias, dadosHoras);
+    
+    // Cria gráfico de acumulado
+    criarGraficoAcumulado(labels, acumuladoDias, acumuladoHoras);
+    
+    // Gera análise macro
+    gerarAnaliseMacro(dadosAno, dadosPorMes, ano);
+}
+
+// Criar gráfico de tendência mensal
+function criarGraficoTendenciaMensal(labels, registros, dias, horas) {
+    const ctx = document.getElementById('chartTendenciaMensal');
+    if (!ctx) return;
+    
+    if (chartTendenciaMensal) {
+        chartTendenciaMensal.destroy();
+    }
+    
+    chartTendenciaMensal = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Registros',
+                    data: registros,
+                    borderColor: '#00bcf2',
+                    backgroundColor: 'rgba(0, 188, 242, 0.1)',
+                    tension: 0.4,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Dias Perdidos',
+                    data: dias,
+                    borderColor: '#ff9800',
+                    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'Horas Perdidas',
+                    data: horas,
+                    borderColor: '#4caf50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    tension: 0.4,
+                    yAxisID: 'y2'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Tendência Mensal - ' + anoSelecionado
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Registros'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Dias'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                y2: {
+                    type: 'linear',
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+// Criar gráfico de acumulado
+function criarGraficoAcumulado(labels, diasAcumulado, horasAcumulado) {
+    const ctx = document.getElementById('chartTendenciaAcumulado');
+    if (!ctx) return;
+    
+    if (chartTendenciaAcumulado) {
+        chartTendenciaAcumulado.destroy();
+    }
+    
+    chartTendenciaAcumulado = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Dias Acumulado',
+                    data: diasAcumulado,
+                    backgroundColor: 'rgba(0, 188, 242, 0.6)',
+                    borderColor: '#00bcf2',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Horas Acumulado',
+                    data: horasAcumulado,
+                    backgroundColor: 'rgba(255, 152, 0, 0.6)',
+                    borderColor: '#ff9800',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Acumulado Anual - ' + anoSelecionado
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Valor Acumulado'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Gerar análise macro
+function gerarAnaliseMacro(dadosAno, dadosPorMes, ano) {
+    const container = document.getElementById('analiseMacroContent');
+    if (!container) return;
+    
+    const meses = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+    
+    // Calcula totais
+    const totalRegistros = dadosAno.length;
+    const totalDias = dadosAno.reduce((sum, reg) => sum + parseFloat(reg.dias_atestados || reg.numero_dias_atestado || 0), 0);
+    const totalHoras = dadosAno.reduce((sum, reg) => sum + parseFloat(reg.horas_perdi || reg.horas_perdidas || 0), 0);
+    const mediaMensalRegistros = totalRegistros / 12;
+    const mediaMensalDias = totalDias / 12;
+    
+    // Encontra mês com maior absenteísmo
+    let mesMaior = null;
+    let maiorDias = 0;
+    Object.keys(dadosPorMes).forEach(mes => {
+        if (dadosPorMes[mes].dias > maiorDias) {
+            maiorDias = dadosPorMes[mes].dias;
+            mesMaior = mes;
+        }
+    });
+    
+    const nomesMeses = {
+        '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+        '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+        '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+    };
+    
+    // Calcula tendência (comparando primeira e segunda metade do ano)
+    const primeiraMetade = meses.slice(0, 6).reduce((sum, mes) => sum + dadosPorMes[mes].dias, 0);
+    const segundaMetade = meses.slice(6, 12).reduce((sum, mes) => sum + dadosPorMes[mes].dias, 0);
+    const variacao = primeiraMetade > 0 ? ((segundaMetade - primeiraMetade) / primeiraMetade * 100).toFixed(1) : '0.0';
+    const tendencia = parseFloat(variacao) > 0 ? 'Aumento' : parseFloat(variacao) < 0 ? 'Redução' : 'Estável';
+    
+    container.innerHTML = `
+        <div class="analise-item">
+            <div class="analise-item-title">Total de Registros</div>
+            <div class="analise-item-value">${totalRegistros.toLocaleString('pt-BR')}</div>
+            <div class="analise-item-desc">Registros de atestados em ${ano}</div>
+        </div>
+        <div class="analise-item">
+            <div class="analise-item-title">Total de Dias Perdidos</div>
+            <div class="analise-item-value">${totalDias.toFixed(1)}</div>
+            <div class="analise-item-desc">Dias de absenteísmo no ano</div>
+        </div>
+        <div class="analise-item">
+            <div class="analise-item-title">Total de Horas Perdidas</div>
+            <div class="analise-item-value">${totalHoras.toFixed(1)}</div>
+            <div class="analise-item-desc">Horas de absenteísmo no ano</div>
+        </div>
+        <div class="analise-item">
+            <div class="analise-item-title">Média Mensal de Registros</div>
+            <div class="analise-item-value">${mediaMensalRegistros.toFixed(1)}</div>
+            <div class="analise-item-desc">Média de atestados por mês</div>
+        </div>
+        <div class="analise-item">
+            <div class="analise-item-title">Média Mensal de Dias</div>
+            <div class="analise-item-value">${mediaMensalDias.toFixed(1)}</div>
+            <div class="analise-item-desc">Média de dias perdidos por mês</div>
+        </div>
+        <div class="analise-item">
+            <div class="analise-item-title">Mês com Maior Absenteísmo</div>
+            <div class="analise-item-value">${mesMaior ? nomesMeses[mesMaior] : 'N/A'}</div>
+            <div class="analise-item-desc">${mesMaior ? maiorDias.toFixed(1) + ' dias perdidos' : ''}</div>
+        </div>
+        <div class="analise-item">
+            <div class="analise-item-title">Tendência do Ano</div>
+            <div class="analise-item-value">${tendencia}</div>
+            <div class="analise-item-desc">${variacao > 0 ? '+' : ''}${variacao}% (2ª metade vs 1ª metade)</div>
+        </div>
+    `;
+}
+
+// Fechar visualização de tendência
+function fecharTendencia() {
+    const tendenciaDiv = document.getElementById('tendenciaAnual');
+    if (tendenciaDiv) {
+        tendenciaDiv.classList.remove('show');
+    }
+    
+    // Limpa seleção de ano se não houver mês selecionado
+    if (!mesSelecionado) {
+        const anoSelect = document.getElementById('anoSelect');
+        if (anoSelect) anoSelect.value = '';
+        anoSelecionado = null;
     }
 }
 
@@ -517,6 +909,24 @@ function searchData(term) {
 function clearFilters() {
     document.getElementById('searchBox').value = '';
     activeFilters = {};
+    
+    // Limpa seletores de período
+    const anoSelect = document.getElementById('anoSelect');
+    const mesSelect = document.getElementById('mesSelect');
+    if (anoSelect) anoSelect.value = '';
+    if (mesSelect) mesSelect.value = '';
+    
+    anoSelecionado = null;
+    mesSelecionado = null;
+    
+    // Remove destaque das abas
+    document.querySelectorAll('.mes-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Fecha tendência anual se estiver aberta
+    fecharTendencia();
+    
     filteredData = [...allData];
     updateStats();
     renderTable();

@@ -119,3 +119,50 @@ class Config(Base):
     descricao = Column(String(500), nullable=True)
     tipo = Column(String(50), default="string")  # string, number, boolean, json
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+class ClientColumnMapping(Base):
+    """Mapeamento de colunas da planilha por cliente"""
+    __tablename__ = "client_column_mappings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, unique=True)
+    
+    # Mapeamento de colunas da planilha para campos do sistema (JSON)
+    # Exemplo: {"NOMECOMPLETO": "nomecompleto", "SETOR_EMPRESA": "setor", ...}
+    column_mapping = Column(Text, nullable=False)  # JSON com mapeamento
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    client = relationship("Client")
+
+class Produtividade(Base):
+    """Dados de produtividade por tipo de consulta"""
+    __tablename__ = "produtividade"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    mes_referencia = Column(String(7), nullable=False)  # YYYY-MM
+    
+    # Tipo de consulta (número e descrição)
+    numero_tipo = Column(String(50), nullable=False)  # Ex: "1", "2", "Tipo A", etc.
+    tipo_consulta = Column(String(200), nullable=True)  # Descrição do tipo
+    
+    # Valores por categoria
+    ocupacionais = Column(Integer, default=0)
+    assistenciais = Column(Integer, default=0)
+    acidente_trabalho = Column(Integer, default=0)
+    inss = Column(Integer, default=0)
+    sinistralidade = Column(Integer, default=0)
+    absenteismo = Column(Integer, default=0)
+    pericia_indireta = Column(Integer, default=0)
+    total = Column(Integer, default=0)  # Soma automática
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    client = relationship("Client")

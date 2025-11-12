@@ -386,6 +386,39 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Produtividade -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Produtividade - Consultas por Categoria</h3>
+                            <p class="chart-subtitle">Distribuição de consultas por tipo (último mês cadastrado)</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartProdutividade"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Produtividade - Evolução Mensal</h3>
+                            <p class="chart-subtitle">Evolução do total de consultas mês a mês</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartProdutividadeEvolucao"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Produtividade por Mês e Categoria -->
+                <div class="chart-container" style="margin-bottom: 16px;">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Produtividade - Distribuição Mensal por Categoria</h3>
+                        <p class="chart-subtitle">Barras empilhadas mostrando a distribuição percentual por mês</p>
+                    </div>
+                    <div class="chart-wrapper" style="height: 400px;">
+                        <canvas id="chartProdutividadeMensalCategoria"></canvas>
+                    </div>
+                </div>
             </div>
         </main>
     </div>

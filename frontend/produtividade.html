@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtividade - AbsenteismoController</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background, #f8f9fa);
+        }
+        
+        .powerbi-container {
+            min-height: 100vh;
+            padding: 24px 32px;
+            background: var(--background, #f5f7fa);
+        }
+        
+        .dados-content {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        
+        .toolbar {
+            background: var(--surface, white);
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #45a049;
+        }
+        
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #e68900;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .data-table {
+            background: var(--surface, white);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+            border: 1px solid #e9ecef;
+        }
+        
+        .table-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 24px;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+            font-weight: 600;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 16px;
+        }
+        
+        .table-header i {
+            font-size: 18px;
+        }
+        
+        .table-container {
+            overflow-x: hidden;
+            overflow-y: auto;
+            max-height: 70vh;
+        }
+        
+        #tableRegistrosSalvos {
+            width: 100%;
+            table-layout: auto;
+        }
+        
+        #tableRegistrosSalvos th,
+        #tableRegistrosSalvos td {
+            padding: 8px 6px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        th, td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        
+        th:first-child {
+            border-top-left-radius: 8px;
+        }
+        
+        th:last-child {
+            border-top-right-radius: 8px;
+        }
+        
+        tbody tr {
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        tbody tr:hover {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+            border-left-color: #667eea;
+            transform: translateX(2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        tbody tr:nth-child(even):hover {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+        }
+        
+        td {
+            font-size: 14px;
+            color: #495057;
+        }
+        
+        td:first-child {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 95%;
+            max-width: 1600px;
+            max-height: 95vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #00bcf2;
+            color: white;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+        
+        .close {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .close:hover {
+            opacity: 0.7;
+        }
+        
+        .modal-body {
+            padding: 32px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .form-group input[type="number"] {
+            text-align: right;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #00bcf2;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 188, 242, 0.2);
+        }
+        
+        .consolidado-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 24px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .consolidado-table th,
+        .consolidado-table td {
+            padding: 16px;
+            text-align: left;
+            border: 1px solid #e9ecef;
+        }
+        
+        .consolidado-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            text-align: center;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .consolidado-table td input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            text-align: right;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .consolidado-table td input[type="number"]:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .consolidado-table td input[type="number"]:read-only {
+            background: #f8f9fa;
+            cursor: not-allowed;
+            border-color: #dee2e6;
+        }
+        
+        .consolidado-table .row-label {
+            font-weight: 700;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            width: 220px;
+            color: #495057;
+            font-size: 14px;
+        }
+        
+        .consolidado-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .consolidado-table tbody tr:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+        
+        .consolidado-table .total-cell {
+            font-weight: 700;
+            color: #00bcf2;
+            text-align: right;
+        }
+        
+        .consolidado-table .percentual-cell {
+            font-weight: 600;
+            text-align: right;
+            color: #6c757d;
+        }
+        
+        .modal-footer {
+            padding: 24px 32px;
+            border-top: 2px solid #e9ecef;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: #f8f9fa;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="powerbi-container">
+        <div class="dados-content">
+            <!-- Toolbar com botão Adicionar Registro -->
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="abrirModal()">
+                    <i class="fas fa-plus"></i> Adicionar Registro
+                </button>
+            </div>
+            
+            <!-- Lista de Registros Salvos -->
+            <div class="data-table">
+                <div class="table-header">
+                    <i class="fas fa-list"></i> 
+                    <span>Registros de Produtividade</span>
+                    <span id="contadorRegistros" style="margin-left: 12px; font-size: 14px; color: #6c757d; font-weight: normal;"></span>
+                </div>
+                <div class="table-container">
+                    <table id="tableRegistrosSalvos">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" style="min-width: 90px; vertical-align: middle; font-size: 12px; text-align: center;">Mês/Ano</th>
+                                <th colspan="2" style="text-align: center; font-size: 11px;">Ocupacionais</th>
+                                <th colspan="2" style="text-align: center; font-size: 11px;">Assistenciais</th>
+                                <th colspan="2" style="text-align: center; font-size: 11px;">Acid. Trabalho</th>
+                                <th colspan="2" style="text-align: center; font-size: 11px;">INSS</th>
+                                <th colspan="2" style="text-align: center; font-size: 11px;">Sinistralidade</th>
+                                <th colspan="2" style="text-align: center; font-size: 11px;">Absenteísmo</th>
+                                <th colspan="2" style="text-align: center; font-size: 11px;">Per. Indireta</th>
+                                <th rowspan="2" style="min-width: 80px; text-align: center; vertical-align: middle; font-size: 11px;">Total Agend.</th>
+                                <th rowspan="2" style="min-width: 80px; text-align: center; vertical-align: middle; font-size: 11px;">Total Faltas</th>
+                                <th rowspan="2" style="min-width: 70px; text-align: center; vertical-align: middle; font-size: 11px;">% Faltas</th>
+                                <th rowspan="2" style="min-width: 130px; vertical-align: middle; font-size: 11px; text-align: center;">Ações</th>
+                            </tr>
+                            <tr>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Agend.</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Faltas</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Agend.</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Faltas</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Agend.</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Faltas</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Agend.</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Faltas</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Agend.</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Faltas</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Agend.</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Faltas</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Agend.</th>
+                                <th style="min-width: 65px; text-align: center; font-weight: 500; font-size: 11px;">Faltas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBodySalvos">
+                            <tr>
+                                <td colspan="18" style="text-align: center; padding: 40px; color: #6c757d;">
+                                    Nenhum registro salvo ainda
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal -->
+    <div id="modalProdutividade" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Consolidado Mensal</h2>
+                <button class="close" onclick="fecharModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="modalAno">Ano *</label>
+                        <select id="modalAno" required>
+                            <option value="">Selecione o ano</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalMes">Mês *</label>
+                        <select id="modalMes" required>
+                            <option value="">Selecione o mês</option>
+                            <option value="01">Janeiro</option>
+                            <option value="02">Fevereiro</option>
+                            <option value="03">Março</option>
+                            <option value="04">Abril</option>
+                            <option value="05">Maio</option>
+                            <option value="06">Junho</option>
+                            <option value="07">Julho</option>
+                            <option value="08">Agosto</option>
+                            <option value="09">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <table class="consolidado-table">
+                    <thead>
+                        <tr>
+                            <th class="row-label">Tipo de Consulta</th>
+                            <th>Ocupacionais</th>
+                            <th>Assistenciais</th>
+                            <th>Acidentes de Trabalho</th>
+                            <th>INSS</th>
+                            <th>Sinistralidade</th>
+                            <th>Absenteísmo</th>
+                            <th>Perícia Indireta</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalTableBody">
+                        <!-- Linha Agendados -->
+                        <tr>
+                            <td class="row-label">Agendados</td>
+                            <td><input type="number" id="agendados_ocupacionais" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="agendados_assistenciais" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="agendados_acidente_trabalho" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="agendados_inss" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="agendados_sinistralidade" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="agendados_absenteismo" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="agendados_pericia_indireta" min="0" onchange="calcularConsolidado()" /></td>
+                            <td class="total-cell" id="total_agendados">0</td>
+                        </tr>
+                        <!-- Linha Compareceram -->
+                        <tr>
+                            <td class="row-label">Compareceram</td>
+                            <td><input type="number" id="compareceram_ocupacionais" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="compareceram_assistenciais" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="compareceram_acidente_trabalho" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="compareceram_inss" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="compareceram_sinistralidade" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="compareceram_absenteismo" min="0" onchange="calcularConsolidado()" /></td>
+                            <td><input type="number" id="compareceram_pericia_indireta" min="0" onchange="calcularConsolidado()" /></td>
+                            <td class="total-cell" id="total_compareceram">0</td>
+                        </tr>
+                        <!-- Linha Faltas (calculada) -->
+                        <tr>
+                            <td class="row-label">Faltas</td>
+                            <td><input type="number" id="faltas_ocupacionais" readonly /></td>
+                            <td><input type="number" id="faltas_assistenciais" readonly /></td>
+                            <td><input type="number" id="faltas_acidente_trabalho" readonly /></td>
+                            <td><input type="number" id="faltas_inss" readonly /></td>
+                            <td><input type="number" id="faltas_sinistralidade" readonly /></td>
+                            <td><input type="number" id="faltas_absenteismo" readonly /></td>
+                            <td><input type="number" id="faltas_pericia_indireta" readonly /></td>
+                            <td class="total-cell" id="total_faltas">0</td>
+                        </tr>
+                        <!-- Linha % de Faltas (calculada) -->
+                        <tr>
+                            <td class="row-label">% de Faltas</td>
+                            <td class="percentual-cell" id="percentual_ocupacionais">0%</td>
+                            <td class="percentual-cell" id="percentual_assistenciais">0%</td>
+                            <td class="percentual-cell" id="percentual_acidente_trabalho">0%</td>
+                            <td class="percentual-cell" id="percentual_inss">0%</td>
+                            <td class="percentual-cell" id="percentual_sinistralidade">0%</td>
+                            <td class="percentual-cell" id="percentual_absenteismo">0%</td>
+                            <td class="percentual-cell" id="percentual_pericia_indireta">0%</td>
+                            <td class="percentual-cell" id="percentual_total">0%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="excluirRegistro()" id="btnExcluir" style="display: inline-block;">
+                    <i class="fas fa-trash"></i> Excluir
+                </button>
+                <button class="btn btn-warning" onclick="editarRegistro()" id="btnEditar" style="display: inline-block;">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
+                <button class="btn btn-success" onclick="salvarRegistro()" id="btnSalvar">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+                <button class="btn btn-primary" onclick="fecharModal()" style="background: #6c757d;">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/produtividade.js"></script>
+</body>
+</html>

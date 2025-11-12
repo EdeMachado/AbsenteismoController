@@ -365,7 +365,7 @@ function renderizarCards() {
         const arquivado = situacao === 'ARQUIVO MORTO';
         const statusLabel = arquivado ? 'Arquivo morto' : (temDados ? 'Ativo' : 'Sem dados');
         const statusIcon = arquivado ? 'fa-archive' : (temDados ? 'fa-check-circle' : 'fa-database');
-        const statusClass = arquivado ? 'status-archive' : (temDados ? '' : 'status-empty');
+        const statusClass = arquivado ? 'status-archive' : (temDados ? 'status-active' : 'status-empty');
         const actionClass = arquivado ? 'btn-reactivate' : (temDados ? 'btn-archive' : 'btn-delete');
         const actionIcon = arquivado ? 'fa-recycle' : (temDados ? 'fa-archive' : 'fa-trash');
         const actionLabel = arquivado ? 'Ativar' : (temDados ? 'Arquivar' : 'Excluir');
@@ -405,7 +405,7 @@ function renderizarCards() {
                         ${statusLabel}
                     </div>
                     <div class="cliente-meta-grid">
-                        <div class="cliente-meta-item">
+                        <div class="cliente-meta-item situacao-item" data-situacao="${situacao.toLowerCase().replace(' ', '-')}">
                             <span>Situação</span>
                             <strong>${situacao}</strong>
                         </div>
@@ -427,6 +427,9 @@ function renderizarCards() {
                     <div class="cliente-card-actions-left">
                         <button type="button" class="btn-card btn-card-secondary" onclick="event.stopPropagation(); editarCliente(${cliente.id})" title="Editar">
                             <i class="fas fa-pen"></i>
+                        </button>
+                        <button type="button" class="btn-card btn-card-info" onclick="event.stopPropagation(); configurarMapeamento(${cliente.id})" title="Configurar Mapeamento de Planilha">
+                            <i class="fas fa-table-columns"></i>
                         </button>
                         <button type="button" class="btn-card ${actionClass}" onclick="event.stopPropagation(); confirmarDeletar(${cliente.id})" title="${actionLabel}">
                             <i class="fas ${actionIcon}"></i>

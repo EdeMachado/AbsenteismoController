@@ -12,10 +12,17 @@ from .genero_detector import GeneroDetector
 class ExcelProcessor:
     """Processador de planilhas Excel"""
     
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, custom_mapping: Dict[str, str] = None):
+        """
+        Args:
+            file_path: Caminho do arquivo Excel
+            custom_mapping: Dicionário com mapeamento customizado de colunas
+                          Ex: {"NOME_FUNC": "nomecompleto", "DEPARTAMENTO": "setor"}
+        """
         self.file_path = file_path
         self.df = None
         self.dados_processados = []
+        self.custom_mapping = custom_mapping or {}  # Mapeamento customizado do cliente
         
     def ler_planilha(self) -> bool:
         """Lê a planilha Excel"""
@@ -32,8 +39,23 @@ class ExcelProcessor:
         # Mantém os nomes originais das colunas, apenas normaliza espaços
         self.df.columns = self.df.columns.str.strip()
         
-        # Mapeamento direto dos campos da planilha padronizada (case-insensitive)
-        mapeamento = {
+        # Se houver mapeamento customizado, aplica primeiro
+        if self.custom_mapping:
+            # Cria mapeamento reverso: coluna da planilha -> campo normalizado
+            mapeamento_custom = {}
+            for col_planilha, campo_sistema in self.custom_mapping.items():
+                # Procura a coluna na planilha (case-insensitive)
+                for col_atual in self.df.columns:
+                    if col_atual.strip().upper() == col_planilha.strip().upper():
+                        # Mapeia para o campo normalizado do sistema
+                        mapeamento_custom[col_atual] = campo_sistema.upper()
+                        break
+            
+            # Aplica mapeamento customizado
+            self.df.rename(columns=mapeamento_custom, inplace=True)
+        
+        # Mapeamento padrão (fallback para colunas não mapeadas)
+        mapeamento_padrao = {
             'NOMECOMPLETO': 'NOMECOMPLETO',
             'DESCRIÇÃO ATESTAD': 'DESCRICAO_ATESTAD',
             'DESCRICAO ATESTAD': 'DESCRICAO_ATESTAD',
@@ -60,11 +82,16 @@ class ExcelProcessor:
             'Horas perdidas': 'HORAS_PERDI',
         }
         
-        # Renomeia as colunas para formato padronizado (maiúsculas com underscore)
+        # Renomeia as colunas não mapeadas para formato padronizado
+        mapeamento_custom_keys = set(mapeamento_custom.keys()) if self.custom_mapping else set()
         for col_atual in self.df.columns:
             col_normalizada = col_atual.strip()
-            if col_normalizada.upper() in mapeamento:
-                self.df.rename(columns={col_atual: mapeamento[col_normalizada.upper()]}, inplace=True)
+            # Se já foi mapeada pelo custom_mapping, pula
+            if col_atual in mapeamento_custom_keys:
+                continue
+            # Aplica mapeamento padrão
+            if col_normalizada.upper() in mapeamento_padrao:
+                self.df.rename(columns={col_atual: mapeamento_padrao[col_normalizada.upper()]}, inplace=True)
             else:
                 # Se não estiver no mapeamento, normaliza para maiúsculas com underscore
                 col_nova = col_normalizada.upper().replace(' ', '_').replace('/', '_')

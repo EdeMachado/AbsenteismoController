@@ -14,7 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeClientContext();
     setupDragDrop();
     loadUploads();
+    inicializarAnosReferencia();
 });
+
+function inicializarAnosReferencia() {
+    const anoSelect = document.getElementById('anoReferencia');
+    if (!anoSelect) return;
+    
+    const anoAtual = new Date().getFullYear();
+    // Adiciona anos de 2020 até 5 anos no futuro
+    for (let ano = 2020; ano <= anoAtual + 5; ano++) {
+        const option = document.createElement('option');
+        option.value = ano;
+        option.textContent = ano;
+        if (ano === anoAtual) {
+            option.selected = true;
+        }
+        anoSelect.appendChild(option);
+    }
+}
 
 function setupDragDrop() {
     const uploadZone = document.getElementById('uploadZone');
@@ -83,11 +101,78 @@ function showFileSelected() {
     document.getElementById('fileSize').textContent = formatFileSize(selectedFile.size);
     document.getElementById('fileSelectedDiv').style.display = 'flex';
     document.getElementById('uploadZone').style.display = 'none';
+    
+    // Tenta detectar mês/ano do nome do arquivo ou usa valores padrão
+    const nomeArquivo = selectedFile.name.toLowerCase();
+    const mesAtual = new Date().getMonth() + 1;
+    const anoAtual = new Date().getFullYear();
+    
+    // Tenta detectar mês no nome do arquivo
+    const meses = {
+        'jan': '01', 'january': '01', 'janeiro': '01',
+        'fev': '02', 'february': '02', 'fevereiro': '02',
+        'mar': '03', 'march': '03', 'março': '03',
+        'abr': '04', 'april': '04', 'abril': '04',
+        'mai': '05', 'may': '05', 'maio': '05',
+        'jun': '06', 'june': '06', 'junho': '06',
+        'jul': '07', 'july': '07', 'julho': '07',
+        'ago': '08', 'august': '08', 'agosto': '08',
+        'set': '09', 'september': '09', 'setembro': '09',
+        'out': '10', 'october': '10', 'outubro': '10',
+        'nov': '11', 'november': '11', 'novembro': '11',
+        'dez': '12', 'december': '12', 'dezembro': '12'
+    };
+    
+    let mesDetectado = null;
+    for (const [key, value] of Object.entries(meses)) {
+        if (nomeArquivo.includes(key)) {
+            mesDetectado = value;
+            break;
+        }
+    }
+    
+    // Tenta detectar ano no nome do arquivo (4 dígitos)
+    const anoMatch = nomeArquivo.match(/\b(20\d{2})\b/);
+    const anoDetectado = anoMatch ? anoMatch[1] : null;
+    
+    // Preenche os campos se detectou algo
+    const mesSelect = document.getElementById('mesReferencia');
+    const anoSelect = document.getElementById('anoReferencia');
+    
+    if (mesSelect && mesDetectado) {
+        mesSelect.value = mesDetectado;
+    } else if (mesSelect) {
+        // Se não detectou, sugere o mês anterior (comum em planilhas mensais)
+        // Ex: se estamos em novembro, a planilha provavelmente é de outubro
+        let mesAnterior = mesAtual - 1;
+        if (mesAnterior === 0) {
+            mesAnterior = 12;
+            // Se for janeiro, o mês anterior seria dezembro do ano anterior
+            // Mas mantemos o ano atual por enquanto
+        }
+        mesSelect.value = String(mesAnterior).padStart(2, '0');
+    }
+    
+    if (anoSelect && anoDetectado) {
+        anoSelect.value = anoDetectado;
+    } else if (anoSelect) {
+        anoSelect.value = anoAtual;
+    }
 }
 
 function cancelFile() {
     selectedFile = null;
     document.getElementById('fileInput').value = '';
+    
+    // Limpa campos de período
+    const mesSelect = document.getElementById('mesReferencia');
+    const anoSelect = document.getElementById('anoReferencia');
+    if (mesSelect) mesSelect.value = '';
+    if (anoSelect) {
+        const anoAtual = new Date().getFullYear();
+        anoSelect.value = anoAtual; // Mantém o ano atual como padrão
+    }
+    
     document.getElementById('fileSelectedDiv').style.display = 'none';
     document.getElementById('uploadZone').style.display = 'block';
 }
@@ -103,9 +188,21 @@ async function uploadFile() {
         return;
     }
     
+    // Valida período de referência
+    const mesRef = document.getElementById('mesReferencia')?.value;
+    const anoRef = document.getElementById('anoReferencia')?.value;
+    
+    if (!mesRef || !anoRef) {
+        alert('Por favor, selecione o mês e ano de referência da planilha.\n\nExemplo: Se a planilha contém dados de outubro/2025, selecione Outubro e 2025.');
+        return;
+    }
+    
+    const mesReferencia = `${anoRef}-${mesRef}`;
+    
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('client_id', currentClient.id);
+    formData.append('mes_referencia', mesReferencia);
     
     // Show progress
     document.getElementById('progressContainer').style.display = 'block';
@@ -148,19 +245,31 @@ async function uploadFile() {
             }, 2000);
             
         } else {
-            throw new Error('Erro no upload');
+            // Tenta obter a mensagem de erro do servidor
+            let errorMessage = 'Erro no upload';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || errorMessage;
+            } catch (e) {
+                errorMessage = `Erro ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
         
     } catch (error) {
         console.error('Erro:', error);
+        const errorMessage = error.message || 'Erro ao processar arquivo';
         document.getElementById('progressFill').style.width = '100%';
         document.getElementById('progressFill').style.background = 'var(--danger)';
-        document.getElementById('progressText').textContent = 'Erro ao processar arquivo';
+        document.getElementById('progressText').textContent = errorMessage;
+        
+        // Mostra alerta com detalhes do erro
+        alert(`Erro no upload:\n\n${errorMessage}\n\nVerifique:\n- Se o arquivo é um Excel válido (.xlsx ou .xls)\n- Se o cliente está selecionado\n- Se a planilha tem o formato correto`);
         
         setTimeout(() => {
             document.getElementById('progressContainer').style.display = 'none';
             document.getElementById('progressFill').style.background = 'var(--success)';
-        }, 3000);
+        }, 5000);
     }
 }
 
@@ -264,7 +373,22 @@ function formatDateTime(dateStr) {
 }
 
 function initializeClientContext() {
-    const storedId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    // Tenta obter o ID do cliente de várias formas
+    let storedId = null;
+    
+    // Método 1: Função global getCurrentClientId
+    if (typeof window.getCurrentClientId === 'function') {
+        storedId = window.getCurrentClientId(null);
+    }
+    
+    // Método 2: localStorage direto
+    if (!storedId) {
+        const stored = localStorage.getItem('cliente_selecionado');
+        if (stored) {
+            storedId = Number(stored);
+        }
+    }
+    
     const numericId = Number(storedId);
     currentClient = {
         id: Number.isFinite(numericId) && numericId > 0 ? numericId : null,
@@ -272,6 +396,8 @@ function initializeClientContext() {
         cnpj: localStorage.getItem('cliente_cnpj') || '',
         logo: localStorage.getItem('cliente_logo_url') || ''
     };
+    
+    console.log('Cliente inicializado:', currentClient);
     renderCurrentClientBanner();
     setUploadAvailability(Boolean(currentClient.id));
 }

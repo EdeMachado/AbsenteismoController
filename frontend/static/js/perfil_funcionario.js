@@ -34,7 +34,14 @@ async function carregarPerfil() {
         const response = await fetch(`/api/funcionario/perfil?nome=${encodeURIComponent(nomeFuncionario)}&client_id=${clientId}`);
         
         if (!response.ok) {
-            throw new Error('Erro ao carregar dados');
+            let errorMessage = 'Erro ao carregar dados do funcionário';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || errorMessage;
+            } catch (e) {
+                errorMessage = `Erro ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();
@@ -62,20 +69,28 @@ async function carregarPerfil() {
         renderizarHistorico(data.historico || []);
         
         // Mostra conteúdo
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('conteudo').style.display = 'block';
+        const loadingEl = document.getElementById('loading');
+        const conteudoEl = document.getElementById('conteudo');
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (conteudoEl) conteudoEl.style.display = 'block';
         
     } catch (error) {
-        console.error('Erro:', error);
-        document.getElementById('loading').innerHTML = `
-            <div style="color: #c33;">
-                <i class="fas fa-exclamation-triangle fa-3x"></i>
-                <p style="margin-top: 16px;">Erro ao carregar dados do funcionário</p>
-                <button class="btn btn-primary" onclick="window.location.href='/funcionarios'" style="margin-top: 16px;">
-                    Voltar para Funcionários
-                </button>
-            </div>
-        `;
+        console.error('Erro ao carregar perfil:', error);
+        const loadingEl = document.getElementById('loading');
+        if (loadingEl) {
+            loadingEl.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--warning); margin-bottom: 16px;"></i>
+                    <h3 style="color: var(--text-primary); margin-bottom: 8px;">Erro ao carregar perfil</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 24px;">${error.message || 'Erro desconhecido'}</p>
+                    <button class="btn btn-primary" onclick="window.location.href='/funcionarios'">
+                        <i class="fas fa-arrow-left"></i> Voltar para Funcionários
+                    </button>
+                </div>
+            `;
+        }
+        const conteudoEl = document.getElementById('conteudo');
+        if (conteudoEl) conteudoEl.style.display = 'none';
     }
 }
 

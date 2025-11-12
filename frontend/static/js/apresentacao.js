@@ -19,7 +19,11 @@ const PALETA_EMPRESA = [
 
 // ==================== INICIALIZAÇÃO ====================
 document.addEventListener('DOMContentLoaded', () => {
-    carregarApresentacao();
+    // Aguarda um pouco para garantir que auth.js carregou
+    setTimeout(() => {
+        console.log('Inicializando apresentação...');
+        carregarApresentacao();
+    }, 500);
     
     // Navegação por teclado
     document.addEventListener('keydown', (e) => {
@@ -30,15 +34,46 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==================== CARREGAR APRESENTAÇÃO ====================
-async function carregarApresentacao() {
+async function carregarApresentacao(forceClientId = null) {
     try {
-        const clientId = localStorage.getItem('cliente_selecionado') || 1;
-        const response = await fetch(`/api/apresentacao?client_id=${clientId}`);
+        // Sempre obtém o client_id atual do localStorage (sem valor padrão)
+        let clientId = forceClientId;
         
-        if (!response.ok) throw new Error('Erro ao carregar apresentação');
+        if (!clientId) {
+            if (typeof window.getCurrentClientId === 'function') {
+                clientId = window.getCurrentClientId(null);
+            } else {
+                const stored = localStorage.getItem('cliente_selecionado');
+                clientId = stored ? Number(stored) : null;
+            }
+        }
+        
+        // Converte para número se for string
+        if (typeof clientId === 'string') {
+            clientId = Number(clientId);
+        }
+        
+        // Valida se é um número válido
+        if (!clientId || !Number.isFinite(clientId) || clientId <= 0 || clientId === 'null' || clientId === 'undefined') {
+            mostrarErro('Selecione um cliente para visualizar a apresentação');
+            return;
+        }
+        
+        console.log('Carregando apresentação para cliente ID:', clientId);
+        
+        // Adiciona timestamp para evitar cache
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/apresentacao?client_id=${clientId}&_t=${timestamp}`);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Erro ao carregar apresentação: ${response.status} - ${errorText}`);
+        }
         
         const data = await response.json();
         slides = data.slides || [];
+        
+        console.log('Slides carregados:', slides.length, 'para cliente:', clientId);
         
         document.getElementById('totalSlides').textContent = slides.length;
         
@@ -53,6 +88,35 @@ async function carregarApresentacao() {
         console.error('Erro ao carregar apresentação:', error);
         mostrarErro('Erro ao carregar apresentação: ' + error.message);
     }
+}
+
+// Recarrega quando o cliente muda
+if (typeof window !== 'undefined') {
+    // Observa mudanças no localStorage
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'cliente_selecionado') {
+            console.log('Cliente mudou no storage, recarregando apresentação...');
+            setTimeout(() => {
+                carregarApresentacao();
+            }, 300);
+        }
+    });
+    
+    // Observa mudanças diretas no localStorage (mesma aba)
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        originalSetItem.apply(this, arguments);
+        if (key === 'cliente_selecionado') {
+            console.log('Cliente mudou no localStorage, recarregando apresentação...');
+            // Recarrega a apresentação quando o cliente muda
+            setTimeout(() => {
+                const newClientId = Number(value);
+                if (newClientId && Number.isFinite(newClientId) && newClientId > 0) {
+                    carregarApresentacao(newClientId);
+                }
+            }, 300);
+        }
+    };
 }
 
 // ==================== RENDERIZAR SLIDE ====================
@@ -99,6 +163,10 @@ function renderizarSlide(slide) {
                     <div class="analise-texto">${formatarAnalise(slide.analise)}</div>
                 </div>
             `;
+            html += `</div>`;
+        } else if (slide.tipo === 'produtividade') {
+            html += `<div class="slide-body">`;
+            html += renderizarProdutividade(slide);
             html += `</div>`;
         } else if (slide.tipo === 'acoes_intro' || slide.tipo === 'acoes_saude_fisica' || slide.tipo === 'acoes_saude_emocional' || slide.tipo === 'acoes_saude_social') {
             // Slides de ações ocupam toda a altura (sem grid de análise)
@@ -1145,6 +1213,299 @@ function renderizarAcoesSaudeSocial(tipo) {
             </div>
         </div>
     `;
+}
+
+// ==================== PRODUTIVIDADE ====================
+function renderizarProdutividade(slide) {
+    const dados = slide.dados || [];
+    
+    if (!dados || dados.length === 0) {
+        return '<div class="empty-state"><p>Nenhum dado de produtividade disponível</p></div>';
+    }
+    
+    // Calcula totais por categoria
+    const totais = {
+        ocupacionais: dados.reduce((sum, d) => sum + (d.ocupacionais || 0), 0),
+        assistenciais: dados.reduce((sum, d) => sum + (d.assistenciais || 0), 0),
+        acidente_trabalho: dados.reduce((sum, d) => sum + (d.acidente_trabalho || 0), 0),
+        inss: dados.reduce((sum, d) => sum + (d.inss || 0), 0),
+        absenteismo: dados.reduce((sum, d) => sum + (d.absenteismo || 0), 0),
+        total: dados.reduce((sum, d) => sum + (d.total || 0), 0)
+    };
+    
+    // Carrega configurações
+    const config = JSON.parse(localStorage.getItem('produtividade_apresentacao') || '{}');
+    
+    // Determina layout baseado nos gráficos ativos
+    const graficosAtivos = [];
+    if (config.graficoCategoria?.ativo !== false) graficosAtivos.push('categoria');
+    if (config.graficoTipo?.ativo !== false) graficosAtivos.push('tipo');
+    if (config.graficoEvolucao?.ativo === true) graficosAtivos.push('evolucao');
+    
+    if (graficosAtivos.length === 0) {
+        return '<div class="empty-state"><p>Nenhum gráfico configurado para exibição</p></div>';
+    }
+    
+    let html = '';
+    
+    // Layout responsivo baseado na quantidade de gráficos
+    if (graficosAtivos.length === 1) {
+        html = `<div style="display: flex; justify-content: center; align-items: center; height: 100%;">`;
+        if (graficosAtivos.includes('categoria')) {
+            html += `<div style="width: 80%; max-width: 800px;"><canvas id="chartProdutividadeCategorias"></canvas></div>`;
+        } else if (graficosAtivos.includes('tipo')) {
+            html += `<div style="width: 80%; max-width: 800px;"><canvas id="chartProdutividadeTipos"></canvas></div>`;
+        } else if (graficosAtivos.includes('evolucao')) {
+            html += `<div style="width: 100%;"><canvas id="graficoEvolucaoProdutividade"></canvas></div>`;
+        }
+        html += `</div>`;
+    } else if (graficosAtivos.length === 2) {
+        html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; height: 100%;">`;
+        if (graficosAtivos.includes('categoria')) {
+            html += `<div><canvas id="chartProdutividadeCategorias"></canvas></div>`;
+        }
+        if (graficosAtivos.includes('tipo')) {
+            html += `<div><canvas id="chartProdutividadeTipos"></canvas></div>`;
+        }
+        if (graficosAtivos.includes('evolucao')) {
+            html += `<div style="grid-column: 1 / -1;"><canvas id="graficoEvolucaoProdutividade"></canvas></div>`;
+        }
+        html += `</div>`;
+    } else {
+        html = `<div style="display: flex; flex-direction: column; gap: 24px; height: 100%;">`;
+        if (graficosAtivos.includes('categoria') || graficosAtivos.includes('tipo')) {
+            html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">`;
+            if (graficosAtivos.includes('categoria')) {
+                html += `<div><canvas id="chartProdutividadeCategorias"></canvas></div>`;
+            }
+            if (graficosAtivos.includes('tipo')) {
+                html += `<div><canvas id="chartProdutividadeTipos"></canvas></div>`;
+            }
+            html += `</div>`;
+        }
+        if (graficosAtivos.includes('evolucao')) {
+            html += `<div style="flex: 1; min-height: 300px;"><canvas id="graficoEvolucaoProdutividade"></canvas></div>`;
+        }
+        html += `</div>`;
+    }
+    
+    // Renderiza gráficos após o HTML ser inserido
+    setTimeout(() => {
+        renderizarGraficoProdutividade(dados, totais);
+    }, 100);
+    
+    return html;
+}
+
+function renderizarGraficoProdutividade(dados, totais) {
+    // Carrega configurações
+    const config = JSON.parse(localStorage.getItem('produtividade_apresentacao') || '{}');
+    
+    // Gráfico de categorias
+    if (config.graficoCategoria?.ativo !== false) {
+        const ctxCategorias = document.getElementById('chartProdutividadeCategorias');
+        if (ctxCategorias && !charts['produtividade_categorias']) {
+            const tipoGrafico = config.graficoCategoria?.tipo || 'bar';
+            
+            const configChart = {
+                type: tipoGrafico,
+                data: {
+                    labels: ['Ocupacionais', 'Assistenciais', 'Acidente de Trabalho', 'INSS', 'Absenteísmo'],
+                    datasets: [{
+                        label: 'Total de Consultas',
+                        data: [
+                            totais.ocupacionais,
+                            totais.assistenciais,
+                            totais.acidente_trabalho,
+                            totais.inss,
+                            totais.absenteismo
+                        ],
+                        backgroundColor: [
+                            CORES_EMPRESA.primary,
+                            CORES_EMPRESA.secondary,
+                            '#ff9800',
+                            '#9c27b0',
+                            '#f44336'
+                        ],
+                        borderColor: [
+                            CORES_EMPRESA.primaryDark,
+                            CORES_EMPRESA.secondaryDark,
+                            '#f57c00',
+                            '#7b1fa2',
+                            '#c62828'
+                        ],
+                        borderRadius: tipoGrafico === 'bar' ? 6 : 0,
+                        borderWidth: tipoGrafico === 'pie' || tipoGrafico === 'doughnut' ? 2 : 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            display: tipoGrafico === 'pie' || tipoGrafico === 'doughnut' || tipoGrafico === 'radar',
+                            position: 'bottom'
+                        }
+                    },
+                    scales: tipoGrafico !== 'pie' && tipoGrafico !== 'doughnut' && tipoGrafico !== 'radar' ? {
+                        y: { beginAtZero: true }
+                    } : undefined
+                }
+            };
+            
+            charts['produtividade_categorias'] = new Chart(ctxCategorias, configChart);
+        }
+    }
+    
+    // Gráfico de tipos
+    if (config.graficoTipo?.ativo !== false) {
+        const ctxTipos = document.getElementById('chartProdutividadeTipos');
+        if (ctxTipos && !charts['produtividade_tipos']) {
+            const tipos = dados.map(d => d.tipo_consulta || d.numero_tipo || 'N/A');
+            const totaisTipos = dados.map(d => d.total || 0);
+            const tipoGrafico = config.graficoTipo?.tipo || 'doughnut';
+            
+            const configChart = {
+                type: tipoGrafico,
+                data: {
+                    labels: tipos,
+                    datasets: [{
+                        label: 'Total',
+                        data: totaisTipos,
+                        backgroundColor: PALETA_EMPRESA
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: tipoGrafico === 'bar' || tipoGrafico === 'line' ? {
+                        y: { beginAtZero: true }
+                    } : undefined
+                }
+            };
+            
+            charts['produtividade_tipos'] = new Chart(ctxTipos, configChart);
+        }
+    }
+    
+    // Gráfico de evolução mensal (se ativado)
+    if (config.graficoEvolucao?.ativo === true) {
+        renderizarGraficoEvolucaoMensal(config.graficoEvolucao?.tipo || 'line');
+    }
+}
+
+function renderizarGraficoEvolucaoMensal(tipoGrafico) {
+    // Busca dados dos últimos 12 meses usando a nova API
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (!clientId) return;
+    
+    fetch(`/api/produtividade/evolucao?client_id=${clientId}&agrupar_por=mes`)
+        .then(response => response.json())
+        .then(data => {
+            const dadosAgregados = data.data || [];
+            
+            // Pega últimos 12 meses
+            const dadosRecentes = dadosAgregados.slice(-12);
+            
+            // Formata labels
+            const meses = {
+                '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+                '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+                '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+            };
+            
+            const labels = dadosRecentes.map(d => {
+                if (d.periodo && d.periodo.includes('-')) {
+                    const [ano, mes] = d.periodo.split('-');
+                    return `${meses[mes] || mes}/${ano.slice(-2)}`;
+                }
+                return d.periodo;
+            });
+            
+            const dadosEvolucao = {
+                ocupacionais: dadosRecentes.map(d => d.ocupacionais || 0),
+                assistenciais: dadosRecentes.map(d => d.assistenciais || 0),
+                acidente_trabalho: dadosRecentes.map(d => d.acidente_trabalho || 0),
+                inss: dadosRecentes.map(d => d.inss || 0),
+                absenteismo: dadosRecentes.map(d => d.absenteismo || 0),
+                total: dadosRecentes.map(d => d.total || 0)
+            };
+            
+            setTimeout(() => {
+                const ctx = document.getElementById('graficoEvolucaoProdutividade');
+                if (ctx && !charts['produtividade_evolucao']) {
+                    const isArea = tipoGrafico === 'area';
+                    charts['produtividade_evolucao'] = new Chart(ctx, {
+                        type: isArea ? 'line' : tipoGrafico,
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Ocupacionais',
+                                    data: dadosEvolucao.ocupacionais,
+                                    borderColor: CORES_EMPRESA.primary,
+                                    backgroundColor: isArea ? 'rgba(26, 35, 126, 0.2)' : CORES_EMPRESA.primary,
+                                    fill: isArea,
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Assistenciais',
+                                    data: dadosEvolucao.assistenciais,
+                                    borderColor: CORES_EMPRESA.secondary,
+                                    backgroundColor: isArea ? 'rgba(85, 107, 47, 0.2)' : CORES_EMPRESA.secondary,
+                                    fill: isArea,
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Acidente de Trabalho',
+                                    data: dadosEvolucao.acidente_trabalho,
+                                    borderColor: '#ff9800',
+                                    backgroundColor: isArea ? 'rgba(255, 152, 0, 0.2)' : '#ff9800',
+                                    fill: isArea,
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'INSS',
+                                    data: dadosEvolucao.inss,
+                                    borderColor: '#9c27b0',
+                                    backgroundColor: isArea ? 'rgba(156, 39, 176, 0.2)' : '#9c27b0',
+                                    fill: isArea,
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Absenteísmo',
+                                    data: dadosEvolucao.absenteismo,
+                                    borderColor: '#f44336',
+                                    backgroundColor: isArea ? 'rgba(244, 67, 54, 0.2)' : '#f44336',
+                                    fill: isArea,
+                                    tension: 0.4
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            },
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+            }, 100);
+        })
+        .catch(error => {
+            console.error('Erro ao carregar dados de evolução:', error);
+        });
 }
 
 // ==================== EDIÇÃO DE AÇÕES ====================

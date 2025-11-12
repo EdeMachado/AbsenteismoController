@@ -45,6 +45,9 @@ let chartEvolucaoSetor = null;
 let chartComparativoDiasHoras = null;
 let chartFrequenciaAtestados = null;
 let chartSetorGenero = null;
+let chartProdutividade = null;
+let chartProdutividadeEvolucao = null;
+let chartProdutividadeMensalCategoria = null;
 
 const getClientId = () => (typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null);
 
@@ -127,6 +130,11 @@ async function carregarDashboard() {
         renderizarChartComparativoDiasHoras(data.comparativo_dias_horas || []);
         renderizarChartFrequenciaAtestados(data.frequencia_atestados || []);
         renderizarChartSetorGenero(data.dias_setor_genero || []);
+        renderizarChartProdutividade(data.produtividade || []);
+        renderizarChartProdutividadeMensalCategoria(data.produtividade || []);
+        
+        // Carrega evolução de produtividade separadamente
+        await carregarEvolucaoProdutividade();
         
     } catch (error) {
         console.error('Erro ao carregar dashboard:', error);
@@ -876,6 +884,572 @@ function renderizarChartFrequenciaAtestados(dados) {
     });
 }
 
+function renderizarChartProdutividade(dados) {
+    const ctx = document.getElementById('chartProdutividade');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    if (chartProdutividade) chartProdutividade.destroy();
+    
+    // Agrupa por mês
+    const dadosPorMes = {};
+    dados.forEach(d => {
+        const mesRef = d.mes_referencia || 'sem-mes';
+        if (!dadosPorMes[mesRef]) {
+            dadosPorMes[mesRef] = [];
+        }
+        dadosPorMes[mesRef].push(d);
+    });
+    
+    // Calcula totais de Agendados e Faltas por categoria (soma de todos os meses)
+    const totaisAgendados = {
+        ocupacionais: 0,
+        assistenciais: 0,
+        acidente_trabalho: 0,
+        inss: 0,
+        sinistralidade: 0,
+        absenteismo: 0,
+        pericia_indireta: 0
+    };
+    
+    const totaisFaltas = {
+        ocupacionais: 0,
+        assistenciais: 0,
+        acidente_trabalho: 0,
+        inss: 0,
+        sinistralidade: 0,
+        absenteismo: 0,
+        pericia_indireta: 0
+    };
+    
+    Object.values(dadosPorMes).forEach(dadosMes => {
+        // Busca os registros de "Agendados" e "Compareceram" para este mês
+        const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+        const compareceram = dadosMes.find(d => d.tipo_consulta === 'Compareceram');
+        
+        if (agendados) {
+            totaisAgendados.ocupacionais += (agendados.ocupacionais || 0);
+            totaisAgendados.assistenciais += (agendados.assistenciais || 0);
+            totaisAgendados.acidente_trabalho += (agendados.acidente_trabalho || 0);
+            totaisAgendados.inss += (agendados.inss || 0);
+            totaisAgendados.sinistralidade += (agendados.sinistralidade || 0);
+            totaisAgendados.absenteismo += (agendados.absenteismo || 0);
+            totaisAgendados.pericia_indireta += (agendados.pericia_indireta || 0);
+        }
+        
+        if (agendados && compareceram) {
+            // Calcula faltas: Agendados - Compareceram
+            totaisFaltas.ocupacionais += Math.max(0, (agendados.ocupacionais || 0) - (compareceram.ocupacionais || 0));
+            totaisFaltas.assistenciais += Math.max(0, (agendados.assistenciais || 0) - (compareceram.assistenciais || 0));
+            totaisFaltas.acidente_trabalho += Math.max(0, (agendados.acidente_trabalho || 0) - (compareceram.acidente_trabalho || 0));
+            totaisFaltas.inss += Math.max(0, (agendados.inss || 0) - (compareceram.inss || 0));
+            totaisFaltas.sinistralidade += Math.max(0, (agendados.sinistralidade || 0) - (compareceram.sinistralidade || 0));
+            totaisFaltas.absenteismo += Math.max(0, (agendados.absenteismo || 0) - (compareceram.absenteismo || 0));
+            totaisFaltas.pericia_indireta += Math.max(0, (agendados.pericia_indireta || 0) - (compareceram.pericia_indireta || 0));
+        }
+    });
+    
+    // Calcula compareceram (Agendados - Faltas) para mostrar na barra empilhada
+    const totaisCompareceram = {
+        ocupacionais: totaisAgendados.ocupacionais - totaisFaltas.ocupacionais,
+        assistenciais: totaisAgendados.assistenciais - totaisFaltas.assistenciais,
+        acidente_trabalho: totaisAgendados.acidente_trabalho - totaisFaltas.acidente_trabalho,
+        inss: totaisAgendados.inss - totaisFaltas.inss,
+        sinistralidade: totaisAgendados.sinistralidade - totaisFaltas.sinistralidade,
+        absenteismo: totaisAgendados.absenteismo - totaisFaltas.absenteismo,
+        pericia_indireta: totaisAgendados.pericia_indireta - totaisFaltas.pericia_indireta
+    };
+    
+    // Determina o período (ano e mês mais recente)
+    const meses = Object.keys(dadosPorMes).sort();
+    let periodoTexto = '';
+    if (meses.length > 0) {
+        const mesMaisRecente = meses[meses.length - 1]; // YYYY-MM
+        const [ano, mes] = mesMaisRecente.split('-');
+        const mesesNomes = {
+            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+            '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+            '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+        };
+        periodoTexto = `Ano ${ano} até ${mesesNomes[mes] || mes}`;
+    }
+    
+    // Cria array de categorias com seus totais para ordenação
+    const categorias = [
+        { nome: 'Ocupacionais', key: 'ocupacionais' },
+        { nome: 'Assistenciais', key: 'assistenciais' },
+        { nome: 'Acidente de Trabalho', key: 'acidente_trabalho' },
+        { nome: 'INSS', key: 'inss' },
+        { nome: 'Sinistralidade', key: 'sinistralidade' },
+        { nome: 'Absenteísmo', key: 'absenteismo' },
+        { nome: 'Perícia Indireta', key: 'pericia_indireta' }
+    ];
+    
+    // Ordena em ordem decrescente pelo total de agendados
+    categorias.sort((a, b) => {
+        const totalA = totaisAgendados[a.key] || 0;
+        const totalB = totaisAgendados[b.key] || 0;
+        return totalB - totalA;
+    });
+    
+    // Prepara os dados ordenados
+    const labelsOrdenados = categorias.map(c => c.nome);
+    const dataCompareceram = categorias.map(c => Math.max(0, totaisCompareceram[c.key]));
+    const dataFaltas = categorias.map(c => totaisFaltas[c.key]);
+    
+    chartProdutividade = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labelsOrdenados,
+            datasets: [
+                {
+                    label: 'Compareceram',
+                    data: dataCompareceram,
+                    backgroundColor: '#0056b3',
+                    borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 }
+                },
+                {
+                    label: 'Faltas',
+                    data: dataFaltas,
+                    backgroundColor: '#dc3545',
+                    borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 }
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: periodoTexto || 'Produtividade - Consultas por Categoria',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    padding: {
+                        top: 10,
+                        bottom: 20
+                    }
+                },
+                legend: { 
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: { size: 12 },
+                        usePointStyle: true,
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            const index = context.dataIndex;
+                            const categoriaKey = categorias[index].key;
+                            const total = totaisAgendados[categoriaKey];
+                            const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} consultas (${percent}%)`;
+                        },
+                        footer: function(tooltipItems) {
+                            if (tooltipItems.length > 0) {
+                                const index = tooltipItems[0].dataIndex;
+                                const categoriaKey = categorias[index].key;
+                                const total = totaisAgendados[categoriaKey];
+                                const compareceram = totaisCompareceram[categoriaKey];
+                                const faltas = totaisFaltas[categoriaKey];
+                                const percentCompareceram = total > 0 ? ((compareceram / total) * 100).toFixed(1) : 0;
+                                const percentFaltas = total > 0 ? ((faltas / total) * 100).toFixed(1) : 0;
+                                return [
+                                    `Total Agendados: ${total} consultas`,
+                                    `Comparecimento: ${percentCompareceram}%`,
+                                    `Faltas: ${percentFaltas}%`
+                                ];
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    stacked: true,
+                    ticks: { font: { size: 11 }, stepSize: 1 }
+                },
+                x: { 
+                    stacked: true,
+                    ticks: { font: { size: 11 } },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+}
+
+// ==================== PRODUTIVIDADE MENSAL POR CATEGORIA ====================
+function renderizarChartProdutividadeMensalCategoria(dados) {
+    const ctx = document.getElementById('chartProdutividadeMensalCategoria');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    if (chartProdutividadeMensalCategoria) chartProdutividadeMensalCategoria.destroy();
+    
+    // Agrupa por mês
+    const dadosPorMes = {};
+    dados.forEach(d => {
+        const mesRef = d.mes_referencia || 'sem-mes';
+        if (!dadosPorMes[mesRef]) {
+            dadosPorMes[mesRef] = [];
+        }
+        dadosPorMes[mesRef].push(d);
+    });
+    
+    // Ordena os meses
+    const mesesOrdenados = Object.keys(dadosPorMes).sort();
+    
+    // Formata labels de mês
+    const mesesNomes = {
+        '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+        '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+        '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+    };
+    
+    const labels = mesesOrdenados.map(mesRef => {
+        const [ano, mes] = mesRef.split('-');
+        return `${mesesNomes[mes] || mes}/${ano}`;
+    });
+    
+    // Categorias com cores da empresa: gradiente do azul marinho (#1a237e) ao verde oliva (#556B2F)
+    const categorias = [
+        { nome: 'Ocupacionais', key: 'ocupacionais', cor: '#1a237e' }, // Azul marinho
+        { nome: 'Assistenciais', key: 'assistenciais', cor: '#283593' }, // Azul marinho claro
+        { nome: 'Acidente de Trabalho', key: 'acidente_trabalho', cor: '#3949ab' }, // Azul intermediário
+        { nome: 'INSS', key: 'inss', cor: '#5c6bc0' }, // Azul mais claro
+        { nome: 'Sinistralidade', key: 'sinistralidade', cor: '#6B8E23' }, // Verde oliva claro
+        { nome: 'Absenteísmo', key: 'absenteismo', cor: '#556B2F' }, // Verde oliva
+        { nome: 'Perícia Indireta', key: 'pericia_indireta', cor: '#4a5d23' } // Verde oliva escuro
+    ];
+    
+    // Prepara datasets para cada categoria
+    const datasets = categorias.map(categoria => {
+        const data = mesesOrdenados.map(mesRef => {
+            const dadosMes = dadosPorMes[mesRef];
+            const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+            return agendados ? (agendados[categoria.key] || 0) : 0;
+        });
+        
+        return {
+            label: categoria.nome,
+            data: data,
+            backgroundColor: categoria.cor,
+            borderRadius: 4
+        };
+    });
+    
+    chartProdutividadeMensalCategoria = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: { size: 11 },
+                        usePointStyle: true,
+                        padding: 12
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            
+                            // Calcula o total do mês
+                            const mesIndex = context.dataIndex;
+                            const mesRef = mesesOrdenados[mesIndex];
+                            const dadosMes = dadosPorMes[mesRef];
+                            const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+                            
+                            let totalMes = 0;
+                            if (agendados) {
+                                categorias.forEach(cat => {
+                                    totalMes += (agendados[cat.key] || 0);
+                                });
+                            }
+                            
+                            const percent = totalMes > 0 ? ((value / totalMes) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} consultas (${percent}%)`;
+                        },
+                        footer: function(tooltipItems) {
+                            if (tooltipItems.length > 0) {
+                                const mesIndex = tooltipItems[0].dataIndex;
+                                const mesRef = mesesOrdenados[mesIndex];
+                                const dadosMes = dadosPorMes[mesRef];
+                                const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+                                
+                                let totalMes = 0;
+                                if (agendados) {
+                                    categorias.forEach(cat => {
+                                        totalMes += (agendados[cat.key] || 0);
+                                    });
+                                }
+                                
+                                return `Total do Mês: ${totalMes} consultas`;
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    ticks: {
+                        font: { size: 11 }
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: {
+                        font: { size: 11 },
+                        stepSize: 5
+                    },
+                    title: {
+                        display: true,
+                        text: 'Quantidade de Consultas',
+                        font: { size: 12, weight: 'bold' }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ==================== EVOLUÇÃO PRODUTIVIDADE ====================
+async function carregarEvolucaoProdutividade() {
+    try {
+        const clientId = getClientId();
+        if (!clientId) return;
+        
+        // Busca dados agregados por mês
+        const response = await fetch(`/api/produtividade/evolucao?client_id=${clientId}&agrupar_por=mes`);
+        
+        if (!response.ok) {
+            console.warn('Erro ao carregar evolução de produtividade');
+            return;
+        }
+        
+        const data = await response.json();
+        const dadosEvolucao = data.data || [];
+        
+        renderizarChartProdutividadeEvolucao(dadosEvolucao);
+        
+    } catch (error) {
+        console.error('Erro ao carregar evolução de produtividade:', error);
+    }
+}
+
+function renderizarChartProdutividadeEvolucao(dados) {
+    const ctx = document.getElementById('chartProdutividadeEvolucao');
+    if (!ctx) return;
+    
+    if (chartProdutividadeEvolucao) chartProdutividadeEvolucao.destroy();
+    
+    if (!dados || dados.length === 0) {
+        // Mostra mensagem de sem dados
+        ctx.parentElement.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #6c757d;">
+                <div style="text-align: center;">
+                    <i class="fas fa-chart-line" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                    <p>Nenhum dado de produtividade cadastrado</p>
+                    <p style="font-size: 12px; margin-top: 8px;">Cadastre dados em "Produtividade" para ver a evolução</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Formata labels de mês (YYYY-MM -> MMM/YYYY)
+    const meses = {
+        '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+        '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+        '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+    };
+    
+    const labels = dados.map(d => {
+        if (d.periodo && d.periodo.includes('-')) {
+            const [ano, mes] = d.periodo.split('-');
+            return `${meses[mes] || mes}/${ano}`;
+        }
+        return d.periodo;
+    });
+    
+    chartProdutividadeEvolucao = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Total de Consultas',
+                    data: dados.map(d => d.total || 0),
+                    borderColor: CORES_EMPRESA.primary,
+                    backgroundColor: 'rgba(26, 35, 126, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    borderWidth: 3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Ocupacionais',
+                    data: dados.map(d => d.ocupacionais || 0),
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    tension: 0.4,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Assistenciais',
+                    data: dados.map(d => d.assistenciais || 0),
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.4,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Acidente de Trabalho',
+                    data: dados.map(d => d.acidente_trabalho || 0),
+                    borderColor: '#ff9800',
+                    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                    tension: 0.4,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'INSS',
+                    data: dados.map(d => d.inss || 0),
+                    borderColor: '#9c27b0',
+                    backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                    tension: 0.4,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Sinistralidade',
+                    data: dados.map(d => d.sinistralidade || 0),
+                    borderColor: '#00bcd4',
+                    backgroundColor: 'rgba(0, 188, 212, 0.1)',
+                    tension: 0.4,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Absenteísmo',
+                    data: dados.map(d => d.absenteismo || 0),
+                    borderColor: '#dc3545',
+                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                    tension: 0.4,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Perícia Indireta',
+                    data: dados.map(d => d.pericia_indireta || 0),
+                    borderColor: '#795548',
+                    backgroundColor: 'rgba(121, 85, 72, 0.1)',
+                    tension: 0.4,
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: { size: 11 },
+                        usePointStyle: true,
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y} consultas`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: { size: 11 },
+                        stepSize: 5,
+                        maxTicksLimit: 10
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Quantidade de Consultas',
+                        font: { size: 12, weight: 'bold' }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: { size: 11 }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Período',
+                        font: { size: 12, weight: 'bold' }
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    });
+}
+
 function renderizarChartSetorGenero(dados) {
     const ctx = document.getElementById('chartSetorGenero');
     if (!ctx || !dados || dados.length === 0) return;
@@ -1075,6 +1649,7 @@ async function aplicarFiltros() {
         renderizarChartComparativoDiasHoras(data.comparativo_dias_horas || []);
         renderizarChartFrequenciaAtestados(data.frequencia_atestados || []);
         renderizarChartSetorGenero(data.dias_setor_genero || []);
+        renderizarChartProdutividade(data.produtividade || []);
         
         // Armazena alertas para o menu
         window.alertasData = data.alertas || [];

@@ -30,13 +30,32 @@ async function carregarConfiguracoes() {
         if (empresaEl) empresaEl.value = configData.empresa?.valor || '';
         if (emailContatoEl) emailContatoEl.value = configData.email_contato?.valor || '';
         if (itensPorPaginaEl) itensPorPaginaEl.value = configData.itens_por_pagina?.valor || '50';
-        if (temaEscuroEl) temaEscuroEl.checked = configData.tema_escuro?.valor === true || configData.tema_escuro?.valor === 'true';
+        // Tema escuro desabilitado - sempre remove o atributo
+        if (temaEscuroEl) {
+            temaEscuroEl.checked = false;
+            aplicarTemaEscuro(false);
+        }
         
     } catch (error) {
         console.error('Erro:', error);
         mostrarAlert('Erro ao carregar configurações', 'error');
     }
 }
+
+// Aplica tema escuro (função global)
+function aplicarTemaEscuro(ativo) {
+    const html = document.documentElement;
+    if (ativo) {
+        html.setAttribute('data-theme', 'dark');
+        localStorage.setItem('tema_escuro', 'true');
+    } else {
+        html.removeAttribute('data-theme');
+        localStorage.setItem('tema_escuro', 'false');
+    }
+}
+
+// Torna função global
+window.aplicarTemaEscuro = aplicarTemaEscuro;
 
 // Salva configurações
 async function salvarConfiguracoes() {
@@ -51,7 +70,7 @@ async function salvarConfiguracoes() {
             { chave: 'empresa', valor: document.getElementById('empresa').value },
             { chave: 'email_contato', valor: document.getElementById('email_contato').value },
             { chave: 'itens_por_pagina', valor: document.getElementById('itens_por_pagina').value },
-            { chave: 'tema_escuro', valor: document.getElementById('tema_escuro').checked.toString(), tipo: 'boolean' }
+            // Tema escuro desabilitado
         ];
         
         for (const config of configs) {
@@ -68,6 +87,9 @@ async function salvarConfiguracoes() {
                 throw new Error(`Erro ao salvar ${config.chave}`);
             }
         }
+        
+        // Tema escuro desabilitado - sempre desativa
+        aplicarTemaEscuro(false);
         
         mostrarAlert('Configurações salvas com sucesso!', 'success');
         
@@ -200,6 +222,9 @@ function mostrarAlert(message, type = 'info') {
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
+    // Tema escuro desabilitado - sempre remove
+    aplicarTemaEscuro(false);
+    
     // Aguarda auth.js carregar
     setTimeout(() => {
         if (typeof checkAuth === 'function' && checkAuth()) {
@@ -215,8 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 carregarUsuarios();
             }
         } else {
-            window.location.href = '/login';
+            // Mesmo sem autenticação, carrega configurações para aplicar tema
+            carregarConfiguracoes();
         }
     }, 500);
+    
+    // Tema escuro desabilitado - não adiciona listener
 });
 

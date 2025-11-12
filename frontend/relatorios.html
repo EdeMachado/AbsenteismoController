@@ -180,6 +180,23 @@
     
     <script src="/static/js/auth.js"></script>
     <script>
+        // Recarrega uploads quando o cliente muda
+        if (typeof window !== 'undefined') {
+            const originalSetItem = localStorage.setItem;
+            localStorage.setItem = function(key, value) {
+                originalSetItem.apply(this, arguments);
+                if (key === 'cliente_selecionado') {
+                    console.log('Cliente mudou, recarregando uploads...');
+                    setTimeout(() => {
+                        if (typeof carregarUploadsSelect === 'function') {
+                            carregarUploadsSelect();
+                        }
+                    }, 300);
+                }
+            };
+        }
+    </script>
+    <script>
         let mesInicio = null;
         let mesFim = null;
         
@@ -204,8 +221,23 @@
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
-                const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
-                let url = `/api/export/pdf?client_id=${clientId}`;
+                // Sempre obtém o client_id atual do localStorage (sem valor padrão)
+                let clientId = null;
+                if (typeof window.getCurrentClientId === 'function') {
+                    clientId = window.getCurrentClientId(null);
+                } else {
+                    const stored = localStorage.getItem('cliente_selecionado');
+                    clientId = stored ? Number(stored) : null;
+                }
+                
+                if (!clientId || !Number.isFinite(clientId) || clientId <= 0) {
+                    alert('Selecione um cliente para exportar o relatório.');
+                    return;
+                }
+                
+                console.log('Exportando Excel para cliente ID:', clientId);
+                const timestamp = new Date().getTime();
+                let url = `/api/export/excel?client_id=${clientId}&_t=${timestamp}`;
                 if (periodo) {
                     url += `&mes=${periodo}`;
                 } else if (mesInicio && mesFim) {
@@ -303,7 +335,21 @@
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
-                const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
+                // Sempre obtém o client_id atual do localStorage (sem valor padrão)
+                let clientId = null;
+                if (typeof window.getCurrentClientId === 'function') {
+                    clientId = window.getCurrentClientId(null);
+                } else {
+                    const stored = localStorage.getItem('cliente_selecionado');
+                    clientId = stored ? Number(stored) : null;
+                }
+                
+                if (!clientId || !Number.isFinite(clientId) || clientId <= 0) {
+                    alert('Selecione um cliente para exportar o relatório.');
+                    return;
+                }
+                
+                console.log('Exportando PDF para cliente ID:', clientId);
                 let url = `/api/export/excel?client_id=${clientId}`;
                 if (periodo) {
                     url += `&mes=${periodo}`;
@@ -402,8 +448,23 @@
                 const periodo = document.getElementById('periodoRelatorio').value;
                 const upload = document.getElementById('uploadRelatorio').value;
                 
-                const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
-                let url = `/api/export/pptx?client_id=${clientId}`;
+                // Sempre obtém o client_id atual do localStorage (sem valor padrão)
+                let clientId = null;
+                if (typeof window.getCurrentClientId === 'function') {
+                    clientId = window.getCurrentClientId(null);
+                } else {
+                    const stored = localStorage.getItem('cliente_selecionado');
+                    clientId = stored ? Number(stored) : null;
+                }
+                
+                if (!clientId || !Number.isFinite(clientId) || clientId <= 0) {
+                    alert('Selecione um cliente para exportar o relatório.');
+                    return;
+                }
+                
+                console.log('Exportando PowerPoint para cliente ID:', clientId);
+                const timestamp = new Date().getTime();
+                let url = `/api/export/pptx?client_id=${clientId}&_t=${timestamp}`;
                 if (periodo) {
                     url += `&mes=${periodo}`;
                 } else if (mesInicio && mesFim) {
@@ -491,9 +552,23 @@
             }
         }
         
-        // Carregar uploads
-        (function carregarUploadsSelect() {
-            const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
+        // Carregar uploads (função global para poder ser chamada quando cliente muda)
+        function carregarUploadsSelect() {
+            // Sempre obtém o client_id atual do localStorage (sem valor padrão)
+            let clientId = null;
+            if (typeof window.getCurrentClientId === 'function') {
+                clientId = window.getCurrentClientId(null);
+            } else {
+                const stored = localStorage.getItem('cliente_selecionado');
+                clientId = stored ? Number(stored) : null;
+            }
+            
+            if (!clientId || !Number.isFinite(clientId) || clientId <= 0) {
+                console.warn('Nenhum cliente selecionado para carregar uploads');
+                return;
+            }
+            
+            console.log('Carregando uploads para cliente ID:', clientId);
             fetch(`/api/uploads?client_id=${clientId}`)
             .then(res => res.json())
             .then(uploads => {
@@ -504,7 +579,18 @@
             .catch(error => {
                 console.error('Erro ao carregar uploads:', error);
             });
-        })();
+        }
+        
+        // Carrega uploads ao inicializar
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', carregarUploadsSelect);
+        } else {
+            // Aguarda auth.js carregar
+            setTimeout(carregarUploadsSelect, 500);
+        }
+        
+        // Torna função global
+        window.carregarUploadsSelect = carregarUploadsSelect;
     </script>
 </body>
 </html>

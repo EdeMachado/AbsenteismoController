@@ -5,8 +5,8 @@
 let chartComparativo;
 
 document.addEventListener('DOMContentLoaded', () => {
-    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
-    if (!clientId) {
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(1) : (localStorage.getItem('cliente_selecionado') || 1);
+    if (!clientId || clientId === 'null' || clientId === 'undefined') {
         alert('Selecione um cliente na aba "Clientes" para visualizar os comparativos.');
         return;
     }
@@ -14,6 +14,26 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarSetores(clientId);
     carregarFaltas(clientId);
 });
+
+// Recarrega quando o cliente muda
+if (typeof window !== 'undefined') {
+    // Observa mudanças no localStorage
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        originalSetItem.apply(this, arguments);
+        if (key === 'cliente_selecionado') {
+            // Recarrega os comparativos quando o cliente muda
+            setTimeout(() => {
+                const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(1) : (localStorage.getItem('cliente_selecionado') || 1);
+                if (clientId && clientId !== 'null' && clientId !== 'undefined') {
+                    carregarVisaoGeral(clientId);
+                    carregarSetores(clientId);
+                    carregarFaltas(clientId);
+                }
+            }, 500);
+        }
+    };
+}
 
 function setComparacao(tipo) {
     const hoje = new Date();
@@ -70,8 +90,8 @@ async function compararPeriodos() {
     }
     
     try {
-        const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
-        if (!clientId) {
+        const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(1) : (localStorage.getItem('cliente_selecionado') || 1);
+        if (!clientId || clientId === 'null' || clientId === 'undefined') {
             alert('Selecione um cliente para gerar o comparativo.');
             return;
         }

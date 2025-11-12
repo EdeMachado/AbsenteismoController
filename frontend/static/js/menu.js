@@ -83,6 +83,10 @@ function renderizarMenu() {
                 <i class="fas fa-table"></i>
                 <span>📋 Meus Dados</span>
             </a>
+            <a href="/produtividade" class="nav-item">
+                <i class="fas fa-chart-line"></i>
+                <span>📊 Produtividade</span>
+            </a>
             <a href="/funcionarios" class="nav-item">
                 <i class="fas fa-users"></i>
                 <span>👥 Funcionários</span>
@@ -181,6 +185,9 @@ document.addEventListener('click', function(event) {
 
 // Carrega alertas ao inicializar
 document.addEventListener('DOMContentLoaded', () => {
+    // Renderiza menu se houver container
+    renderizarMenu();
+    
     setTimeout(() => {
         carregarAlertasMenu();
         // Recarrega alertas a cada 5 minutos

@@ -118,6 +118,7 @@
             align-items: center;
             gap: 16px;
             box-shadow: var(--shadow-sm);
+            flex-wrap: wrap;
         }
         
         .file-icon {
@@ -219,13 +220,43 @@
                         <div class="file-name" id="fileName"></div>
                         <div class="file-size" id="fileSize"></div>
                     </div>
-                    <button class="btn btn-primary" onclick="uploadFile()">
-                        <i class="fas fa-upload"></i>
-                        Enviar
-                    </button>
-                    <button class="btn btn-secondary" onclick="cancelFile()">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Período de Referência</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <select id="mesReferencia" required style="padding: 8px 12px; border: 2px solid var(--primary); border-radius: 6px; font-size: 14px; min-width: 120px; background: white; font-weight: 600;">
+                                    <option value="">Selecione o Mês</option>
+                                    <option value="01">Janeiro</option>
+                                    <option value="02">Fevereiro</option>
+                                    <option value="03">Março</option>
+                                    <option value="04">Abril</option>
+                                    <option value="05">Maio</option>
+                                    <option value="06">Junho</option>
+                                    <option value="07">Julho</option>
+                                    <option value="08">Agosto</option>
+                                    <option value="09">Setembro</option>
+                                    <option value="10">Outubro</option>
+                                    <option value="11">Novembro</option>
+                                    <option value="12">Dezembro</option>
+                                </select>
+                                <select id="anoReferencia" required style="padding: 8px 12px; border: 2px solid var(--primary); border-radius: 6px; font-size: 14px; min-width: 100px; background: white; font-weight: 600;">
+                                    <option value="">Ano</option>
+                                </select>
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; padding: 8px; background: rgba(0, 188, 242, 0.08); border-radius: 6px; border-left: 3px solid #00bcf2;">
+                                <i class="fas fa-info-circle" style="color: #00bcf2;"></i> <strong>Importante:</strong> Selecione o mês/ano a que se referem os dados da planilha. Exemplo: se você fez upload em nov/2025 mas os dados são de outubro/2025, selecione <strong>Outubro</strong> e <strong>2025</strong>.
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-primary" onclick="uploadFile()">
+                            <i class="fas fa-upload"></i>
+                            Enviar
+                        </button>
+                        <button class="btn btn-secondary" onclick="cancelFile()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="progress-container" id="progressContainer">
@@ -262,6 +293,7 @@
         </div>
     </main>
     
+    <script src="/static/js/auth.js"></script>
     <script src="/static/js/menu.js"></script>
     <script src="/static/js/upload.js"></script>
 </body>

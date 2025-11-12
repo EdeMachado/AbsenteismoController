@@ -18,7 +18,7 @@ from collections import OrderedDict
 import pandas as pd
 
 from .database import get_db, init_db, run_migrations
-from .models import Client, Upload, Atestado, User, Config
+from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
@@ -166,7 +166,7 @@ async def login_page():
         return HTMLResponse(content=f.read())
 
 @app.get("/configuracoes", response_class=HTMLResponse)
-async def configuracoes_page(current_user: User = Depends(get_current_active_user)):
+async def configuracoes_page():
     """Página de configurações"""
     file_path = os.path.join(FRONTEND_DIR, "configuracoes.html")
     with open(file_path, "r", encoding="utf-8") as f:
@@ -229,7 +229,7 @@ async def funcionarios_page():
         return HTMLResponse(content=f.read())
 
 @app.get("/comparativos", response_class=HTMLResponse)
-async def comparativos_page(current_user: User = Depends(get_current_active_user)):
+async def comparativos_page():
     """Página de comparativos"""
     file_path = os.path.join(FRONTEND_DIR, "comparativos.html")
     with open(file_path, "r", encoding="utf-8") as f:
@@ -240,6 +240,13 @@ async def comparativos_page(current_user: User = Depends(get_current_active_user
 async def dados_powerbi_page():
     """Página de análise de dados estilo PowerBI"""
     file_path = os.path.join(FRONTEND_DIR, "dados_powerbi.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/produtividade", response_class=HTMLResponse)
+async def produtividade_page():
+    """Página de produtividade"""
+    file_path = os.path.join(FRONTEND_DIR, "produtividade.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
@@ -320,7 +327,7 @@ async def logout(current_user: User = Depends(get_current_active_user)):
 # ==================== CONFIGURATIONS API ====================
 
 @app.get("/api/config")
-async def get_config(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+async def get_config(db: Session = Depends(get_db)):
     """Retorna todas as configurações"""
     configs = db.query(Config).all()
     result = {}
@@ -333,7 +340,7 @@ async def get_config(current_user: User = Depends(get_current_active_user), db: 
     return result
 
 @app.get("/api/config/{chave}")
-async def get_config_value_api(chave: str, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+async def get_config_value_api(chave: str, db: Session = Depends(get_db)):
     """Retorna valor de uma configuração específica"""
     valor = get_config_value(db, chave)
     return {"chave": chave, "valor": valor}
@@ -405,10 +412,24 @@ async def create_user(
 async def upload_file(
     file: UploadFile = File(...),
     client_id: int = Form(1),
+    mes_referencia: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """Upload de planilha"""
     try:
+        # Valida se o cliente existe
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail=f"Cliente com ID {client_id} não encontrado")
+        
+        # Valida se o arquivo foi enviado
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Nenhum arquivo foi enviado")
+        
+        # Valida extensão do arquivo
+        if not file.filename.lower().endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="Formato de arquivo inválido. Use .xlsx ou .xls")
+        
         # Salva arquivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         saved_filename = f"{timestamp}_{file.filename}"
@@ -419,23 +440,69 @@ async def upload_file(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
+        # Busca mapeamento customizado do cliente (se existir)
+        custom_mapping = None
+        mapping_obj = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
+        if mapping_obj and mapping_obj.column_mapping:
+            try:
+                custom_mapping = json.loads(mapping_obj.column_mapping)
+            except:
+                custom_mapping = None
+        
         # Processa Excel
-        processor = ExcelProcessor(file_path)
-        registros = processor.processar()
+        try:
+            processor = ExcelProcessor(file_path, custom_mapping=custom_mapping)
+            registros = processor.processar()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=400, detail=f"Erro ao processar planilha Excel: {str(e)}")
         
         if not registros:
-            raise HTTPException(status_code=400, detail="Erro ao processar planilha")
+            raise HTTPException(status_code=400, detail="Erro ao processar planilha. A planilha não contém dados válidos ou está vazia.")
         
-        # Detecta mês de referência (pega do primeiro registro)
+        # Usa o mês de referência fornecido pelo usuário, ou tenta detectar automaticamente
         mes_ref = None
-        if registros and registros[0].get('data_afastamento'):
-            data = registros[0]['data_afastamento']
-            if isinstance(data, datetime):
-                mes_ref = data.strftime("%Y-%m")
-            else:
+        
+        if mes_referencia:
+            # Valida formato do mês de referência (YYYY-MM)
+            try:
+                # Valida se está no formato correto
+                if len(mes_referencia) == 7 and mes_referencia[4] == '-':
+                    ano, mes = mes_referencia.split('-')
+                    if int(ano) >= 2020 and int(ano) <= 2100 and int(mes) >= 1 and int(mes) <= 12:
+                        mes_ref = mes_referencia
+                    else:
+                        raise HTTPException(status_code=400, detail="Formato de mês de referência inválido. Use YYYY-MM (ex: 2025-10)")
+                else:
+                    raise HTTPException(status_code=400, detail="Formato de mês de referência inválido. Use YYYY-MM (ex: 2025-10)")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Formato de mês de referência inválido. Use YYYY-MM (ex: 2025-10)")
+        
+        # Se não foi fornecido, tenta detectar automaticamente (fallback)
+        if not mes_ref:
+            campos_data = ['data_afastamento', 'data_retorno', 'DATA_AFASTAMENTO', 'DATA_RETORNO']
+            
+            for reg in registros[:10]:  # Verifica os primeiros 10 registros
+                for campo in campos_data:
+                    if campo in reg and reg[campo]:
+                        data = reg[campo]
+                        if isinstance(data, datetime):
+                            mes_ref = data.strftime("%Y-%m")
+                            break
+                        elif isinstance(data, str):
+                            try:
+                                data_obj = datetime.strptime(data[:10], "%Y-%m-%d")
+                                mes_ref = data_obj.strftime("%Y-%m")
+                                break
+                            except:
+                                pass
+                if mes_ref:
+                    break
+            
+            # Se não encontrou, usa o mês atual
+            if not mes_ref:
                 mes_ref = datetime.now().strftime("%Y-%m")
-        else:
-            mes_ref = datetime.now().strftime("%Y-%m")
         
         # Cria registro de upload
         upload = Upload(
@@ -447,13 +514,87 @@ async def upload_file(
         db.add(upload)
         db.flush()
         
-        # Salva atestados
-        for reg in registros:
-            atestado = Atestado(
-                upload_id=upload.id,
-                **reg
-            )
-            db.add(atestado)
+        # Salva atestados - filtra apenas campos válidos do modelo
+        campos_validos = {
+            'nomecompleto', 'descricao_atestad', 'dias_atestados', 'cid', 'diagnostico',
+            'centro_custo', 'setor', 'motivo_atestado', 'escala', 'horas_dia', 'horas_perdi',
+            'nome_funcionario', 'cpf', 'matricula', 'cargo', 'genero', 'data_afastamento',
+            'data_retorno', 'tipo_info_atestado', 'tipo_atestado', 'descricao_cid',
+            'numero_dias_atestado', 'numero_horas_atestado', 'dias_perdidos', 'horas_perdidas',
+            'dados_originais'
+        }
+        
+        for idx, reg in enumerate(registros):
+            try:
+                # Filtra apenas campos válidos do modelo
+                reg_filtrado = {k: v for k, v in reg.items() if k in campos_validos}
+                
+                # Converte tipos de dados para evitar erros
+                # Converte datas de string/datetime para date se necessário
+                from datetime import date as date_type
+                
+                if 'data_afastamento' in reg_filtrado and reg_filtrado['data_afastamento']:
+                    try:
+                        if isinstance(reg_filtrado['data_afastamento'], str):
+                            dt = datetime.strptime(reg_filtrado['data_afastamento'][:10], "%Y-%m-%d")
+                            reg_filtrado['data_afastamento'] = dt.date()
+                        elif isinstance(reg_filtrado['data_afastamento'], datetime):
+                            reg_filtrado['data_afastamento'] = reg_filtrado['data_afastamento'].date()
+                        elif isinstance(reg_filtrado['data_afastamento'], date_type):
+                            pass  # Já é date
+                        else:
+                            reg_filtrado['data_afastamento'] = None
+                    except:
+                        reg_filtrado['data_afastamento'] = None
+                else:
+                    reg_filtrado['data_afastamento'] = None
+                
+                if 'data_retorno' in reg_filtrado and reg_filtrado['data_retorno']:
+                    try:
+                        if isinstance(reg_filtrado['data_retorno'], str):
+                            dt = datetime.strptime(reg_filtrado['data_retorno'][:10], "%Y-%m-%d")
+                            reg_filtrado['data_retorno'] = dt.date()
+                        elif isinstance(reg_filtrado['data_retorno'], datetime):
+                            reg_filtrado['data_retorno'] = reg_filtrado['data_retorno'].date()
+                        elif isinstance(reg_filtrado['data_retorno'], date_type):
+                            pass  # Já é date
+                        else:
+                            reg_filtrado['data_retorno'] = None
+                    except:
+                        reg_filtrado['data_retorno'] = None
+                else:
+                    reg_filtrado['data_retorno'] = None
+                
+                # Garante que valores numéricos são float ou None
+                for campo_num in ['dias_atestados', 'horas_dia', 'horas_perdi', 'numero_dias_atestado', 
+                                 'numero_horas_atestado', 'dias_perdidos', 'horas_perdidas']:
+                    if campo_num in reg_filtrado:
+                        if reg_filtrado[campo_num] is None:
+                            reg_filtrado[campo_num] = 0.0
+                        else:
+                            try:
+                                reg_filtrado[campo_num] = float(reg_filtrado[campo_num])
+                            except:
+                                reg_filtrado[campo_num] = 0.0
+                
+                # Garante que tipo_info_atestado é int ou None
+                if 'tipo_info_atestado' in reg_filtrado and reg_filtrado['tipo_info_atestado'] is not None:
+                    try:
+                        reg_filtrado['tipo_info_atestado'] = int(reg_filtrado['tipo_info_atestado'])
+                    except:
+                        reg_filtrado['tipo_info_atestado'] = None
+                
+                atestado = Atestado(
+                    upload_id=upload.id,
+                    **reg_filtrado
+                )
+                db.add(atestado)
+            except Exception as e:
+                # Log do erro mas continua processando outros registros
+                print(f"Erro ao processar registro {idx + 1}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                continue
         
         db.commit()
         
@@ -464,16 +605,27 @@ async def upload_file(
             "mes_referencia": mes_ref
         }
     
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_detail = str(e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao processar upload: {error_detail}")
 
 @app.get("/api/uploads")
 async def list_uploads(
-    client_id: int = 1,
+    client_id: int = Query(1, description="ID do cliente"),
     db: Session = Depends(get_db)
 ):
     """Lista uploads"""
+    # Valida se o cliente existe
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail=f"Cliente com ID {client_id} não encontrado")
+    
     uploads = db.query(Upload).filter(Upload.client_id == client_id).order_by(Upload.data_upload.desc()).all()
     
     return [
@@ -610,6 +762,35 @@ async def dashboard(
             print(f"Erro ao detectar alertas: {e}")
             alertas = []
         
+        # Busca dados de produtividade (todos os meses)
+        try:
+            produtividade_data = db.query(Produtividade).filter(
+                Produtividade.client_id == client_id
+            ).order_by(Produtividade.mes_referencia.desc(), Produtividade.numero_tipo).all()
+            
+            produtividade = []
+            if produtividade_data:
+                # Retorna todos os meses para o gráfico poder somar corretamente
+                produtividade = [
+                    {
+                        "numero_tipo": p.numero_tipo,
+                        "tipo_consulta": p.tipo_consulta,
+                        "ocupacionais": p.ocupacionais or 0,
+                        "assistenciais": p.assistenciais or 0,
+                        "acidente_trabalho": p.acidente_trabalho or 0,
+                        "inss": p.inss or 0,
+                        "sinistralidade": p.sinistralidade or 0,
+                        "absenteismo": p.absenteismo or 0,
+                        "pericia_indireta": p.pericia_indireta or 0,
+                        "total": p.total or 0,
+                        "mes_referencia": p.mes_referencia
+                    }
+                    for p in produtividade_data
+                ]
+        except Exception as e:
+            print(f"Erro ao buscar produtividade: {e}")
+            produtividade = []
+        
         resultado = {
             "metricas": metricas,
             "top_cids": top_cids,
@@ -626,6 +807,7 @@ async def dashboard(
             "comparativo_dias_horas": comparativo_dias_horas,
             "frequencia_atestados": frequencia_atestados,
             "dias_setor_genero": dias_setor_genero,
+            "produtividade": produtividade,
             "insights": insights,
             "alertas": alertas
         }
@@ -1175,6 +1357,170 @@ async def ativar_cliente(cliente_id: int, db: Session = Depends(get_db)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao reativar cliente: {str(e)}")
 
+# ==================== API - MAPEAMENTO DE COLUNAS ====================
+
+@app.get("/api/clientes/{client_id}/column-mapping")
+async def get_column_mapping(client_id: int, db: Session = Depends(get_db)):
+    """Obtém o mapeamento de colunas de um cliente"""
+    try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        mapping = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
+        
+        if mapping:
+            return {
+                "client_id": client_id,
+                "column_mapping": json.loads(mapping.column_mapping),
+                "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
+                "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None
+            }
+        else:
+            return {
+                "client_id": client_id,
+                "column_mapping": {},
+                "message": "Nenhum mapeamento configurado"
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao obter mapeamento: {str(e)}")
+
+@app.put("/api/clientes/{client_id}/column-mapping")
+async def save_column_mapping(
+    client_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Salva o mapeamento de colunas de um cliente"""
+    try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        body = await request.json()
+        column_mapping = body.get('column_mapping', {})
+        
+        # Valida o mapeamento (deve ser um dicionário)
+        if not isinstance(column_mapping, dict):
+            raise HTTPException(status_code=400, detail="Mapeamento deve ser um objeto JSON")
+        
+        # Campos válidos do sistema
+        campos_validos = [
+            'nomecompleto', 'nome_funcionario', 'cpf', 'matricula', 'cargo',
+            'setor', 'centro_custo', 'genero', 'data_afastamento', 'data_retorno',
+            'cid', 'diagnostico', 'descricao_cid', 'descricao_atestad',
+            'dias_atestados', 'numero_dias_atestado', 'dias_perdidos',
+            'horas_dia', 'horas_perdi', 'horas_perdidas', 'numero_horas_atestado',
+            'motivo_atestado', 'escala', 'tipo_atestado', 'tipo_info_atestado'
+        ]
+        
+        # Valida se os campos mapeados são válidos
+        for col_planilha, campo_sistema in column_mapping.items():
+            if campo_sistema.lower() not in campos_validos:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Campo '{campo_sistema}' não é válido. Campos válidos: {', '.join(campos_validos)}"
+                )
+        
+        # Busca ou cria mapeamento
+        mapping = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
+        
+        if mapping:
+            mapping.column_mapping = json.dumps(column_mapping, ensure_ascii=False)
+            mapping.updated_at = datetime.now()
+        else:
+            mapping = ClientColumnMapping(
+                client_id=client_id,
+                column_mapping=json.dumps(column_mapping, ensure_ascii=False)
+            )
+            db.add(mapping)
+        
+        db.commit()
+        db.refresh(mapping)
+        
+        return {
+            "message": "Mapeamento salvo com sucesso",
+            "client_id": client_id,
+            "column_mapping": column_mapping,
+            "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar mapeamento: {str(e)}")
+
+@app.post("/api/clientes/{client_id}/column-mapping/preview")
+async def preview_column_mapping(
+    client_id: int,
+    file: UploadFile = File(...),
+    column_mapping: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Preview do mapeamento de colunas usando uma planilha de exemplo"""
+    try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        if not file.filename or not file.filename.lower().endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="Arquivo inválido. Use .xlsx ou .xls")
+        
+        # Salva arquivo temporário
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+        
+        try:
+            # Lê planilha
+            df = pd.read_excel(tmp_path, sheet_name=0, engine='openpyxl', nrows=5)  # Apenas 5 linhas para preview
+            
+            # Parse do mapeamento
+            mapping_dict = {}
+            if column_mapping:
+                try:
+                    mapping_dict = json.loads(column_mapping)
+                except:
+                    pass
+            
+            # Aplica mapeamento
+            processor = ExcelProcessor(tmp_path, custom_mapping=mapping_dict if mapping_dict else None)
+            if processor.ler_planilha():
+                processor.padronizar_colunas()
+                
+                # Retorna preview
+                preview_data = []
+                for idx, row in processor.df.head(3).iterrows():
+                    preview_data.append(row.to_dict())
+                
+                return {
+                    "success": True,
+                    "columns_original": list(df.columns),
+                    "columns_mapped": list(processor.df.columns),
+                    "preview": preview_data,
+                    "total_rows": len(processor.df)
+                }
+            else:
+                raise HTTPException(status_code=400, detail="Erro ao ler planilha")
+        finally:
+            # Remove arquivo temporário
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao fazer preview: {str(e)}")
+
 @app.get("/api/buscar-cnpj/{cnpj}")
 async def buscar_cnpj(cnpj: str):
     """Busca dados da empresa por CNPJ usando ReceitaWS"""
@@ -1243,7 +1589,7 @@ async def pagina_apresentacao():
 
 @app.get("/api/apresentacao")
 async def dados_apresentacao(
-    client_id: int = 1,
+    client_id: int = Query(1, description="ID do cliente"),
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
     funcionario: Optional[List[str]] = Query(None),
@@ -1252,6 +1598,17 @@ async def dados_apresentacao(
 ):
     """Retorna todos os dados necessários para a apresentação com análises IA"""
     try:
+        # Log para debug
+        print(f"[APRESENTACAO] Recebido client_id: {client_id} (tipo: {type(client_id)})")
+        
+        # Valida se o cliente existe
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            print(f"[APRESENTACAO] ERRO: Cliente {client_id} não encontrado")
+            raise HTTPException(status_code=404, detail=f"Cliente com ID {client_id} não encontrado")
+        
+        print(f"[APRESENTACAO] Cliente encontrado: {client.nome} (ID: {client.id})")
+        
         analytics = Analytics(db)
         insights_engine = InsightsEngine(db)
         
@@ -1472,6 +1829,45 @@ async def dados_apresentacao(
                 "analise": insights_engine.gerar_analise_grafico('distribuicao_dias', distribuicao_dias, metricas)
             })
         
+        # Busca dados de produtividade
+        try:
+            produtividade_data = db.query(Produtividade).filter(
+                Produtividade.client_id == client_id
+            ).order_by(Produtividade.mes_referencia.desc(), Produtividade.numero_tipo).all()
+            
+            if produtividade_data:
+                # Agrupa por mês
+                produtividade_por_mes = {}
+                for p in produtividade_data:
+                    if p.mes_referencia not in produtividade_por_mes:
+                        produtividade_por_mes[p.mes_referencia] = []
+                    produtividade_por_mes[p.mes_referencia].append({
+                        "numero_tipo": p.numero_tipo,
+                        "tipo_consulta": p.tipo_consulta,
+                        "ocupacionais": p.ocupacionais,
+                        "assistenciais": p.assistenciais,
+                        "acidente_trabalho": p.acidente_trabalho,
+                        "inss": p.inss,
+                        "absenteismo": p.absenteismo,
+                        "total": p.total
+                    })
+                
+                # Pega o mês mais recente
+                if produtividade_por_mes:
+                    mes_mais_recente = max(produtividade_por_mes.keys())
+                    produtividade_recente = produtividade_por_mes[mes_mais_recente]
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "produtividade",
+                        "titulo": "Produtividade",
+                        "subtitulo": f"Consultas realizadas - {mes_mais_recente}",
+                        "dados": produtividade_recente,
+                        "analise": insights_engine.gerar_analise_grafico('produtividade', produtividade_recente, metricas) if hasattr(insights_engine, 'gerar_analise_grafico') else None
+                    })
+        except Exception as e:
+            print(f"Erro ao buscar produtividade: {e}")
+        
         # Slide 12: Média por CID
         if media_cid:
             slides.append({
@@ -1641,22 +2037,7 @@ async def tendencias(
         "analise": "Análise de tendências com base nos últimos 12 meses"
     }
 
-@app.get("/api/relatorios/comparativo")
-async def relatorio_comparativo(
-    client_id: int = 1,
-    periodo1_inicio: str = Query(...),
-    periodo1_fim: str = Query(...),
-    periodo2_inicio: str = Query(...),
-    periodo2_fim: str = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Relatório comparativo entre períodos"""
-    analytics = Analytics(db)
-    return analytics.comparativo_periodos(
-        client_id,
-        (periodo1_inicio, periodo1_fim),
-        (periodo2_inicio, periodo2_fim)
-    )
+# Endpoint duplicado removido - usando o endpoint completo abaixo
 
 @app.delete("/api/uploads/{upload_id}")
 async def delete_upload(
@@ -1675,7 +2056,7 @@ async def delete_upload(
 
 @app.get("/api/export/excel")
 async def export_excel(
-    client_id: int = 1,
+    client_id: int = Query(1, description="ID do cliente"),
     mes: Optional[str] = None,
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
@@ -1685,6 +2066,14 @@ async def export_excel(
 ):
     """Exporta relatório completo para Excel"""
     try:
+        # Valida se o cliente existe
+        print(f"[EXPORT EXCEL] Recebido client_id: {client_id}")
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            print(f"[EXPORT EXCEL] ERRO: Cliente {client_id} não encontrado")
+            raise HTTPException(status_code=404, detail=f"Cliente com ID {client_id} não encontrado")
+        print(f"[EXPORT EXCEL] Cliente encontrado: {client.nome} (ID: {client.id})")
+        
         analytics = Analytics(db)
         report_gen = ReportGenerator()
         
@@ -1821,7 +2210,7 @@ async def export_excel(
 
 @app.get("/api/export/pdf")
 async def export_pdf(
-    client_id: int = 1,
+    client_id: int = Query(1, description="ID do cliente"),
     mes: Optional[str] = None,
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
@@ -1831,6 +2220,14 @@ async def export_pdf(
 ):
     """Exporta relatório completo para PDF"""
     try:
+        # Valida se o cliente existe
+        print(f"[EXPORT PDF] Recebido client_id: {client_id}")
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            print(f"[EXPORT PDF] ERRO: Cliente {client_id} não encontrado")
+            raise HTTPException(status_code=404, detail=f"Cliente com ID {client_id} não encontrado")
+        print(f"[EXPORT PDF] Cliente encontrado: {client.nome} (ID: {client.id})")
+        
         analytics = Analytics(db)
         report_gen = ReportGenerator()
         
@@ -1991,7 +2388,7 @@ async def export_pdf(
 
 @app.get("/api/export/pptx")
 async def export_pptx(
-    client_id: int = 1,
+    client_id: int = Query(1, description="ID do cliente"),
     mes: Optional[str] = None,
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
@@ -2001,6 +2398,14 @@ async def export_pptx(
 ):
     """Exporta apresentação completa para PowerPoint"""
     try:
+        # Valida se o cliente existe
+        print(f"[EXPORT PPTX] Recebido client_id: {client_id}")
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            print(f"[EXPORT PPTX] ERRO: Cliente {client_id} não encontrado")
+            raise HTTPException(status_code=404, detail=f"Cliente com ID {client_id} não encontrado")
+        print(f"[EXPORT PPTX] Cliente encontrado: {client.nome} (ID: {client.id})")
+        
         analytics = Analytics(db)
         report_gen = ReportGenerator()
         
@@ -2164,16 +2569,20 @@ async def export_pptx(
 
 @app.get("/api/relatorios/comparativo")
 async def comparativo_periodos(
-    client_id: int = 1,
+    client_id: int = Query(1, description="ID do cliente"),
     periodo1_inicio: str = Query(...),
     periodo1_fim: str = Query(...),
     periodo2_inicio: str = Query(...),
     periodo2_fim: str = Query(...),
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Compara dois períodos e retorna métricas e variações"""
     try:
+        # Valida se o cliente existe
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail=f"Cliente com ID {client_id} não encontrado")
+        
         analytics = Analytics(db)
         
         # Busca métricas do período 1
@@ -2240,7 +2649,7 @@ async def comparativo_periodos(
 # ==================== ROUTES - PERFIL FUNCIONÁRIO ====================
 
 @app.get("/perfil_funcionario", response_class=HTMLResponse)
-async def perfil_funcionario_page(current_user: User = Depends(get_current_active_user)):
+async def perfil_funcionario_page():
     """Página de perfil de funcionário"""
     file_path = os.path.join(FRONTEND_DIR, "perfil_funcionario.html")
     with open(file_path, "r", encoding="utf-8") as f:
@@ -2250,7 +2659,6 @@ async def perfil_funcionario_page(current_user: User = Depends(get_current_activ
 async def perfil_funcionario(
     nome: str = Query(...),
     client_id: int = 1,
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Retorna perfil completo de um funcionário"""
@@ -2401,10 +2809,14 @@ async def listar_todos_dados(
                         print(f"Erro ao parse JSON dados_originais: {e}")
                         dados_originais = {}
                 
+                # Busca o upload para pegar mes_referencia
+                upload = db.query(Upload).filter(Upload.id == a.upload_id).first()
+                
                 # Cria registro com os novos campos da planilha padronizada
                 registro = {
                     'id': a.id,
                     'upload_id': a.upload_id,
+                    'mes_referencia': upload.mes_referencia if upload else None,
                     # Campos principais da planilha padronizada
                     'nomecompleto': a.nomecompleto or '',
                     'descricao_atestad': a.descricao_atestad or '',
@@ -2559,6 +2971,310 @@ async def atualizar_dado(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== PRODUTIVIDADE API ====================
+
+@app.get("/api/produtividade")
+async def obter_produtividade(
+    client_id: int = Query(1),
+    mes_referencia: Optional[str] = Query(None),  # YYYY-MM
+    db: Session = Depends(get_db)
+):
+    """Retorna dados de produtividade do cliente"""
+    try:
+        query = db.query(Produtividade).filter(Produtividade.client_id == client_id)
+        
+        if mes_referencia:
+            query = query.filter(Produtividade.mes_referencia == mes_referencia)
+        
+        registros = query.order_by(Produtividade.numero_tipo).all()
+        
+        return {
+            "success": True,
+            "data": [
+                {
+                    "id": r.id,
+                    "numero_tipo": r.numero_tipo,
+                    "tipo_consulta": r.tipo_consulta,
+                    "ocupacionais": r.ocupacionais or 0,
+                    "assistenciais": r.assistenciais or 0,
+                    "acidente_trabalho": r.acidente_trabalho or 0,
+                    "inss": r.inss or 0,
+                    "sinistralidade": r.sinistralidade or 0,
+                    "absenteismo": r.absenteismo or 0,
+                    "pericia_indireta": r.pericia_indireta or 0,
+                    "total": r.total or 0,
+                    "mes_referencia": r.mes_referencia
+                }
+                for r in registros
+            ]
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar produtividade: {str(e)}")
+
+@app.post("/api/produtividade")
+async def salvar_produtividade(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Salva ou atualiza dados de produtividade"""
+    try:
+        data = await request.json()
+        
+        client_id = data.get("client_id", 1)
+        mes_referencia = data.get("mes_referencia")  # YYYY-MM
+        registros = data.get("registros", [])  # Lista de registros
+        
+        if not mes_referencia:
+            raise HTTPException(status_code=400, detail="mes_referencia é obrigatório")
+        
+        # Remove registros antigos do mesmo mês
+        db.query(Produtividade).filter(
+            Produtividade.client_id == client_id,
+            Produtividade.mes_referencia == mes_referencia
+        ).delete()
+        
+        # Cria novos registros
+        novos_registros = []
+        for reg in registros:
+            # Calcula total
+            total = (
+                (reg.get("ocupacionais", 0) or 0) +
+                (reg.get("assistenciais", 0) or 0) +
+                (reg.get("acidente_trabalho", 0) or 0) +
+                (reg.get("inss", 0) or 0) +
+                (reg.get("sinistralidade", 0) or 0) +
+                (reg.get("absenteismo", 0) or 0) +
+                (reg.get("pericia_indireta", 0) or 0)
+            )
+            
+            novo = Produtividade(
+                client_id=client_id,
+                mes_referencia=mes_referencia,
+                numero_tipo=str(reg.get("numero_tipo", "")),
+                tipo_consulta=reg.get("tipo_consulta", ""),
+                ocupacionais=int(reg.get("ocupacionais", 0) or 0),
+                assistenciais=int(reg.get("assistenciais", 0) or 0),
+                acidente_trabalho=int(reg.get("acidente_trabalho", 0) or 0),
+                inss=int(reg.get("inss", 0) or 0),
+                sinistralidade=int(reg.get("sinistralidade", 0) or 0),
+                absenteismo=int(reg.get("absenteismo", 0) or 0),
+                pericia_indireta=int(reg.get("pericia_indireta", 0) or 0),
+                total=total
+            )
+            db.add(novo)
+            novos_registros.append(novo)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"{len(novos_registros)} registro(s) salvo(s) com sucesso",
+            "count": len(novos_registros)
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar produtividade: {str(e)}")
+
+@app.put("/api/produtividade/{produtividade_id}")
+async def atualizar_produtividade(
+    produtividade_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Atualiza um registro de produtividade"""
+    try:
+        registro = db.query(Produtividade).filter(Produtividade.id == produtividade_id).first()
+        if not registro:
+            raise HTTPException(status_code=404, detail="Registro não encontrado")
+        
+        data = await request.json()
+        
+        # Atualiza campos
+        registro.numero_tipo = data.get("numero_tipo", registro.numero_tipo)
+        registro.tipo_consulta = data.get("tipo_consulta", registro.tipo_consulta)
+        registro.ocupacionais = int(data.get("ocupacionais", registro.ocupacionais) or 0)
+        registro.assistenciais = int(data.get("assistenciais", registro.assistenciais) or 0)
+        registro.acidente_trabalho = int(data.get("acidente_trabalho", registro.acidente_trabalho) or 0)
+        registro.inss = int(data.get("inss", registro.inss) or 0)
+        registro.sinistralidade = int(data.get("sinistralidade", registro.sinistralidade) or 0)
+        registro.absenteismo = int(data.get("absenteismo", registro.absenteismo) or 0)
+        registro.pericia_indireta = int(data.get("pericia_indireta", registro.pericia_indireta) or 0)
+        
+        # Recalcula total
+        registro.total = (
+            registro.ocupacionais +
+            registro.assistenciais +
+            registro.acidente_trabalho +
+            registro.inss +
+            registro.sinistralidade +
+            registro.absenteismo +
+            registro.pericia_indireta
+        )
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Registro atualizado com sucesso",
+            "data": {
+                "id": registro.id,
+                "numero_tipo": registro.numero_tipo,
+                "tipo_consulta": registro.tipo_consulta,
+                "ocupacionais": registro.ocupacionais,
+                "assistenciais": registro.assistenciais,
+                "acidente_trabalho": registro.acidente_trabalho,
+                "inss": registro.inss,
+                "sinistralidade": registro.sinistralidade,
+                "absenteismo": registro.absenteismo,
+                "pericia_indireta": registro.pericia_indireta,
+                "total": registro.total,
+                "mes_referencia": registro.mes_referencia
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar: {str(e)}")
+
+@app.delete("/api/produtividade/{produtividade_id}")
+async def excluir_produtividade(
+    produtividade_id: int,
+    db: Session = Depends(get_db)
+):
+    """Exclui um registro de produtividade"""
+    try:
+        registro = db.query(Produtividade).filter(Produtividade.id == produtividade_id).first()
+        if not registro:
+            raise HTTPException(status_code=404, detail="Registro não encontrado")
+        
+        db.delete(registro)
+        db.commit()
+        
+        return {"success": True, "message": "Registro excluído com sucesso"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao excluir: {str(e)}")
+
+@app.get("/api/produtividade/evolucao")
+async def obter_evolucao_produtividade(
+    client_id: int = Query(1),
+    agrupar_por: str = Query("mes", description="Agrupar por 'mes' ou 'ano'"),
+    db: Session = Depends(get_db)
+):
+    """Retorna dados agregados de produtividade para gráficos de evolução"""
+    try:
+        # Busca todos os registros do cliente
+        registros = db.query(Produtividade).filter(
+            Produtividade.client_id == client_id
+        ).order_by(Produtividade.mes_referencia).all()
+        
+        if not registros:
+            return {
+                "success": True,
+                "data": [],
+                "agrupar_por": agrupar_por
+            }
+        
+        # Agrupa por mês ou ano
+        # Primeiro agrupa por mês e tipo_consulta
+        dados_por_mes_tipo = {}
+        
+        for reg in registros:
+            mes_ref = reg.mes_referencia  # YYYY-MM
+            tipo = reg.tipo_consulta or "sem-tipo"
+            
+            if agrupar_por == "ano":
+                # Agrupa por ano (YYYY)
+                chave = mes_ref.split('-')[0] if mes_ref else "sem-ano"
+            else:
+                # Agrupa por mês (YYYY-MM)
+                chave = mes_ref if mes_ref else "sem-mes"
+            
+            chave_completa = f"{chave}_{tipo}"
+            
+            if chave_completa not in dados_por_mes_tipo:
+                dados_por_mes_tipo[chave_completa] = {
+                    "periodo": chave,
+                    "tipo_consulta": tipo,
+                    "ocupacionais": 0,
+                    "assistenciais": 0,
+                    "acidente_trabalho": 0,
+                    "inss": 0,
+                    "sinistralidade": 0,
+                    "absenteismo": 0,
+                    "pericia_indireta": 0,
+                    "total": 0
+                }
+            
+            # Soma os valores
+            dados_por_mes_tipo[chave_completa]["ocupacionais"] += reg.ocupacionais or 0
+            dados_por_mes_tipo[chave_completa]["assistenciais"] += reg.assistenciais or 0
+            dados_por_mes_tipo[chave_completa]["acidente_trabalho"] += reg.acidente_trabalho or 0
+            dados_por_mes_tipo[chave_completa]["inss"] += reg.inss or 0
+            dados_por_mes_tipo[chave_completa]["sinistralidade"] += reg.sinistralidade or 0
+            dados_por_mes_tipo[chave_completa]["absenteismo"] += reg.absenteismo or 0
+            dados_por_mes_tipo[chave_completa]["pericia_indireta"] += reg.pericia_indireta or 0
+            dados_por_mes_tipo[chave_completa]["total"] += reg.total or 0
+        
+        # Agora agrega apenas os registros do tipo "Agendados"
+        dados_agregados = {}
+        
+        for chave_completa, dados in dados_por_mes_tipo.items():
+            if dados["tipo_consulta"] == "Agendados":
+                periodo = dados["periodo"]
+                
+                if periodo not in dados_agregados:
+                    dados_agregados[periodo] = {
+                        "periodo": periodo,
+                        "ocupacionais": 0,
+                        "assistenciais": 0,
+                        "acidente_trabalho": 0,
+                        "inss": 0,
+                        "sinistralidade": 0,
+                        "absenteismo": 0,
+                        "pericia_indireta": 0,
+                        "total": 0
+                    }
+                
+                # Soma apenas os valores de "Agendados"
+                dados_agregados[periodo]["ocupacionais"] += dados["ocupacionais"]
+                dados_agregados[periodo]["assistenciais"] += dados["assistenciais"]
+                dados_agregados[periodo]["acidente_trabalho"] += dados["acidente_trabalho"]
+                dados_agregados[periodo]["inss"] += dados["inss"]
+                dados_agregados[periodo]["sinistralidade"] += dados["sinistralidade"]
+                dados_agregados[periodo]["absenteismo"] += dados["absenteismo"]
+                dados_agregados[periodo]["pericia_indireta"] += dados["pericia_indireta"]
+                dados_agregados[periodo]["total"] += dados["total"]
+        
+        # Converte para lista ordenada
+        lista_ordenada = sorted(
+            dados_agregados.values(),
+            key=lambda x: x["periodo"]
+        )
+        
+        return {
+            "success": True,
+            "data": lista_ordenada,
+            "agrupar_por": agrupar_por
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar evolução: {str(e)}")
+
 @app.delete("/api/dados/{atestado_id}")
 async def excluir_dado(
     atestado_id: int,
@@ -2577,6 +3293,93 @@ async def excluir_dado(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/funcionario/atualizar")
+async def atualizar_funcionario(
+    nome: str = Query(...),
+    client_id: int = Query(1),
+    genero: Optional[str] = Query(None),
+    setor: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Atualiza todos os registros de um funcionário (em massa)"""
+    try:
+        # Busca todos os atestados do funcionário
+        atestados = db.query(Atestado).join(Upload).filter(
+            Upload.client_id == client_id,
+            (Atestado.nomecompleto == nome) | (Atestado.nome_funcionario == nome)
+        ).all()
+        
+        if not atestados:
+            raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+        
+        atualizados = 0
+        for atestado in atestados:
+            if genero is not None:
+                atestado.genero = genero.upper()[:1] if genero else None
+            if setor is not None:
+                atestado.setor = setor
+        
+        db.commit()
+        return {
+            "success": True,
+            "total_atualizados": len(atestados),
+            "mensagem": f"{len(atestados)} registro(s) atualizado(s) com sucesso"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar funcionário: {str(e)}")
+
+@app.put("/api/funcionarios/atualizar-massa")
+async def atualizar_funcionarios_massa(
+    nomes: List[str] = Query(...),
+    client_id: int = Query(1),
+    genero: Optional[str] = Query(None),
+    setor: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Atualiza múltiplos funcionários em massa"""
+    try:
+        if not nomes or len(nomes) == 0:
+            raise HTTPException(status_code=400, detail="Nenhum funcionário selecionado")
+        
+        total_registros_atualizados = 0
+        funcionarios_atualizados = 0
+        
+        for nome in nomes:
+            # Busca todos os atestados do funcionário
+            atestados = db.query(Atestado).join(Upload).filter(
+                Upload.client_id == client_id,
+                (Atestado.nomecompleto == nome) | (Atestado.nome_funcionario == nome)
+            ).all()
+            
+            if atestados:
+                funcionarios_atualizados += 1
+                for atestado in atestados:
+                    if genero is not None:
+                        atestado.genero = genero.upper()[:1] if genero else None
+                    if setor is not None:
+                        atestado.setor = setor
+                    total_registros_atualizados += 1
+        
+        db.commit()
+        return {
+            "success": True,
+            "funcionarios_atualizados": funcionarios_atualizados,
+            "total_registros_atualizados": total_registros_atualizados,
+            "mensagem": f"{funcionarios_atualizados} funcionário(s) atualizado(s) com sucesso ({total_registros_atualizados} registro(s))"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar funcionários: {str(e)}")
 
 # ==================== ROUTES - UPLOAD INTELIGENTE ====================
 

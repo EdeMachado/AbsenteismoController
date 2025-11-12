@@ -176,13 +176,17 @@ class Analytics:
         query = aplicar_filtro_setor(query, setor)
         
         # Agrupa apenas por nome para somar todos os dias do funcionário
-        query = query.group_by(Atestado.nomecompleto).order_by(func.sum(Atestado.dias_atestados).desc()).limit(limit)
+        # Ordena alfabeticamente por nome
+        query = query.group_by(Atestado.nomecompleto).order_by(Atestado.nomecompleto.asc()).limit(limit)
         
         results = query.all()
         
         # Busca setor e gênero do primeiro registro de cada funcionário para exibição
         funcionarios_completos = []
         for r in results:
+            if not r.nomecompleto:
+                continue  # Pula se não tiver nome
+                
             # Busca setor e genero do primeiro registro desse funcionário
             primeiro = self.db.query(Atestado.setor, Atestado.genero).join(Upload).filter(
                 Upload.client_id == client_id,
@@ -191,9 +195,9 @@ class Analytics:
             
             funcionarios_completos.append({
                 'nome': r.nomecompleto or 'Não informado',
-                'setor': primeiro.setor if primeiro else 'Não informado',
-                'genero': primeiro.genero if primeiro else '-',
-                'quantidade': r.quantidade,
+                'setor': primeiro.setor if primeiro and primeiro.setor else 'Não informado',
+                'genero': primeiro.genero if primeiro and primeiro.genero else '-',
+                'quantidade': r.quantidade or 0,
                 'dias_perdidos': round(r.dias_perdidos or 0, 2),
                 'horas_perdidas': round(r.horas_perdidas or 0, 2)
             })
