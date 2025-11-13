@@ -101,20 +101,90 @@ async function salvarConfiguracoes() {
 
 // Carrega usuários (apenas admin)
 async function carregarUsuarios() {
-    if (!isAdmin()) return;
+    // Verifica se é admin de várias formas
+    let isUserAdmin = false;
+    
+    if (typeof isAdmin === 'function') {
+        try {
+            isUserAdmin = isAdmin();
+        } catch (e) {
+            console.warn('Erro ao verificar isAdmin:', e);
+        }
+    }
+    
+    if (typeof window.isAdmin === 'function') {
+        try {
+            isUserAdmin = window.isAdmin();
+        } catch (e) {
+            console.warn('Erro ao verificar window.isAdmin:', e);
+        }
+    }
+    
+    // Verifica no token JWT
+    try {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            if (payload.is_admin === true) {
+                isUserAdmin = true;
+            }
+        }
+    } catch (e) {
+        console.warn('Erro ao verificar token:', e);
+    }
+    
+    if (!isUserAdmin) {
+        console.log('⚠️ Usuário não é admin, não carregando usuários');
+        return;
+    }
     
     try {
-        const response = await fetch('/api/users');
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            console.error('❌ Token não encontrado');
+            const tbody = document.getElementById('usersTableBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">Token de autenticação não encontrado</td></tr>';
+            }
+            return;
+        }
+        
+        console.log('🔑 Token encontrado, fazendo requisição para /api/users');
+        console.log('🔑 Token (primeiros 20 chars):', token.substring(0, 20) + '...');
+        
+        // O interceptador em auth.js já adiciona o token, mas vamos garantir
+        const response = await fetch('/api/users', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
         if (!response.ok) {
-            throw new Error('Erro ao carregar usuários');
+            if (response.status === 401) {
+                console.error('❌ Não autorizado (401) - Token pode estar inválido ou expirado');
+                const errorText = await response.text();
+                console.error('Resposta do servidor:', errorText);
+                const tbody = document.getElementById('usersTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Não autorizado. Faça login novamente.</td></tr>';
+                }
+                return;
+            }
+            throw new Error(`Erro ${response.status} ao carregar usuários`);
         }
         
         usersData = await response.json();
+        console.log('✅ Usuários carregados:', usersData.length);
         renderizarUsuarios();
         
     } catch (error) {
-        console.error('Erro:', error);
-        mostrarAlert('Erro ao carregar usuários', 'error');
+        console.error('❌ Erro ao carregar usuários:', error);
+        const tbody = document.getElementById('usersTableBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center">Erro: ${error.message}</td></tr>`;
+        }
     }
 }
 
@@ -225,25 +295,55 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tema escuro desabilitado - sempre remove
     aplicarTemaEscuro(false);
     
-    // Aguarda auth.js carregar
+    // Carrega configurações sempre
+    carregarConfiguracoes();
+    
+    // Aguarda auth.js carregar e verifica se é admin
     setTimeout(() => {
-        if (typeof checkAuth === 'function' && checkAuth()) {
-            carregarConfiguracoes();
-            if (typeof isAdmin === 'function' && isAdmin()) {
-                document.getElementById('adminSection').style.display = 'block';
-                carregarUsuarios();
+        const adminSection = document.getElementById('adminSection');
+        if (!adminSection) return;
+        
+        // Verifica se é admin de várias formas
+        let isUserAdmin = false;
+        
+        if (typeof isAdmin === 'function') {
+            try {
+                isUserAdmin = isAdmin();
+            } catch (e) {
+                console.warn('Erro ao verificar isAdmin:', e);
             }
-        } else if (typeof isAuthenticated === 'function' && isAuthenticated()) {
-            carregarConfiguracoes();
-            if (typeof isAdmin === 'function' && isAdmin()) {
-                document.getElementById('adminSection').style.display = 'block';
-                carregarUsuarios();
-            }
-        } else {
-            // Mesmo sem autenticação, carrega configurações para aplicar tema
-            carregarConfiguracoes();
         }
-    }, 500);
+        
+        if (typeof window.isAdmin === 'function') {
+            try {
+                isUserAdmin = window.isAdmin();
+            } catch (e) {
+                console.warn('Erro ao verificar window.isAdmin:', e);
+            }
+        }
+        
+        // Verifica no token JWT
+        try {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                if (payload.is_admin === true) {
+                    isUserAdmin = true;
+                }
+            }
+        } catch (e) {
+            console.warn('Erro ao verificar token:', e);
+        }
+        
+        console.log('🔍 Verificação de Admin:', isUserAdmin);
+        
+        if (isUserAdmin) {
+            adminSection.style.display = 'block';
+            carregarUsuarios();
+        } else {
+            adminSection.style.display = 'none';
+        }
+    }, 800);
     
     // Tema escuro desabilitado - não adiciona listener
 });

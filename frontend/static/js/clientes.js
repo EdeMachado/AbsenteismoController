@@ -80,7 +80,77 @@ function obterBrandingCliente(cliente) {
     return { ...DEFAULT_BRANDING };
 }
 
+function limparCacheGraficos() {
+    /**
+     * Limpa todos os gráficos e cache ao trocar de cliente
+     * Isso evita que dados de um cliente apareçam em outro
+     */
+    console.log('[CACHE] Limpando gráficos e cache...');
+    
+    // Destrói todos os gráficos Chart.js globais
+    if (window.chartCids && typeof window.chartCids.destroy === 'function') {
+        window.chartCids.destroy();
+        window.chartCids = null;
+    }
+    if (window.chartSetores && typeof window.chartSetores.destroy === 'function') {
+        window.chartSetores.destroy();
+        window.chartSetores = null;
+    }
+    if (window.chartEvolucao && typeof window.chartEvolucao.destroy === 'function') {
+        window.chartEvolucao.destroy();
+        window.chartEvolucao = null;
+    }
+    if (window.chartGenero && typeof window.chartGenero.destroy === 'function') {
+        window.chartGenero.destroy();
+        window.chartGenero = null;
+    }
+    if (window.chartProdutividade && typeof window.chartProdutividade.destroy === 'function') {
+        window.chartProdutividade.destroy();
+        window.chartProdutividade = null;
+    }
+    if (window.chartProdutividadeEvolucao && typeof window.chartProdutividadeEvolucao.destroy === 'function') {
+        window.chartProdutividadeEvolucao.destroy();
+        window.chartProdutividadeEvolucao = null;
+    }
+    // Limpa outros gráficos conhecidos
+    Object.keys(window).forEach(key => {
+        if (key.startsWith('chart') && window[key] && typeof window[key].destroy === 'function') {
+            try {
+                window[key].destroy();
+                window[key] = null;
+            } catch (e) {
+                console.warn(`[CACHE] Erro ao destruir gráfico ${key}:`, e);
+            }
+        }
+    });
+    
+    // Limpa dados em cache
+    if (window.camposDisponiveis) {
+        window.camposDisponiveis = {};
+    }
+    if (window.alertasData) {
+        window.alertasData = [];
+    }
+    
+    // Força recarregamento da página se estiver no dashboard
+    if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+        console.log('[CACHE] Recarregando dashboard...');
+        setTimeout(() => {
+            if (typeof carregarDashboard === 'function') {
+                carregarDashboard();
+            } else {
+                window.location.reload();
+            }
+        }, 100);
+    }
+    
+    console.log('[CACHE] Cache limpo com sucesso');
+}
+
 function salvarSelecaoCliente(cliente, branding) {
+    // Limpa cache antes de trocar
+    limparCacheGraficos();
+    
     localStorage.setItem('cliente_selecionado', cliente.id);
     localStorage.setItem('cliente_nome', cliente.nome_fantasia || cliente.nome || '');
     if (cliente.cnpj) {
@@ -101,6 +171,8 @@ function salvarSelecaoCliente(cliente, branding) {
         background: branding.background || DEFAULT_BRANDING.background
     };
     localStorage.setItem('cliente_tema', JSON.stringify(tema));
+    
+    console.log(`[CLIENTE] Cliente alterado para: ${cliente.nome} (ID: ${cliente.id})`);
 }
 
 function atualizarSelecaoVisual(selectedId) {
@@ -430,9 +502,6 @@ function renderizarCards() {
                         </button>
                         <button type="button" class="btn-card btn-card-info" onclick="event.stopPropagation(); configurarMapeamento(${cliente.id})" title="Configurar Mapeamento de Planilha">
                             <i class="fas fa-table-columns"></i>
-                        </button>
-                        <button type="button" class="btn-card btn-card-success" onclick="event.stopPropagation(); configurarGraficos(${cliente.id})" title="Configurar Gráficos Personalizados">
-                            <i class="fas fa-chart-bar"></i>
                         </button>
                         <button type="button" class="btn-card ${actionClass}" onclick="event.stopPropagation(); confirmarDeletar(${cliente.id})" title="${actionLabel}">
                             <i class="fas ${actionIcon}"></i>

@@ -176,8 +176,8 @@ class Analytics:
         query = aplicar_filtro_setor(query, setor)
         
         # Agrupa apenas por nome para somar todos os dias do funcionário
-        # Ordena alfabeticamente por nome
-        query = query.group_by(Atestado.nomecompleto).order_by(Atestado.nomecompleto.asc()).limit(limit)
+        # Ordena por dias perdidos (decrescente) para mostrar os TOP funcionários
+        query = query.group_by(Atestado.nomecompleto).order_by(func.sum(Atestado.dias_atestados).desc()).limit(limit)
         
         results = query.all()
         
@@ -369,16 +369,22 @@ class Analytics:
         ]
     
     def dias_perdidos_por_centro_custo(self, client_id: int, limit: int = 10, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
-        """TOP Setores por dias perdidos (usando setor como centro de custo)"""
+        """TOP Centros de Custo por dias perdidos (centro_custo = setor)"""
         query = self.db.query(
             Atestado.setor,
             func.count(Atestado.id).label('quantidade'),
             func.sum(Atestado.dias_atestados).label('dias_perdidos'),
             func.sum(Atestado.horas_perdi).label('horas_perdidas')
         ).join(Upload).filter(
-            Upload.client_id == client_id,
-            Atestado.setor != '',
-            Atestado.setor.isnot(None)
+            Upload.client_id == client_id
+        )
+        
+        # Filtra apenas registros com setor preenchido (centro de custo = setor)
+        query = query.filter(
+            or_(
+                Atestado.setor != '',
+                Atestado.setor.isnot(None)
+            )
         )
         
         if mes_inicio:
@@ -389,22 +395,28 @@ class Analytics:
         # Aplica filtros usando helper
         from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
         query = aplicar_filtro_funcionario(query, funcionario)
-        query = aplicar_filtro_setor(query, setor)
-
+        # Não aplica filtro de setor aqui, pois queremos ver todos os setores (centros de custo)
         
         query = query.group_by(Atestado.setor).order_by(func.sum(Atestado.dias_atestados).desc()).limit(limit)
         
         results = query.all()
         
-        return [
-            {
-                'centro_custo': r.setor or 'Não informado',
-                'quantidade': r.quantidade,
-                'dias_perdidos': round(r.dias_perdidos or 0, 2),
-                'horas_perdidas': round(r.horas_perdidas or 0, 2)
-            }
-            for r in results
-        ]
+        print(f"🔍 DEBUG dias_perdidos_por_centro_custo - client_id={client_id}, resultados encontrados: {len(results)}")
+        
+        resultado = []
+        for r in results:
+            dias = r.dias_perdidos if r.dias_perdidos is not None else 0
+            if dias > 0:  # Só inclui se tiver dias > 0
+                resultado.append({
+                    'centro_custo': r.setor or 'Não informado',
+                    'quantidade': r.quantidade or 0,
+                    'dias_perdidos': round(dias, 2),
+                    'horas_perdidas': round(r.horas_perdidas or 0, 2)
+                })
+                print(f"  - Centro Custo (Setor): {r.setor}, Dias: {round(dias, 2)}")
+        
+        print(f"📊 Total de centros de custo retornados: {len(resultado)}")
+        return resultado
     
     def distribuicao_dias_por_atestado(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """Distribuição de dias por atestado (histograma)"""
@@ -725,4 +737,350 @@ class Analytics:
                 'dias_perdidos': round(r.dias_perdidos or 0, 2)
             }
             for r in results
+        ]
+    
+    def classificacao_funcionarios_roda_ouro(self, client_id: int, limit: int = 15, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Classificação por Funcionário - Roda de Ouro (conta atestados, não dias)"""
+        query = self.db.query(
+            Atestado.nomecompleto,
+            func.count(Atestado.id).label('quantidade')
+        ).join(Upload).filter(
+            Upload.client_id == client_id,
+            or_(
+                Atestado.nomecompleto != '',
+                Atestado.nomecompleto.isnot(None)
+            )
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        query = query.group_by(Atestado.nomecompleto).order_by(func.count(Atestado.id).desc()).limit(limit)
+        
+        results = query.all()
+        
+        return [
+            {
+                'nome': r.nomecompleto or 'Não informado',
+                'quantidade': r.quantidade or 0
+            }
+            for r in results
+        ]
+    
+    def classificacao_setores_roda_ouro(self, client_id: int, limit: int = 15, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Classificação por Setor - Roda de Ouro (soma dias de afastamento, não conta atestados)"""
+        # Query mais flexível - aceita setor vazio ou NULL, mas agrupa por setor
+        query = self.db.query(
+            Atestado.setor,
+            func.sum(Atestado.dias_atestados).label('dias_afastamento')
+        ).join(Upload).filter(
+            Upload.client_id == client_id
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        # Agrupa por setor, incluindo NULLs como "Não informado"
+        query = query.group_by(Atestado.setor).order_by(func.sum(Atestado.dias_atestados).desc()).limit(limit)
+        
+        results = query.all()
+        
+        print(f"🔍 DEBUG classificacao_setores_roda_ouro - client_id={client_id}, resultados encontrados: {len(results)}")
+        
+        resultado = []
+        for r in results:
+            dias = r.dias_afastamento if r.dias_afastamento is not None else 0
+            setor_nome = r.setor if r.setor and r.setor.strip() else 'Não informado'
+            if dias > 0:  # Só inclui setores com dias > 0
+                resultado.append({
+                    'setor': setor_nome,
+                    'dias_afastamento': round(dias, 2)
+                })
+                print(f"  - Setor: {setor_nome}, Dias: {round(dias, 2)}")
+        
+        print(f"📊 Total de setores retornados: {len(resultado)}")
+        return resultado
+    
+    def classificacao_doencas_roda_ouro(self, client_id: int, limit: int = 15, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Classificação por Doença - Roda de Ouro (agrupa por tipo de doença baseado no diagnóstico)"""
+        # Busca todos os registros com diagnóstico
+        query = self.db.query(
+            Atestado.diagnostico,
+            Atestado.cid,
+            Atestado.descricao_cid,
+            func.count(Atestado.id).label('quantidade')
+        ).join(Upload).filter(
+            Upload.client_id == client_id,
+            or_(
+                Atestado.diagnostico != '',
+                Atestado.descricao_cid != ''
+            ),
+            or_(
+                Atestado.diagnostico.isnot(None),
+                Atestado.descricao_cid.isnot(None)
+            )
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        query = query.group_by(Atestado.diagnostico, Atestado.cid, Atestado.descricao_cid).order_by(func.count(Atestado.id).desc()).limit(limit * 2)
+        
+        results = query.all()
+        
+        # Agrupa por tipo de doença (categoriza diagnósticos)
+        tipos_doenca = {}
+        for r in results:
+            diagnostico = (r.diagnostico or r.descricao_cid or '').upper()
+            tipo = self._categorizar_doenca(diagnostico)
+            
+            if tipo not in tipos_doenca:
+                tipos_doenca[tipo] = 0
+            tipos_doenca[tipo] += r.quantidade or 0
+        
+        # Ordena e limita
+        tipos_ordenados = sorted(tipos_doenca.items(), key=lambda x: x[1], reverse=True)[:limit]
+        
+        return [
+            {
+                'tipo_doenca': tipo,
+                'quantidade': quantidade
+            }
+            for tipo, quantidade in tipos_ordenados
+        ]
+    
+    def _categorizar_doenca(self, diagnostico: str) -> str:
+        """Categoriza diagnóstico em tipo de doença"""
+        diagnostico_upper = diagnostico.upper()
+        
+        # Mapeamento de categorias
+        if any(palavra in diagnostico_upper for palavra in ['OSTEOMUSCULAR', 'MUSCULO', 'OSSEO', 'ARTICULAÇÃO', 'ARTICULACAO', 'COLUNA', 'LOMBAR', 'CERVICAL', 'DORSAL']):
+            if any(palavra in diagnostico_upper for palavra in ['TRAUMA', 'LESÃO', 'LESAO', 'FRATURA', 'ENTORSE', 'LUXAÇÃO', 'LUXACAO']):
+                return 'OSTEOMUSCULAR - TRAUMA'
+            else:
+                return 'OSTEOMUSCULAR - CRÔNICO'
+        elif any(palavra in diagnostico_upper for palavra in ['RESPIRATÓRIO', 'RESPIRATORIO', 'BRONQUITE', 'ASMA', 'PNEUMONIA', 'RINITE', 'SINUSITE']):
+            return 'TRATO RESPIRATÓRIO'
+        elif any(palavra in diagnostico_upper for palavra in ['GASTROINTESTINAL', 'GASTRICO', 'GASTRITE', 'ÚLCERA', 'ULCERA', 'INTESTINO', 'DIGESTIVO']):
+            return 'TRATO GASTROINTESTINAL'
+        elif any(palavra in diagnostico_upper for palavra in ['DERMATOLÓGICA', 'DERMATOLOGICA', 'PELE', 'DERMATITE', 'PSORÍASE', 'PSORIASE']):
+            return 'DERMATOLÓGICAS'
+        elif any(palavra in diagnostico_upper for palavra in ['OFTALMOLÓGICA', 'OFTALMOLOGICA', 'OLHO', 'VISÃO', 'VISAO', 'CONJUNTIVITE']):
+            return 'OFTALMOLÓGICAS'
+        elif any(palavra in diagnostico_upper for palavra in ['CARDIOLÓGICA', 'CARDIOLOGICA', 'CORAÇÃO', 'CORACAO', 'CARDIACO', 'HIPERTENSÃO', 'HIPERTENSAO']):
+            return 'CARDIOLÓGICAS'
+        elif any(palavra in diagnostico_upper for palavra in ['INFECCIOSA', 'INFECÇÃO', 'INFECCAO', 'VIRAL', 'BACTERIANA']):
+            return 'DOENÇAS INFECCIOSAS'
+        elif any(palavra in diagnostico_upper for palavra in ['ODONTOLÓGICA', 'ODONTOLOGICA', 'DENTAL', 'DENTE', 'GENGIVA']):
+            return 'ODONTOLÓGICAS'
+        elif any(palavra in diagnostico_upper for palavra in ['VASCULAR', 'VARIZES', 'CIRCULAÇÃO', 'CIRCULACAO']):
+            return 'VASCULAR'
+        else:
+            return 'OUTRAS'
+    
+    def dias_atestados_por_ano_coerencia(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> Dict[str, Any]:
+        """Dias atestados por ano com coerência (COERENTE vs SEM COERÊNCIA)"""
+        import json
+        
+        # Busca todos os registros
+        query = self.db.query(
+            Atestado.dias_atestados,
+            Atestado.data_afastamento,
+            Atestado.dados_originais,
+            Upload.mes_referencia
+        ).join(Upload).filter(
+            Upload.client_id == client_id
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        registros = query.all()
+        
+        # Agrupa por ano
+        dados_por_ano = {}
+        
+        for r in registros:
+            # Tenta obter ano da data de afastamento ou do mês de referência
+            ano = None
+            if r.data_afastamento:
+                ano = str(r.data_afastamento.year)
+            elif r.mes_referencia:
+                ano = r.mes_referencia.split('-')[0]
+            
+            if not ano:
+                continue
+            
+            if ano not in dados_por_ano:
+                dados_por_ano[ano] = {'coerente': 0, 'sem_coerencia': 0}
+            
+            # Verifica coerência nos dados originais
+            coerente = self._verificar_coerencia(r.dados_originais, r.dias_atestados)
+            
+            if coerente:
+                dados_por_ano[ano]['coerente'] += r.dias_atestados or 0
+            else:
+                dados_por_ano[ano]['sem_coerencia'] += r.dias_atestados or 0
+        
+        # Converte para lista ordenada
+        anos_ordenados = sorted(dados_por_ano.keys())
+        
+        return {
+            'anos': anos_ordenados,
+            'coerente': [dados_por_ano[ano]['coerente'] for ano in anos_ordenados],
+            'sem_coerencia': [dados_por_ano[ano]['sem_coerencia'] for ano in anos_ordenados]
+        }
+    
+    def _verificar_coerencia(self, dados_originais_json: str, dias_atestados: float) -> bool:
+        """Verifica se o atestado é coerente baseado nos dados originais"""
+        import json
+        
+        if not dados_originais_json:
+            # Se não tem dados originais, assume coerente
+            return True
+        
+        try:
+            dados_originais = json.loads(dados_originais_json)
+            
+            # Procura campos relacionados a coerência
+            for key, value in dados_originais.items():
+                key_upper = str(key).upper()
+                value_str = str(value).upper() if value else ''
+                
+                # Verifica se tem campo de coerência
+                if 'COERENTE' in key_upper or 'COERENCIA' in key_upper:
+                    if 'SIM' in value_str or 'S' in value_str or 'TRUE' in value_str or '1' in value_str:
+                        return True
+                    elif 'NÃO' in value_str or 'NAO' in value_str or 'N' in value_str or 'FALSE' in value_str or '0' in value_str:
+                        return False
+                
+                # Verifica se tem campo "SEM COERÊNCIA"
+                if 'SEM COER' in key_upper or 'SEM_COER' in key_upper:
+                    if 'SIM' in value_str or 'S' in value_str or 'TRUE' in value_str or '1' in value_str:
+                        return False
+            
+            # Se não encontrou campo de coerência, assume coerente por padrão
+            return True
+        except:
+            # Se der erro ao parsear, assume coerente
+            return True
+    
+    def analise_atestados_coerencia(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> Dict[str, Any]:
+        """Análise de atestados por coerência (para gráfico de rosca)"""
+        import json
+        
+        query = self.db.query(
+            Atestado.dias_atestados,
+            Atestado.dados_originais,
+            Upload.mes_referencia
+        ).join(Upload).filter(
+            Upload.client_id == client_id
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        registros = query.all()
+        
+        total_coerente = 0
+        total_sem_coerencia = 0
+        
+        for r in registros:
+            dias = r.dias_atestados or 0
+            coerente = self._verificar_coerencia(r.dados_originais, dias)
+            
+            if coerente:
+                total_coerente += dias
+            else:
+                total_sem_coerencia += dias
+        
+        total = total_coerente + total_sem_coerencia
+        
+        return {
+            'coerente': total_coerente,
+            'sem_coerencia': total_sem_coerencia,
+            'total': total,
+            'percentual_coerente': (total_coerente / total * 100) if total > 0 else 0,
+            'percentual_sem_coerencia': (total_sem_coerencia / total * 100) if total > 0 else 0
+        }
+    
+    def tempo_servico_atestados(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Tempo de Serviço x Atestados - agrupa por ano (baseado em data_afastamento ou mes_referencia)"""
+        query = self.db.query(
+            Atestado.data_afastamento,
+            Upload.mes_referencia,
+            func.count(Atestado.id).label('quantidade')
+        ).join(Upload).filter(
+            Upload.client_id == client_id
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        registros = query.all()
+        
+        # Agrupa por ano
+        dados_por_ano = {}
+        
+        for r in registros:
+            # Tenta obter ano da data de afastamento ou do mês de referência
+            ano = None
+            if r.data_afastamento:
+                ano = str(r.data_afastamento.year)
+            elif r.mes_referencia:
+                ano = r.mes_referencia.split('-')[0]
+            
+            if not ano:
+                continue
+            
+            if ano not in dados_por_ano:
+                dados_por_ano[ano] = 0
+            
+            dados_por_ano[ano] += r.quantidade or 0
+        
+        # Converte para lista ordenada
+        anos_ordenados = sorted(dados_por_ano.keys())
+        
+        return [
+            {
+                'ano': ano,
+                'quantidade': dados_por_ano[ano]
+            }
+            for ano in anos_ordenados
         ]

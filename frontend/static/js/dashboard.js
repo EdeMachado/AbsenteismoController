@@ -90,6 +90,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     carregarDashboard();
 });
 
+// ==================== HELPER FUNCTIONS ====================
+
+function garantirClientId(clientId, endpoint = '') {
+    /**
+     * Garante que client_id seja sempre válido antes de fazer requisições
+     * Retorna o client_id válido ou lança erro
+     */
+    if (!clientId || clientId <= 0) {
+        const errorMsg = `client_id é obrigatório para ${endpoint || 'esta requisição'}. Selecione um cliente primeiro.`;
+        console.error(`[CLIENT_ID] ${errorMsg}`);
+        throw new Error(errorMsg);
+    }
+    console.log(`[CLIENT_ID] Usando client_id: ${clientId} para ${endpoint || 'requisição'}`);
+    return clientId;
+}
+
 // ==================== CARREGAR DASHBOARD ====================
 let camposDisponiveis = {}; // Armazena campos disponíveis do cliente atual
 
@@ -118,8 +134,12 @@ function temCampo(campo) {
 async function carregarDashboard() {
     try {
         const clientId = getClientId();
-        if (!clientId) {
-            alert('Selecione um cliente na aba "Clientes" para visualizar o dashboard.');
+        
+        // Valida client_id antes de continuar
+        try {
+            garantirClientId(clientId, '/api/dashboard');
+        } catch (error) {
+            alert(error.message);
             return;
         }
 
@@ -236,8 +256,8 @@ async function carregarDashboard() {
             ocultarGrafico('chartMotivos');
         }
         
-        // Gráfico de Centro de Custo
-        if (temCampo('centro_custo')) {
+        // Gráfico de Centro de Custo (centro_custo = setor)
+        if (temCampo('setor')) {
             renderizarChartCentroCusto(data.dias_centro_custo || []);
         } else {
             ocultarGrafico('chartCentroCusto');

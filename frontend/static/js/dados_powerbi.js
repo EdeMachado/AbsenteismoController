@@ -861,7 +861,13 @@ async function saveCell(input, field, id) {
     const cell = input.parentElement;
     
     try {
-        const response = await fetch(`/api/dados/${id}`, {
+        const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+        if (!clientId) {
+            alert('Erro: Cliente não selecionado');
+            return;
+        }
+        
+        const response = await fetch(`/api/dados/${id}?client_id=${clientId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [field]: newValue })
@@ -1064,7 +1070,13 @@ async function detectarGeneros() {
             
             if (generoDetectado !== 'Indefinido') {
                 try {
-                    const response = await fetch(`/api/dados/${registro.id}`, {
+                    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+                    if (!clientId) {
+                        console.error('Erro: Cliente não selecionado');
+                        continue;
+                    }
+                    
+                    const response = await fetch(`/api/dados/${registro.id}?client_id=${clientId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ genero: generoDetectado })
