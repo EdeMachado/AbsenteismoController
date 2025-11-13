@@ -445,8 +445,18 @@ async def upload_file(
         mapping_obj = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
         if mapping_obj and mapping_obj.column_mapping:
             try:
-                custom_mapping = json.loads(mapping_obj.column_mapping)
-            except:
+                mapping_data = json.loads(mapping_obj.column_mapping)
+                # O mapeamento pode estar dentro de um objeto com 'column_mapping' ou ser o próprio dicionário
+                if isinstance(mapping_data, dict) and 'column_mapping' in mapping_data:
+                    custom_mapping = mapping_data['column_mapping']
+                elif isinstance(mapping_data, dict):
+                    custom_mapping = mapping_data
+                else:
+                    custom_mapping = None
+                
+                print(f"📋 Mapeamento carregado para cliente {client_id}: {custom_mapping}")
+            except Exception as e:
+                print(f"❌ Erro ao carregar mapeamento: {e}")
                 custom_mapping = None
         
         # Processa Excel
@@ -791,6 +801,50 @@ async def dashboard(
             print(f"Erro ao buscar produtividade: {e}")
             produtividade = []
         
+        # Busca campos disponíveis do cliente (mapeamento)
+        campos_disponiveis = {}
+        try:
+            mapping_obj = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
+            if mapping_obj and mapping_obj.column_mapping:
+                try:
+                    mapping_data = json.loads(mapping_obj.column_mapping)
+                    if isinstance(mapping_data, dict) and 'column_mapping' in mapping_data:
+                        campos_disponiveis = mapping_data.get('column_mapping', {})
+                    elif isinstance(mapping_data, dict):
+                        campos_disponiveis = mapping_data
+                except:
+                    pass
+        except Exception as e:
+            print(f"Erro ao buscar campos disponíveis: {e}")
+        
+        # Verifica quais campos realmente têm dados no banco
+        campos_com_dados = {}
+        try:
+            # Busca uma amostra de registros para verificar campos preenchidos
+            amostra = db.query(Atestado).join(Upload).filter(
+                Upload.client_id == client_id
+            ).limit(100).all()
+            
+            if amostra:
+                # Campos do modelo que podem ter dados
+                campos_modelo = [
+                    'nomecompleto', 'cpf', 'matricula', 'setor', 'centro_custo', 'cargo',
+                    'genero', 'data_afastamento', 'data_retorno', 'cid', 'diagnostico',
+                    'descricao_cid', 'dias_atestados', 'horas_perdi', 'motivo_atestado',
+                    'escala', 'tipo_atestado', 'descricao_atestad'
+                ]
+                
+                for campo in campos_modelo:
+                    # Verifica se pelo menos um registro tem esse campo preenchido
+                    tem_dados = any(
+                        getattr(reg, campo, None) not in (None, '', 0, 0.0) 
+                        for reg in amostra
+                    )
+                    if tem_dados:
+                        campos_com_dados[campo] = True
+        except Exception as e:
+            print(f"Erro ao verificar campos com dados: {e}")
+        
         resultado = {
             "metricas": metricas,
             "top_cids": top_cids,
@@ -809,7 +863,9 @@ async def dashboard(
             "dias_setor_genero": dias_setor_genero,
             "produtividade": produtividade,
             "insights": insights,
-            "alertas": alertas
+            "alertas": alertas,
+            "campos_mapeados": campos_disponiveis,  # Campos mapeados pelo cliente
+            "campos_com_dados": campos_com_dados  # Campos que realmente têm dados
         }
         
         # Corrige encoding antes de retornar
@@ -850,6 +906,292 @@ async def obter_filtros(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao buscar filtros: {str(e)}")
+
+@app.get("/api/clientes/{client_id}/graficos")
+async def obter_graficos_configurados(client_id: int, db: Session = Depends(get_db)):
+    """Retorna os gráficos configurados para um cliente"""
+    try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        mapping = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
+        if mapping and mapping.graficos_configurados:
+            try:
+                graficos = json.loads(mapping.graficos_configurados)
+                return {
+                    "success": True,
+                    "client_id": client_id,
+                    "graficos": graficos if isinstance(graficos, list) else []
+                }
+            except:
+                pass
+        
+        return {
+            "success": True,
+            "client_id": client_id,
+            "graficos": []
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao obter gráficos: {str(e)}")
+
+@app.put("/api/clientes/{client_id}/graficos")
+async def salvar_graficos_configurados(client_id: int, request: Request, db: Session = Depends(get_db)):
+    """Salva os gráficos configurados para um cliente"""
+    try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        body = await request.json()
+        graficos = body.get('graficos', [])
+        
+        if not isinstance(graficos, list):
+            raise HTTPException(status_code=400, detail="Gráficos devem ser uma lista")
+        
+        # Busca ou cria mapeamento
+        mapping = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
+        
+        if mapping:
+            mapping.graficos_configurados = json.dumps(graficos, ensure_ascii=False)
+            mapping.updated_at = datetime.now()
+        else:
+            # Se não tem mapeamento, cria um básico
+            mapping = ClientColumnMapping(
+                client_id=client_id,
+                column_mapping=json.dumps({}, ensure_ascii=False),
+                graficos_configurados=json.dumps(graficos, ensure_ascii=False)
+            )
+            db.add(mapping)
+        
+        db.commit()
+        db.refresh(mapping)
+        
+        return {
+            "success": True,
+            "message": "Gráficos salvos com sucesso",
+            "client_id": client_id,
+            "graficos": graficos
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar gráficos: {str(e)}")
+
+@app.post("/api/clientes/{client_id}/graficos/gerar-dados")
+async def gerar_dados_grafico_personalizado(client_id: int, request: Request, db: Session = Depends(get_db)):
+    """Gera dados para um gráfico personalizado baseado na configuração"""
+    try:
+        body = await request.json()
+        config = body.get('config', {})
+        
+        campo = config.get('campo')
+        tipo = config.get('tipo', 'bar')
+        campos_agrupar = config.get('campos_agrupar', [])  # Array de campos para agrupar
+        # Compatibilidade com versão antiga
+        if not campos_agrupar:
+            agrupar_por = config.get('agrupar_por')
+            if agrupar_por:
+                campos_agrupar = [agrupar_por]
+        ordenar_por = config.get('ordenar_por', 'quantidade')
+        limite = config.get('limite', 10)
+        
+        if not campo:
+            raise HTTPException(status_code=400, detail="Campo principal é obrigatório")
+        
+        # Verifica se o campo existe no modelo
+        if not hasattr(Atestado, campo):
+            raise HTTPException(status_code=400, detail=f"Campo '{campo}' não existe no sistema")
+        
+        # Verifica campos de agrupar
+        for campo_agrupar in campos_agrupar:
+            if campo_agrupar and not hasattr(Atestado, campo_agrupar):
+                raise HTTPException(status_code=400, detail=f"Campo de agrupar '{campo_agrupar}' não existe no sistema")
+        
+        # Query base
+        query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
+        
+        # Filtra apenas registros com o campo principal preenchido
+        campo_attr = getattr(Atestado, campo)
+        query = query.filter(campo_attr != None, campo_attr != '')
+        
+        # Separa campos numéricos de campos de texto
+        campos_numericos = ['dias_atestados', 'horas_perdi', 'numero_dias_atestado', 'horas_perdidas', 'dias_perdidos']
+        
+        # Filtra apenas campos de texto (não filtra campos numéricos, pois eles podem ser 0)
+        for campo_agrupar in campos_agrupar:
+            if campo_agrupar and campo_agrupar not in campos_numericos:
+                agrupar_attr = getattr(Atestado, campo_agrupar)
+                query = query.filter(agrupar_attr != None, agrupar_attr != '')
+        
+        registros = query.all()
+        
+        print(f"📊 Gerando dados para gráfico: campo={campo}, campos_agrupar={campos_agrupar}, registros encontrados={len(registros)}")
+        
+        if len(registros) == 0:
+            return {
+                "success": True,
+                "labels": [],
+                "quantidades": [],
+                "valores": [],
+                "dados": [],
+                "message": f"Nenhum registro encontrado para o campo '{campo}' no cliente {client_id}"
+            }
+        
+        # Separa campos numéricos (para somar) de campos de texto (para agrupar)
+        campos_numericos = ['dias_atestados', 'horas_perdi', 'numero_dias_atestado', 'horas_perdidas', 'dias_perdidos']
+        campos_agrupar_texto = []
+        campos_agrupar_numericos = []
+        
+        for campo_agrupar in campos_agrupar:
+            if campo_agrupar in campos_numericos:
+                campos_agrupar_numericos.append(campo_agrupar)
+            else:
+                campos_agrupar_texto.append(campo_agrupar)
+        
+        # Se o campo principal for numérico, trata diferente
+        campo_principal_numerico = campo in campos_numericos
+        
+        # Agrega dados
+        dados_agregados = {}
+        for registro in registros:
+            valor_campo = getattr(registro, campo, None)
+            if valor_campo is None or valor_campo == '':
+                continue
+            
+            # Constrói chave de agrupamento
+            # Se houver campos de texto para agrupar, usa eles na chave
+            # Se não, usa apenas o valor do campo principal
+            if campos_agrupar_texto:
+                partes_chave = [str(valor_campo)]
+                for campo_agrupar in campos_agrupar_texto:
+                    valor_agrupar = getattr(registro, campo_agrupar, None) or 'Não especificado'
+                    partes_chave.append(str(valor_agrupar))
+                chave = ' - '.join(partes_chave)
+            else:
+                chave = str(valor_campo)
+            
+            if chave not in dados_agregados:
+                dados_agregados[chave] = {
+                    'label': chave,
+                    'quantidade': 0,
+                    'valor': 0
+                }
+            
+            dados_agregados[chave]['quantidade'] += 1
+            
+            # Soma valores numéricos
+            # Se o campo principal for numérico, soma ele
+            if campo_principal_numerico:
+                valor = float(getattr(registro, campo) or 0)
+                dados_agregados[chave]['valor'] += valor
+            
+            # Se houver campos numéricos para agrupar, soma eles também
+            for campo_numerico in campos_agrupar_numericos:
+                valor = float(getattr(registro, campo_numerico) or 0)
+                dados_agregados[chave]['valor'] += valor
+        
+        # Converte para lista e ordena
+        dados_lista = list(dados_agregados.values())
+        
+        if ordenar_por == 'quantidade':
+            dados_lista.sort(key=lambda x: x['quantidade'], reverse=True)
+        elif ordenar_por == 'valor':
+            dados_lista.sort(key=lambda x: x['valor'], reverse=True)
+        elif ordenar_por == 'nome':
+            dados_lista.sort(key=lambda x: x['label'])
+        
+        # Aplica limite
+        if limite and limite > 0:
+            dados_lista = dados_lista[:limite]
+        
+        return {
+            "success": True,
+            "labels": [d['label'] for d in dados_lista],
+            "quantidades": [d['quantidade'] for d in dados_lista],
+            "valores": [d['valor'] for d in dados_lista],
+            "dados": dados_lista
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar dados do gráfico: {str(e)}")
+
+@app.get("/api/clientes/{client_id}/campos-disponiveis")
+async def obter_campos_disponiveis(client_id: int, db: Session = Depends(get_db)):
+    """Retorna os campos disponíveis para um cliente (mapeados e com dados)"""
+    try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        # Busca mapeamento do cliente
+        campos_mapeados = {}
+        custom_fields = []
+        try:
+            mapping_obj = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
+            if mapping_obj and mapping_obj.column_mapping:
+                try:
+                    mapping_data = json.loads(mapping_obj.column_mapping)
+                    if isinstance(mapping_data, dict) and 'column_mapping' in mapping_data:
+                        campos_mapeados = mapping_data.get('column_mapping', {})
+                        custom_fields = mapping_data.get('custom_fields', [])
+                    elif isinstance(mapping_data, dict):
+                        campos_mapeados = mapping_data
+                except:
+                    pass
+        except Exception as e:
+            print(f"Erro ao buscar mapeamento: {e}")
+        
+        # Verifica quais campos têm dados reais no banco
+        campos_com_dados = {}
+        try:
+            amostra = db.query(Atestado).join(Upload).filter(
+                Upload.client_id == client_id
+            ).limit(500).all()
+            
+            if amostra:
+                campos_modelo = [
+                    'nomecompleto', 'cpf', 'matricula', 'setor', 'centro_custo', 'cargo',
+                    'genero', 'data_afastamento', 'data_retorno', 'cid', 'diagnostico',
+                    'descricao_cid', 'dias_atestados', 'horas_perdi', 'motivo_atestado',
+                    'escala', 'tipo_atestado', 'descricao_atestad', 'numero_dias_atestado',
+                    'horas_perdidas', 'dias_perdidos'
+                ]
+                
+                for campo in campos_modelo:
+                    tem_dados = any(
+                        getattr(reg, campo, None) not in (None, '', 0, 0.0) 
+                        for reg in amostra
+                    )
+                    if tem_dados:
+                        campos_com_dados[campo] = True
+        except Exception as e:
+            print(f"Erro ao verificar campos com dados: {e}")
+        
+        return {
+            "success": True,
+            "client_id": client_id,
+            "campos_mapeados": campos_mapeados,  # Coluna da planilha -> Campo do sistema
+            "campos_com_dados": list(campos_com_dados.keys()),  # Campos que têm dados
+            "custom_fields": custom_fields  # Campos personalizados criados
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao obter campos disponíveis: {str(e)}")
 
 @app.get("/api/alertas")
 async def obter_alertas(
@@ -915,10 +1257,11 @@ async def listar_clientes(db: Session = Depends(get_db)):
                 "telefone": c.telefone,
                 "email": c.email,
                 "situacao": c.situacao,
-                "logo_url": c.logo_url,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
-                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-                "total_uploads": len(c.uploads)
+            "logo_url": c.logo_url,
+            "cores_personalizadas": json.loads(c.cores_personalizadas) if c.cores_personalizadas else None,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            "total_uploads": len(c.uploads)
             }
             for c in clientes
         ]
@@ -953,6 +1296,7 @@ async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
             "email": cliente.email,
             "situacao": cliente.situacao,
             "logo_url": cliente.logo_url,
+            "cores_personalizadas": json.loads(cliente.cores_personalizadas) if cliente.cores_personalizadas else None,
             "data_abertura": cliente.data_abertura.isoformat() if cliente.data_abertura else None,
             "atividade_principal": cliente.atividade_principal,
             "created_at": cliente.created_at.isoformat() if cliente.created_at else None
@@ -1326,6 +1670,72 @@ async def arquivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao mover para arquivo morto: {str(e)}")
 
+@app.put("/api/clientes/{cliente_id}/cores")
+async def salvar_cores_cliente(
+    cliente_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Salva as cores personalizadas de um cliente"""
+    try:
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        body = await request.json()
+        cores = body.get('cores', {})
+        
+        # Valida estrutura básica
+        if not isinstance(cores, dict):
+            raise HTTPException(status_code=400, detail="Cores devem ser um objeto JSON")
+        
+        # Salva como JSON string
+        cliente.cores_personalizadas = json.dumps(cores)
+        cliente.updated_at = datetime.now()
+        
+        db.commit()
+        db.refresh(cliente)
+        
+        return {
+            "success": True,
+            "message": "Cores salvas com sucesso",
+            "cores": json.loads(cliente.cores_personalizadas) if cliente.cores_personalizadas else None
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar cores: {str(e)}")
+
+@app.get("/api/clientes/{cliente_id}/cores")
+async def obter_cores_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    """Obtém as cores personalizadas de um cliente"""
+    try:
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado")
+        
+        cores = None
+        if cliente.cores_personalizadas:
+            try:
+                cores = json.loads(cliente.cores_personalizadas)
+            except:
+                cores = None
+        
+        return {
+            "success": True,
+            "cores": cores
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao obter cores: {str(e)}")
+
 @app.post("/api/clientes/{cliente_id}/ativar")
 async def ativar_cliente(cliente_id: int, db: Session = Depends(get_db)):
     """Reativa um cliente anteriormente arquivado"""
@@ -1370,16 +1780,38 @@ async def get_column_mapping(client_id: int, db: Session = Depends(get_db)):
         mapping = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
         
         if mapping:
-            return {
-                "client_id": client_id,
-                "column_mapping": json.loads(mapping.column_mapping),
-                "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
-                "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None
-            }
+            try:
+                mapping_data = json.loads(mapping.column_mapping)
+                # Suporta formato antigo (só column_mapping) e novo (com custom_fields)
+                if isinstance(mapping_data, dict) and 'column_mapping' in mapping_data:
+                    return {
+                        "client_id": client_id,
+                        "column_mapping": mapping_data.get('column_mapping', {}),
+                        "custom_fields": mapping_data.get('custom_fields', []),
+                        "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
+                        "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None
+                    }
+                else:
+                    # Formato antigo - só column_mapping
+                    return {
+                        "client_id": client_id,
+                        "column_mapping": mapping_data if isinstance(mapping_data, dict) else {},
+                        "custom_fields": [],
+                        "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
+                        "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None
+                    }
+            except:
+                return {
+                    "client_id": client_id,
+                    "column_mapping": {},
+                    "custom_fields": [],
+                    "message": "Erro ao ler mapeamento"
+                }
         else:
             return {
                 "client_id": client_id,
                 "column_mapping": {},
+                "custom_fields": [],
                 "message": "Nenhum mapeamento configurado"
             }
     except HTTPException:
@@ -1403,12 +1835,17 @@ async def save_column_mapping(
         
         body = await request.json()
         column_mapping = body.get('column_mapping', {})
+        custom_fields = body.get('custom_fields', [])
         
         # Valida o mapeamento (deve ser um dicionário)
         if not isinstance(column_mapping, dict):
             raise HTTPException(status_code=400, detail="Mapeamento deve ser um objeto JSON")
         
-        # Campos válidos do sistema
+        # Valida campos personalizados
+        if not isinstance(custom_fields, list):
+            raise HTTPException(status_code=400, detail="Campos personalizados devem ser uma lista")
+        
+        # Campos válidos do sistema (incluindo campos personalizados)
         campos_validos = [
             'nomecompleto', 'nome_funcionario', 'cpf', 'matricula', 'cargo',
             'setor', 'centro_custo', 'genero', 'data_afastamento', 'data_retorno',
@@ -1418,24 +1855,42 @@ async def save_column_mapping(
             'motivo_atestado', 'escala', 'tipo_atestado', 'tipo_info_atestado'
         ]
         
-        # Valida se os campos mapeados são válidos
+        # Adiciona campos personalizados à lista de válidos
+        for campo_personalizado in custom_fields:
+            if isinstance(campo_personalizado, dict) and 'value' in campo_personalizado:
+                campos_validos.append(campo_personalizado['value'].lower())
+        
+        # Valida se os campos mapeados são válidos (agora permite campos personalizados)
         for col_planilha, campo_sistema in column_mapping.items():
             if campo_sistema.lower() not in campos_validos:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Campo '{campo_sistema}' não é válido. Campos válidos: {', '.join(campos_validos)}"
+                # Permite campos personalizados mesmo que não estejam na lista padrão
+                campo_personalizado_existe = any(
+                    cf.get('value', '').lower() == campo_sistema.lower() 
+                    for cf in custom_fields if isinstance(cf, dict)
                 )
+                if not campo_personalizado_existe:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Campo '{campo_sistema}' não é válido. Use um campo do sistema ou crie um campo personalizado."
+                    )
         
         # Busca ou cria mapeamento
         mapping = db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_id).first()
         
+        # Salva campos personalizados no campo column_mapping como JSON adicional
+        # ou em um campo separado se existir
+        mapping_data = {
+            'column_mapping': column_mapping,
+            'custom_fields': custom_fields
+        }
+        
         if mapping:
-            mapping.column_mapping = json.dumps(column_mapping, ensure_ascii=False)
+            mapping.column_mapping = json.dumps(mapping_data, ensure_ascii=False)
             mapping.updated_at = datetime.now()
         else:
             mapping = ClientColumnMapping(
                 client_id=client_id,
-                column_mapping=json.dumps(column_mapping, ensure_ascii=False)
+                column_mapping=json.dumps(mapping_data, ensure_ascii=False)
             )
             db.add(mapping)
         
@@ -1446,6 +1901,7 @@ async def save_column_mapping(
             "message": "Mapeamento salvo com sucesso",
             "client_id": client_id,
             "column_mapping": column_mapping,
+            "custom_fields": custom_fields,
             "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None
         }
     except HTTPException:
@@ -1829,42 +2285,39 @@ async def dados_apresentacao(
                 "analise": insights_engine.gerar_analise_grafico('distribuicao_dias', distribuicao_dias, metricas)
             })
         
-        # Busca dados de produtividade
+        # Busca dados de produtividade (todos os meses para gráficos mês a mês)
         try:
             produtividade_data = db.query(Produtividade).filter(
                 Produtividade.client_id == client_id
             ).order_by(Produtividade.mes_referencia.desc(), Produtividade.numero_tipo).all()
             
             if produtividade_data:
-                # Agrupa por mês
-                produtividade_por_mes = {}
-                for p in produtividade_data:
-                    if p.mes_referencia not in produtividade_por_mes:
-                        produtividade_por_mes[p.mes_referencia] = []
-                    produtividade_por_mes[p.mes_referencia].append({
+                # Retorna TODOS os meses para permitir gráficos mês a mês
+                produtividade_todos = [
+                    {
                         "numero_tipo": p.numero_tipo,
                         "tipo_consulta": p.tipo_consulta,
-                        "ocupacionais": p.ocupacionais,
-                        "assistenciais": p.assistenciais,
-                        "acidente_trabalho": p.acidente_trabalho,
-                        "inss": p.inss,
-                        "absenteismo": p.absenteismo,
-                        "total": p.total
-                    })
+                        "ocupacionais": p.ocupacionais or 0,
+                        "assistenciais": p.assistenciais or 0,
+                        "acidente_trabalho": p.acidente_trabalho or 0,
+                        "inss": p.inss or 0,
+                        "sinistralidade": p.sinistralidade or 0,
+                        "absenteismo": p.absenteismo or 0,
+                        "pericia_indireta": p.pericia_indireta or 0,
+                        "total": p.total or 0,
+                        "mes_referencia": p.mes_referencia
+                    }
+                    for p in produtividade_data
+                ]
                 
-                # Pega o mês mais recente
-                if produtividade_por_mes:
-                    mes_mais_recente = max(produtividade_por_mes.keys())
-                    produtividade_recente = produtividade_por_mes[mes_mais_recente]
-                    
-                    slides.append({
-                        "id": len(slides),
-                        "tipo": "produtividade",
-                        "titulo": "Produtividade",
-                        "subtitulo": f"Consultas realizadas - {mes_mais_recente}",
-                        "dados": produtividade_recente,
-                        "analise": insights_engine.gerar_analise_grafico('produtividade', produtividade_recente, metricas) if hasattr(insights_engine, 'gerar_analise_grafico') else None
-                    })
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "produtividade",
+                    "titulo": "Produtividade",
+                    "subtitulo": "Consultas realizadas - Anual (Mês a Mês)",
+                    "dados": produtividade_todos,
+                    "analise": insights_engine.gerar_analise_grafico('produtividade', produtividade_todos, metricas) if hasattr(insights_engine, 'gerar_analise_grafico') else None
+                })
         except Exception as e:
             print(f"Erro ao buscar produtividade: {e}")
         

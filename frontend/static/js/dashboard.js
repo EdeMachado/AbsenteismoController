@@ -1,34 +1,59 @@
 // ==================== VARIÁVEIS GLOBAIS ====================
-// Paleta de Cores da Empresa (Azul Marinho e Verde Oliva)
-const CORES_EMPRESA = {
-    primary: '#1a237e',        // Azul Marinho principal
-    primaryDark: '#0d47a1',    // Azul Marinho escuro
-    primaryLight: '#3949ab',   // Azul Marinho claro
-    primaryLighter: '#5c6bc0', // Azul Marinho mais claro
-    primaryDarkest: '#000051', // Azul Marinho muito escuro
-    secondary: '#556B2F',      // Verde Oliva principal
-    secondaryDark: '#4a5d23',  // Verde Oliva escuro
-    secondaryLight: '#6B8E23', // Verde Oliva claro
-    secondaryLighter: '#808000',// Verde Oliva mais claro
-    gray: '#9E9E9E',           // Cinza
-    grayLight: '#BDBDBD',      // Cinza claro
-    grayDark: '#757575',       // Cinza escuro
-    masculino: '#1a237e',      // Azul Marinho
-    feminino: '#556B2F'        // Verde Oliva
-};
+// Funções para obter cores do cliente (carregadas dinamicamente)
+function getCores() {
+    if (typeof getCoresCliente === 'function') {
+        return getCoresCliente();
+    }
+    // Fallback para cores padrão
+    return {
+        primary: '#1a237e',
+        primaryDark: '#0d47a1',
+        primaryLight: '#3949ab',
+        primaryLighter: '#5c6bc0',
+        primaryDarkest: '#000051',
+        secondary: '#556B2F',
+        secondaryDark: '#4a5d23',
+        secondaryLight: '#6B8E23',
+        secondaryLighter: '#808000',
+        gray: '#9E9E9E',
+        grayLight: '#BDBDBD',
+        grayDark: '#757575',
+        masculino: '#1a237e',
+        feminino: '#556B2F'
+    };
+}
 
-const PALETA_EMPRESA = [
-    '#1a237e',  // Azul Marinho principal
-    '#556B2F',  // Verde Oliva principal
-    '#0d47a1',  // Azul Marinho escuro
-    '#6B8E23',  // Verde Oliva claro
-    '#3949ab',  // Azul Marinho claro
-    '#808000',  // Verde Oliva mais claro
-    '#5c6bc0',  // Azul Marinho mais claro
-    '#4a5d23',  // Verde Oliva escuro
-    '#9E9E9E',  // Cinza
-    '#757575'   // Cinza escuro
-];
+function getPaleta() {
+    if (typeof getPaletaCliente === 'function') {
+        return getPaletaCliente();
+    }
+    // Fallback para paleta padrão
+    return ['#1a237e', '#556B2F', '#0d47a1', '#6B8E23', '#3949ab', '#808000', '#5c6bc0', '#4a5d23', '#9E9E9E', '#757575'];
+}
+
+// Mantém compatibilidade com código existente
+const CORES_EMPRESA = new Proxy({}, {
+    get: (target, prop) => {
+        const cores = getCores();
+        return cores[prop] || cores.primary;
+    }
+});
+
+const PALETA_EMPRESA = new Proxy([], {
+    get: (target, prop) => {
+        const paleta = getPaleta();
+        if (prop === 'slice') {
+            return (...args) => paleta.slice(...args);
+        }
+        if (prop === 'length') {
+            return paleta.length;
+        }
+        if (typeof prop === 'string' && !isNaN(prop)) {
+            return paleta[parseInt(prop)];
+        }
+        return paleta[prop];
+    }
+});
 
 let chartCids = null;
 let chartSetores = null;
@@ -53,11 +78,43 @@ const getClientId = () => (typeof window.getCurrentClientId === 'function' ? win
 
 // ==================== INICIALIZAÇÃO ====================
 document.addEventListener('DOMContentLoaded', async () => {
+    // Carrega cores do cliente primeiro
+    if (typeof carregarCoresCliente === 'function') {
+        const clientId = getClientId();
+        if (clientId) {
+            await carregarCoresCliente(clientId);
+        }
+    }
+    
     await carregarFiltros();
     carregarDashboard();
 });
 
 // ==================== CARREGAR DASHBOARD ====================
+let camposDisponiveis = {}; // Armazena campos disponíveis do cliente atual
+
+async function carregarCamposDisponiveis(clientId) {
+    try {
+        const response = await fetch(`/api/clientes/${clientId}/campos-disponiveis`);
+        if (response.ok) {
+            const data = await response.json();
+            camposDisponiveis = {
+                mapeados: data.campos_mapeados || {},
+                com_dados: data.campos_com_dados || [],
+                custom_fields: data.custom_fields || []
+            };
+            console.log('📊 Campos disponíveis carregados:', camposDisponiveis);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar campos disponíveis:', error);
+        camposDisponiveis = { mapeados: {}, com_dados: [], custom_fields: [] };
+    }
+}
+
+function temCampo(campo) {
+    return camposDisponiveis.com_dados && camposDisponiveis.com_dados.includes(campo);
+}
+
 async function carregarDashboard() {
     try {
         const clientId = getClientId();
@@ -65,6 +122,9 @@ async function carregarDashboard() {
             alert('Selecione um cliente na aba "Clientes" para visualizar o dashboard.');
             return;
         }
+
+        // Carrega campos disponíveis primeiro
+        await carregarCamposDisponiveis(clientId);
 
         // Pega valores dos filtros (se existirem)
         const mesInicio = document.getElementById('mesInicio')?.value || '';
@@ -115,26 +175,97 @@ async function carregarDashboard() {
         
         // Renderiza insights
         renderizarInsights(data.insights || []);
-        renderizarChartCids(data.top_cids || []);
-        renderizarChartSetores(data.top_setores || []);
-        renderizarChartEvolucao(data.evolucao_mensal || []);
-        renderizarChartGenero(data.distribuicao_genero || []);
-        renderizarChartMediaCid(data.top_cids || []);
-        renderizarChartFuncionariosDias(data.top_funcionarios || []);
-        renderizarChartEscalas(data.top_escalas || []);
-        renderizarChartMotivos(data.top_motivos || []);
-        renderizarChartCentroCusto(data.dias_centro_custo || []);
-        renderizarChartDistribuicaoDias(data.distribuicao_dias || []);
-        renderizarChartMediaCidDias(data.media_cid || []);
-        renderizarChartEvolucaoSetor(data.evolucao_setor || {});
-        renderizarChartComparativoDiasHoras(data.comparativo_dias_horas || []);
-        renderizarChartFrequenciaAtestados(data.frequencia_atestados || []);
-        renderizarChartSetorGenero(data.dias_setor_genero || []);
-        renderizarChartProdutividade(data.produtividade || []);
-        renderizarChartProdutividadeMensalCategoria(data.produtividade || []);
+        
+        // Renderiza gráficos apenas se os campos necessários estiverem disponíveis
+        // Gráficos de CID
+        if (temCampo('cid') || temCampo('diagnostico')) {
+            renderizarChartCids(data.top_cids || []);
+            renderizarChartMediaCid(data.top_cids || []);
+            renderizarChartMediaCidDias(data.media_cid || []);
+        } else {
+            ocultarGrafico('chartCids');
+            ocultarGrafico('chartMediaCid');
+            ocultarGrafico('chartMediaCidDias');
+        }
+        
+        // Gráficos de Setor
+        if (temCampo('setor')) {
+            renderizarChartSetores(data.top_setores || []);
+            renderizarChartEvolucaoSetor(data.evolucao_setor || {});
+            renderizarChartSetorGenero(data.dias_setor_genero || []);
+        } else {
+            ocultarGrafico('chartSetores');
+            ocultarGrafico('chartEvolucaoSetor');
+            ocultarGrafico('chartSetorGenero');
+        }
+        
+        // Gráfico de Evolução (sempre disponível se tiver dados)
+        if (data.evolucao_mensal && data.evolucao_mensal.length > 0) {
+            renderizarChartEvolucao(data.evolucao_mensal || []);
+        } else {
+            ocultarGrafico('chartEvolucao');
+        }
+        
+        // Gráfico de Gênero
+        if (temCampo('genero')) {
+            renderizarChartGenero(data.distribuicao_genero || []);
+        } else {
+            ocultarGrafico('chartGenero');
+        }
+        
+        // Gráfico de Funcionários
+        if (temCampo('nomecompleto')) {
+            renderizarChartFuncionariosDias(data.top_funcionarios || []);
+            renderizarChartFrequenciaAtestados(data.frequencia_atestados || []);
+        } else {
+            ocultarGrafico('chartFuncionariosDias');
+            ocultarGrafico('chartFrequenciaAtestados');
+        }
+        
+        // Gráfico de Escalas
+        if (temCampo('escala')) {
+            renderizarChartEscalas(data.top_escalas || []);
+        } else {
+            ocultarGrafico('chartEscalas');
+        }
+        
+        // Gráfico de Motivos
+        if (temCampo('motivo_atestado')) {
+            renderizarChartMotivos(data.top_motivos || []);
+        } else {
+            ocultarGrafico('chartMotivos');
+        }
+        
+        // Gráfico de Centro de Custo
+        if (temCampo('centro_custo')) {
+            renderizarChartCentroCusto(data.dias_centro_custo || []);
+        } else {
+            ocultarGrafico('chartCentroCusto');
+        }
+        
+        // Gráficos de Dias/Horas (sempre disponíveis se tiver dados)
+        if (temCampo('dias_atestados') || temCampo('horas_perdi')) {
+            renderizarChartDistribuicaoDias(data.distribuicao_dias || []);
+            renderizarChartComparativoDiasHoras(data.comparativo_dias_horas || []);
+        } else {
+            ocultarGrafico('chartDistribuicaoDias');
+            ocultarGrafico('chartComparativoDiasHoras');
+        }
+        
+        // Gráficos de Produtividade (sempre disponíveis se tiver dados)
+        if (data.produtividade && data.produtividade.length > 0) {
+            renderizarChartProdutividade(data.produtividade || []);
+            renderizarChartProdutividadeMensalCategoria(data.produtividade || []);
+        } else {
+            ocultarGrafico('chartProdutividade');
+            ocultarGrafico('chartProdutividadeMensalCategoria');
+        }
         
         // Carrega evolução de produtividade separadamente
         await carregarEvolucaoProdutividade();
+        
+        // Carrega e renderiza gráficos personalizados configurados pelo usuário
+        await carregarERenderizarGraficosPersonalizados(clientId);
         
     } catch (error) {
         console.error('Erro ao carregar dashboard:', error);
@@ -142,8 +273,219 @@ async function carregarDashboard() {
     }
 }
 
+// ==================== GRÁFICOS PERSONALIZADOS ====================
+
+let graficosPersonalizadosInstances = {}; // Armazena instâncias dos gráficos personalizados
+
+async function carregarERenderizarGraficosPersonalizados(clientId) {
+    try {
+        console.log('📊 Carregando gráficos personalizados para cliente:', clientId);
+        
+        // Busca gráficos configurados
+        const response = await fetch(`/api/clientes/${clientId}/graficos`);
+        if (!response.ok) {
+            console.warn('⚠️ Erro ao buscar gráficos:', response.status);
+            return;
+        }
+        
+        const data = await response.json();
+        const graficos = data.graficos || [];
+        
+        console.log('📈 Gráficos encontrados:', graficos.length, graficos);
+        
+        if (graficos.length === 0) {
+            console.log('ℹ️ Nenhum gráfico configurado para este cliente');
+            return;
+        }
+        
+        // Remove gráficos personalizados anteriores
+        const containerPersonalizados = document.getElementById('graficosPersonalizadosContainer');
+        if (containerPersonalizados) {
+            containerPersonalizados.remove();
+        }
+        
+        // Cria container para gráficos personalizados
+        const mainContent = document.querySelector('.main-content');
+        if (!mainContent) return;
+        
+        const container = document.createElement('div');
+        container.id = 'graficosPersonalizadosContainer';
+        container.style.marginTop = '32px';
+        container.style.paddingTop = '32px';
+        container.style.borderTop = '2px solid var(--border)';
+        
+        const tituloSecao = document.createElement('div');
+        tituloSecao.style.marginBottom = '24px';
+        tituloSecao.innerHTML = `
+            <h2 style="font-size: 24px; font-weight: 600; color: var(--text-primary); margin: 0;">
+                <i class="fas fa-chart-bar" style="margin-right: 8px;"></i>Gráficos Personalizados
+            </h2>
+            <p style="font-size: 14px; color: var(--text-secondary); margin: 8px 0 0 0;">
+                Análises configuradas especificamente para esta empresa
+            </p>
+        `;
+        container.appendChild(tituloSecao);
+        
+        // Cria grid para gráficos
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+        grid.style.gap = '16px';
+        grid.id = 'graficosPersonalizadosGrid';
+        container.appendChild(grid);
+        
+        mainContent.appendChild(container);
+        
+        // Renderiza cada gráfico
+        for (let i = 0; i < graficos.length; i++) {
+            const grafico = graficos[i];
+            await renderizarGraficoPersonalizado(grafico, i, clientId);
+        }
+        
+    } catch (error) {
+        console.error('Erro ao carregar gráficos personalizados:', error);
+    }
+}
+
+async function renderizarGraficoPersonalizado(config, index, clientId) {
+    try {
+        console.log(`🎨 Renderizando gráfico ${index + 1}/${graficos.length}:`, config.titulo);
+        
+        // Gera dados do gráfico
+        const response = await fetch(`/api/clientes/${clientId}/graficos/gerar-dados`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ config })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Erro ao gerar dados do gráfico ${config.titulo}:`, response.status, errorText);
+            return;
+        }
+        
+        const data = await response.json();
+        console.log(`📦 Dados recebidos para ${config.titulo}:`, data);
+        
+        if (!data.success) {
+            console.warn(`⚠️ Gráfico ${config.titulo} retornou erro:`, data.detail || 'Erro desconhecido');
+            return;
+        }
+        
+        if (!data.labels || data.labels.length === 0) {
+            console.warn(`⚠️ Gráfico ${config.titulo} não tem dados`);
+            return;
+        }
+        
+        console.log(`✅ Renderizando gráfico ${config.titulo} com ${data.labels.length} itens`);
+        
+        // Cria container do gráfico
+        const grid = document.getElementById('graficosPersonalizadosGrid');
+        if (!grid) return;
+        
+        const chartCard = document.createElement('div');
+        chartCard.className = 'chart-container';
+        chartCard.id = `graficoPersonalizado_${index}`;
+        
+        chartCard.innerHTML = `
+            <div class="chart-header">
+                <h3 class="chart-title">${config.titulo || 'Gráfico'}</h3>
+                ${config.descricao ? `<p class="chart-subtitle">${config.descricao}</p>` : ''}
+            </div>
+            <div class="chart-wrapper" style="height: 350px;">
+                <canvas id="canvasGraficoPersonalizado_${index}"></canvas>
+            </div>
+        `;
+        
+        grid.appendChild(chartCard);
+        
+        // Aguarda um pouco para o DOM atualizar
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Renderiza gráfico com Chart.js
+        const canvas = document.getElementById(`canvasGraficoPersonalizado_${index}`);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Destrói gráfico anterior se existir
+        if (graficosPersonalizadosInstances[`grafico_${index}`]) {
+            graficosPersonalizadosInstances[`grafico_${index}`].destroy();
+        }
+        
+        // Decide qual dado usar (valores numéricos ou quantidades)
+        const camposNumericos = ['dias_atestados', 'horas_perdi', 'numero_dias_atestado', 'horas_perdidas', 'dias_perdidos'];
+        const temCampoNumerico = camposNumericos.includes(config.campo) || 
+                                 (config.campos_agrupar && config.campos_agrupar.some(c => camposNumericos.includes(c)));
+        const dadosParaGrafico = temCampoNumerico && data.valores && data.valores.length > 0 && data.valores.some(v => v > 0) 
+                                 ? data.valores 
+                                 : data.quantidades;
+        
+        // Configuração base do gráfico
+        const chartConfig = {
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: config.titulo,
+                    data: dadosParaGrafico,
+                    backgroundColor: getPaleta().slice(0, data.labels.length),
+                    borderColor: getCores().primary,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: config.tipo === 'pie' || config.tipo === 'doughnut',
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                }
+            }
+        };
+        
+        // Ajusta configuração baseado no tipo
+        if (config.tipo === 'bar-horizontal') {
+            chartConfig.type = 'bar';
+            chartConfig.options.indexAxis = 'y';
+        } else if (config.tipo === 'line') {
+            chartConfig.type = 'line';
+            chartConfig.data.datasets[0].fill = false;
+            chartConfig.data.datasets[0].tension = 0.4;
+        } else if (config.tipo === 'pie') {
+            chartConfig.type = 'pie';
+        } else if (config.tipo === 'doughnut') {
+            chartConfig.type = 'doughnut';
+        } else if (config.tipo === 'area') {
+            chartConfig.type = 'line';
+            chartConfig.data.datasets[0].fill = true;
+        } else {
+            chartConfig.type = 'bar';
+        }
+        
+        // Cria instância do gráfico
+        graficosPersonalizadosInstances[`grafico_${index}`] = new Chart(ctx, chartConfig);
+        
+    } catch (error) {
+        console.error(`Erro ao renderizar gráfico personalizado ${config.titulo}:`, error);
+    }
+}
+
 
 // ==================== RENDERIZAR CARDS ====================
+function ocultarGrafico(chartId) {
+    const chartContainer = document.getElementById(chartId)?.closest('.chart-container')?.closest('.chart-card');
+    if (chartContainer) {
+        chartContainer.style.display = 'none';
+    }
+}
+
 function renderizarCards(metricas) {
     // Dias Perdidos = Soma da coluna DIAS ATESTADOS
     const diasPerdidos = metricas.total_dias_perdidos || 0;
@@ -959,18 +1301,17 @@ function renderizarChartProdutividade(dados) {
         pericia_indireta: totaisAgendados.pericia_indireta - totaisFaltas.pericia_indireta
     };
     
-    // Determina o período (ano e mês mais recente)
+    // Determina o período (anos disponíveis)
     const meses = Object.keys(dadosPorMes).sort();
     let periodoTexto = '';
     if (meses.length > 0) {
-        const mesMaisRecente = meses[meses.length - 1]; // YYYY-MM
-        const [ano, mes] = mesMaisRecente.split('-');
-        const mesesNomes = {
-            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
-            '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
-            '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
-        };
-        periodoTexto = `Ano ${ano} até ${mesesNomes[mes] || mes}`;
+        // Extrai anos únicos
+        const anos = [...new Set(meses.map(m => m.split('-')[0]))].sort();
+        if (anos.length === 1) {
+            periodoTexto = `Ano ${anos[0]} (Mês a Mês)`;
+        } else if (anos.length > 1) {
+            periodoTexto = `Anos ${anos[0]} a ${anos[anos.length - 1]} (Mês a Mês)`;
+        }
     }
     
     // Cria array de categorias com seus totais para ordenação
@@ -1004,13 +1345,13 @@ function renderizarChartProdutividade(dados) {
                 {
                     label: 'Compareceram',
                     data: dataCompareceram,
-                    backgroundColor: '#0056b3',
+                    backgroundColor: getCores().primary || '#0056b3',
                     borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 }
                 },
                 {
                     label: 'Faltas',
                     data: dataFaltas,
-                    backgroundColor: '#dc3545',
+                    backgroundColor: getCores().secondary || '#dc3545',
                     borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 }
                 }
             ]
@@ -1094,7 +1435,7 @@ function renderizarChartProdutividadeMensalCategoria(dados) {
     
     if (chartProdutividadeMensalCategoria) chartProdutividadeMensalCategoria.destroy();
     
-    // Agrupa por mês
+    // Agrupa por mês (dados anuais mês a mês)
     const dadosPorMes = {};
     dados.forEach(d => {
         const mesRef = d.mes_referencia || 'sem-mes';
@@ -1119,15 +1460,19 @@ function renderizarChartProdutividadeMensalCategoria(dados) {
         return `${mesesNomes[mes] || mes}/${ano}`;
     });
     
-    // Categorias com cores da empresa: gradiente do azul marinho (#1a237e) ao verde oliva (#556B2F)
+    // Gera gradiente de cores baseado nas cores do cliente
+    const cores = getCores();
+    const paleta = getPaleta();
+    
+    // Cria gradiente do primary ao secondary
     const categorias = [
-        { nome: 'Ocupacionais', key: 'ocupacionais', cor: '#1a237e' }, // Azul marinho
-        { nome: 'Assistenciais', key: 'assistenciais', cor: '#283593' }, // Azul marinho claro
-        { nome: 'Acidente de Trabalho', key: 'acidente_trabalho', cor: '#3949ab' }, // Azul intermediário
-        { nome: 'INSS', key: 'inss', cor: '#5c6bc0' }, // Azul mais claro
-        { nome: 'Sinistralidade', key: 'sinistralidade', cor: '#6B8E23' }, // Verde oliva claro
-        { nome: 'Absenteísmo', key: 'absenteismo', cor: '#556B2F' }, // Verde oliva
-        { nome: 'Perícia Indireta', key: 'pericia_indireta', cor: '#4a5d23' } // Verde oliva escuro
+        { nome: 'Ocupacionais', key: 'ocupacionais', cor: cores.primary },
+        { nome: 'Assistenciais', key: 'assistenciais', cor: cores.primaryLight },
+        { nome: 'Acidente de Trabalho', key: 'acidente_trabalho', cor: cores.primaryLighter },
+        { nome: 'INSS', key: 'inss', cor: paleta[3] || cores.secondaryLight },
+        { nome: 'Sinistralidade', key: 'sinistralidade', cor: paleta[4] || cores.secondary },
+        { nome: 'Absenteísmo', key: 'absenteismo', cor: cores.secondary },
+        { nome: 'Perícia Indireta', key: 'pericia_indireta', cor: cores.secondaryDark }
     ];
     
     // Prepara datasets para cada categoria
@@ -1242,7 +1587,7 @@ async function carregarEvolucaoProdutividade() {
         const clientId = getClientId();
         if (!clientId) return;
         
-        // Busca dados agregados por mês
+        // Busca dados agregados por mês (dados anuais mês a mês)
         const response = await fetch(`/api/produtividade/evolucao?client_id=${clientId}&agrupar_por=mes`);
         
         if (!response.ok) {

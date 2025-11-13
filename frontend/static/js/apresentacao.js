@@ -3,25 +3,66 @@ let slides = [];
 let slideAtual = 0;
 let charts = {};
 
-// Paleta de Cores da Empresa
-const CORES_EMPRESA = {
-    primary: '#1a237e',
-    primaryDark: '#0d47a1',
-    primaryLight: '#3949ab',
-    secondary: '#556B2F',
-    secondaryDark: '#4a5d23',
-    secondaryLight: '#6B8E23',
-};
+// Funções para obter cores do cliente (carregadas dinamicamente)
+function getCoresApresentacao() {
+    if (typeof getCoresCliente === 'function') {
+        return getCoresCliente();
+    }
+    // Fallback para cores padrão
+    return {
+        primary: '#1a237e',
+        primaryDark: '#0d47a1',
+        primaryLight: '#3949ab',
+        secondary: '#556B2F',
+        secondaryDark: '#4a5d23',
+        secondaryLight: '#6B8E23',
+    };
+}
 
-const PALETA_EMPRESA = [
-    '#1a237e', '#556B2F', '#3949ab', '#6B8E23', '#0d47a1', '#808000'
-];
+function getPaletaApresentacao() {
+    if (typeof getPaletaCliente === 'function') {
+        return getPaletaCliente();
+    }
+    // Fallback para paleta padrão
+    return ['#1a237e', '#556B2F', '#3949ab', '#6B8E23', '#0d47a1', '#808000'];
+}
+
+// Mantém compatibilidade com código existente
+const CORES_EMPRESA = new Proxy({}, {
+    get: (target, prop) => {
+        const cores = getCoresApresentacao();
+        return cores[prop] || cores.primary;
+    }
+});
+
+const PALETA_EMPRESA = new Proxy([], {
+    get: (target, prop) => {
+        const paleta = getPaletaApresentacao();
+        if (prop === 'slice') {
+            return (...args) => paleta.slice(...args);
+        }
+        if (prop === 'length') {
+            return paleta.length;
+        }
+        if (typeof prop === 'string' && !isNaN(prop)) {
+            return paleta[parseInt(prop)];
+        }
+        return paleta[prop];
+    }
+});
 
 // ==================== INICIALIZAÇÃO ====================
 document.addEventListener('DOMContentLoaded', () => {
-    // Aguarda um pouco para garantir que auth.js carregou
-    setTimeout(() => {
+    // Aguarda um pouco para garantir que auth.js e cores-cliente.js carregaram
+    setTimeout(async () => {
         console.log('Inicializando apresentação...');
+        // Carrega cores do cliente primeiro
+        if (typeof carregarCoresCliente === 'function') {
+            const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+            if (clientId) {
+                await carregarCoresCliente(clientId);
+            }
+        }
         carregarApresentacao();
     }, 500);
     
@@ -29,8 +70,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowLeft') slideAnterior();
         if (e.key === 'ArrowRight') proximoSlide();
-        if (e.key === 'Escape') sairApresentacao();
+        if (e.key === 'Escape') {
+            // Se estiver em fullscreen, sai do fullscreen primeiro
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+                exitFullscreen();
+            } else {
+                sairApresentacao();
+            }
+        }
+        if (e.key === 'F11') {
+            e.preventDefault();
+            toggleFullscreen();
+        }
     });
+    
+    // Detecta mudanças no estado de fullscreen
+    document.addEventListener('fullscreenchange', atualizarIconeFullscreen);
+    document.addEventListener('webkitfullscreenchange', atualizarIconeFullscreen);
+    document.addEventListener('mozfullscreenchange', atualizarIconeFullscreen);
+    document.addEventListener('MSFullscreenChange', atualizarIconeFullscreen);
 });
 
 // ==================== CARREGAR APRESENTAÇÃO ====================
@@ -139,8 +197,12 @@ function renderizarSlide(slide) {
     
     // Renderiza conteúdo baseado no tipo
     if (slide.tipo === 'capa') {
-        // Capa não tem header
-        html += renderizarCapa();
+        // Capa não tem header - renderiza de forma assíncrona
+        container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Carregando capa...</p></div></div>';
+        renderizarCapa().then(capaHTML => {
+            container.innerHTML = capaHTML;
+        });
+        return; // Retorna cedo para não processar o resto
     } else {
         // Outros slides têm header
         html += `
@@ -230,52 +292,112 @@ function renderizarSlide(slide) {
 }
 
 // ==================== RENDERIZAR CAPA ====================
-function renderizarCapa() {
-    return `
+async function renderizarCapa() {
+    // Busca dados do cliente atual
+    let clienteInfo = {
+        nome: 'Empresa',
+        nome_fantasia: '',
+        logo_url: null
+    };
+    
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (clientId) {
+        try {
+            const response = await fetch(`/api/clientes/${clientId}`);
+            if (response.ok) {
+                const cliente = await response.json();
+                clienteInfo = {
+                    nome: cliente.nome || 'Empresa',
+                    nome_fantasia: cliente.nome_fantasia || cliente.nome || 'Empresa',
+                    logo_url: cliente.logo_url || null
+                };
+            }
+        } catch (error) {
+            console.error('Erro ao buscar dados do cliente:', error);
+        }
+    }
+    
+    // Obtém cores do cliente
+    const cores = getCoresApresentacao();
+    const corPrimaria = cores.primary || '#1a237e';
+    const corSecundaria = cores.secondary || '#556B2F';
+    
+    // Gera nome da empresa para exibição
+    const nomeExibicao = clienteInfo.nome_fantasia || clienteInfo.nome || 'Empresa';
+    
+    // Formata data atual
+    const agora = new Date();
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const mesAtual = meses[agora.getMonth()];
+    const anoAtual = agora.getFullYear();
+    const dataFormatada = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    
+    // Renderiza logo ou nome
+    let logoHTML = '';
+    if (clienteInfo.logo_url) {
+        logoHTML = `
+            <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center;">
+                <img src="${clienteInfo.logo_url}" alt="${nomeExibicao}" style="max-height: 200px; max-width: 600px; object-fit: contain;">
+            </div>
+        `;
+    } else {
+        // Usa iniciais se não tiver logo
+        const iniciais = gerarIniciaisCapa(nomeExibicao);
+        logoHTML = `
+            <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 180px; height: 180px; border-radius: 50%; background: linear-gradient(135deg, ${corPrimaria}, ${corSecundaria}); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
+                    <span style="font-size: 72px; font-weight: 700; color: white; letter-spacing: 2px;">${iniciais}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    const htmlCapa = `
         <div style="display: flex; flex-direction: column; height: 100%; width: 100%; background: white; position: relative;">
-            <!-- Linha decorativa no topo (verde à esquerda, azul à direita) -->
-            <div style="height: 4px; background: linear-gradient(to right, #6B8E23 0%, #6B8E23 50%, #1a237e 50%, #1a237e 100%);"></div>
+            <!-- Linha decorativa no topo -->
+            <div style="height: 4px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corSecundaria} 50%, ${corPrimaria} 50%, ${corPrimaria} 100%);"></div>
             
             <!-- Conteúdo principal -->
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 40px; position: relative;">
-                <!-- Logo CONVER -->
-                <div style="margin-bottom: 60px; display: flex; align-items: center; gap: 0;">
-                    <span style="font-size: 72px; font-weight: 700; color: #1a237e; letter-spacing: 2px;">C</span>
-                    <div style="width: 72px; height: 72px; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 0 4px;">
-                        <svg width="72" height="72" viewBox="0 0 72 72">
-                            <circle cx="36" cy="36" r="32" fill="none" stroke="#6B8E23" stroke-width="4"/>
-                            <path d="M 36 8 A 28 28 0 1 1 32 64" fill="none" stroke="#1a237e" stroke-width="3.5" stroke-linecap="round"/>
-                            <circle cx="36" cy="12" r="4" fill="#6B8E23"/>
-                        </svg>
-                    </div>
-                    <span style="font-size: 72px; font-weight: 700; color: #1a237e; letter-spacing: 2px;">NVER</span>
-                </div>
+                ${logoHTML}
                 
                 <!-- Título principal -->
-                <div style="text-align: center; margin-bottom: 40px;">
-                    <h1 style="font-size: 36px; font-weight: 700; color: #1a237e; margin: 0 0 20px 0; letter-spacing: 1px; line-height: 1.4;">
+                <div style="text-align: center; margin-bottom: 60px;">
+                    <h1 style="font-size: 48px; font-weight: 700; color: ${corPrimaria}; margin: 0 0 30px 0; letter-spacing: 1px; line-height: 1.4;">
                         SAÚDE CORPORATIVA - MEDICINA DO TRABALHO
                     </h1>
-                    <h2 style="font-size: 32px; font-weight: 600; color: #1a237e; margin: 0; letter-spacing: 0.5px;">
+                    <h2 style="font-size: 42px; font-weight: 600; color: ${corPrimaria}; margin: 0; letter-spacing: 0.5px;">
                         INDICADORES DE SAÚDE
                     </h2>
                 </div>
                 
                 <!-- Data no canto inferior direito -->
-                <div style="position: absolute; bottom: 40px; right: 60px; text-align: right;">
-                    <div style="font-size: 24px; font-weight: 600; color: #1a237e; margin-bottom: 8px; letter-spacing: 0.5px;">
-                        OUTUBRO, 2025
+                <div style="position: absolute; bottom: 50px; right: 80px; text-align: right;">
+                    <div style="font-size: 32px; font-weight: 600; color: ${corPrimaria}; margin-bottom: 10px; letter-spacing: 0.5px;">
+                        ${mesAtual.toUpperCase()}, ${anoAtual}
                     </div>
-                    <div style="font-size: 20px; font-weight: 500; color: #1a237e; letter-spacing: 0.5px;">
-                        10/11/2025
+                    <div style="font-size: 26px; font-weight: 500; color: ${corPrimaria}; letter-spacing: 0.5px;">
+                        ${dataFormatada}
                     </div>
                 </div>
             </div>
             
-            <!-- Linha decorativa na parte inferior (azul à esquerda, verde à direita) -->
-            <div style="height: 4px; background: linear-gradient(to right, #1a237e 0%, #1a237e 50%, #6B8E23 50%, #6B8E23 100%);"></div>
+            <!-- Linha decorativa na parte inferior -->
+            <div style="height: 4px; background: linear-gradient(to right, ${corPrimaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 50%, ${corSecundaria} 100%);"></div>
         </div>
     `;
+    
+    return htmlCapa;
+}
+
+function gerarIniciaisCapa(nome) {
+    if (!nome) return 'AC';
+    const palavras = nome.trim().split(/\s+/);
+    if (palavras.length >= 2) {
+        return (palavras[0][0] + palavras[palavras.length - 1][0]).toUpperCase();
+    }
+    return nome.substring(0, 2).toUpperCase();
 }
 
 function renderizarKPIs(dados) {
@@ -1001,7 +1123,68 @@ function atualizarBotoes() {
 
 function sairApresentacao() {
     if (confirm('Deseja sair da apresentação?')) {
+        // Sai do fullscreen se estiver ativo
+        if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+            exitFullscreen();
+        }
         window.location.href = '/';
+    }
+}
+
+// ==================== FUNÇÕES DE TELA CHEIA ====================
+function toggleFullscreen() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+        entrarFullscreen();
+    } else {
+        exitFullscreen();
+    }
+}
+
+function entrarFullscreen() {
+    const elem = document.documentElement;
+    
+    if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+    } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+    } else if (elem.mozRequestFullScreen) {
+        elem.mozRequestFullScreen();
+    } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
+    }
+    
+    document.body.classList.add('fullscreen-mode');
+}
+
+function exitFullscreen() {
+    if (document.exitFullscreen) {
+        document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+    }
+    
+    document.body.classList.remove('fullscreen-mode');
+}
+
+function atualizarIconeFullscreen() {
+    const icon = document.getElementById('fullscreenIcon');
+    const btn = document.getElementById('btnFullscreen');
+    const span = btn.querySelector('span');
+    
+    if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+        // Está em fullscreen
+        if (icon) icon.className = 'fas fa-compress';
+        if (span) span.textContent = 'Sair Tela Cheia';
+        document.body.classList.add('fullscreen-mode');
+    } else {
+        // Não está em fullscreen
+        if (icon) icon.className = 'fas fa-expand';
+        if (span) span.textContent = 'Tela Cheia';
+        document.body.classList.remove('fullscreen-mode');
     }
 }
 
@@ -1223,180 +1406,345 @@ function renderizarProdutividade(slide) {
         return '<div class="empty-state"><p>Nenhum dado de produtividade disponível</p></div>';
     }
     
-    // Calcula totais por categoria
-    const totais = {
-        ocupacionais: dados.reduce((sum, d) => sum + (d.ocupacionais || 0), 0),
-        assistenciais: dados.reduce((sum, d) => sum + (d.assistenciais || 0), 0),
-        acidente_trabalho: dados.reduce((sum, d) => sum + (d.acidente_trabalho || 0), 0),
-        inss: dados.reduce((sum, d) => sum + (d.inss || 0), 0),
-        absenteismo: dados.reduce((sum, d) => sum + (d.absenteismo || 0), 0),
-        total: dados.reduce((sum, d) => sum + (d.total || 0), 0)
-    };
-    
-    // Carrega configurações
-    const config = JSON.parse(localStorage.getItem('produtividade_apresentacao') || '{}');
-    
-    // Determina layout baseado nos gráficos ativos
-    const graficosAtivos = [];
-    if (config.graficoCategoria?.ativo !== false) graficosAtivos.push('categoria');
-    if (config.graficoTipo?.ativo !== false) graficosAtivos.push('tipo');
-    if (config.graficoEvolucao?.ativo === true) graficosAtivos.push('evolucao');
-    
-    if (graficosAtivos.length === 0) {
-        return '<div class="empty-state"><p>Nenhum gráfico configurado para exibição</p></div>';
-    }
-    
     let html = '';
     
-    // Layout responsivo baseado na quantidade de gráficos
-    if (graficosAtivos.length === 1) {
-        html = `<div style="display: flex; justify-content: center; align-items: center; height: 100%;">`;
-        if (graficosAtivos.includes('categoria')) {
-            html += `<div style="width: 80%; max-width: 800px;"><canvas id="chartProdutividadeCategorias"></canvas></div>`;
-        } else if (graficosAtivos.includes('tipo')) {
-            html += `<div style="width: 80%; max-width: 800px;"><canvas id="chartProdutividadeTipos"></canvas></div>`;
-        } else if (graficosAtivos.includes('evolucao')) {
-            html += `<div style="width: 100%;"><canvas id="graficoEvolucaoProdutividade"></canvas></div>`;
-        }
-        html += `</div>`;
-    } else if (graficosAtivos.length === 2) {
-        html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; height: 100%;">`;
-        if (graficosAtivos.includes('categoria')) {
-            html += `<div><canvas id="chartProdutividadeCategorias"></canvas></div>`;
-        }
-        if (graficosAtivos.includes('tipo')) {
-            html += `<div><canvas id="chartProdutividadeTipos"></canvas></div>`;
-        }
-        if (graficosAtivos.includes('evolucao')) {
-            html += `<div style="grid-column: 1 / -1;"><canvas id="graficoEvolucaoProdutividade"></canvas></div>`;
-        }
-        html += `</div>`;
-    } else {
-        html = `<div style="display: flex; flex-direction: column; gap: 24px; height: 100%;">`;
-        if (graficosAtivos.includes('categoria') || graficosAtivos.includes('tipo')) {
-            html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">`;
-            if (graficosAtivos.includes('categoria')) {
-                html += `<div><canvas id="chartProdutividadeCategorias"></canvas></div>`;
-            }
-            if (graficosAtivos.includes('tipo')) {
-                html += `<div><canvas id="chartProdutividadeTipos"></canvas></div>`;
-            }
-            html += `</div>`;
-        }
-        if (graficosAtivos.includes('evolucao')) {
-            html += `<div style="flex: 1; min-height: 300px;"><canvas id="graficoEvolucaoProdutividade"></canvas></div>`;
-        }
-        html += `</div>`;
-    }
+    // Layout com os dois novos gráficos de produtividade lado a lado
+    html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; height: 100%;">`;
+    html += `<div><canvas id="chartProdutividadeCategoriaAgendadosFaltas"></canvas></div>`;
+    html += `<div><canvas id="chartProdutividadeMensalCategoria"></canvas></div>`;
+    html += `</div>`;
     
     // Renderiza gráficos após o HTML ser inserido
     setTimeout(() => {
-        renderizarGraficoProdutividade(dados, totais);
+        renderizarGraficoProdutividadeCategoriaAgendadosFaltas(dados);
+        renderizarGraficoProdutividadeMensalCategoria(dados);
     }, 100);
     
     return html;
 }
 
-function renderizarGraficoProdutividade(dados, totais) {
-    // Carrega configurações
-    const config = JSON.parse(localStorage.getItem('produtividade_apresentacao') || '{}');
+// ==================== GRÁFICO PRODUTIVIDADE POR CATEGORIA (AGENDADOS/FALTAS) ====================
+function renderizarGraficoProdutividadeCategoriaAgendadosFaltas(dados) {
+    const ctx = document.getElementById('chartProdutividadeCategoriaAgendadosFaltas');
+    if (!ctx || !dados || dados.length === 0) return;
     
-    // Gráfico de categorias
-    if (config.graficoCategoria?.ativo !== false) {
-        const ctxCategorias = document.getElementById('chartProdutividadeCategorias');
-        if (ctxCategorias && !charts['produtividade_categorias']) {
-            const tipoGrafico = config.graficoCategoria?.tipo || 'bar';
-            
-            const configChart = {
-                type: tipoGrafico,
+    if (charts['produtividade_categoria_agendados_faltas']) {
+        charts['produtividade_categoria_agendados_faltas'].destroy();
+    }
+    
+    // Agrupa por mês
+    const dadosPorMes = {};
+    dados.forEach(d => {
+        const mesRef = d.mes_referencia || 'sem-mes';
+        if (!dadosPorMes[mesRef]) {
+            dadosPorMes[mesRef] = [];
+        }
+        dadosPorMes[mesRef].push(d);
+    });
+    
+    // Calcula totais de Agendados e Faltas por categoria (soma de todos os meses)
+    const totaisAgendados = {
+        ocupacionais: 0, assistenciais: 0, acidente_trabalho: 0, inss: 0,
+        sinistralidade: 0, absenteismo: 0, pericia_indireta: 0
+    };
+    
+    const totaisFaltas = {
+        ocupacionais: 0, assistenciais: 0, acidente_trabalho: 0, inss: 0,
+        sinistralidade: 0, absenteismo: 0, pericia_indireta: 0
+    };
+    
+    Object.values(dadosPorMes).forEach(dadosMes => {
+        const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+        const compareceram = dadosMes.find(d => d.tipo_consulta === 'Compareceram');
+        
+        if (agendados) {
+            totaisAgendados.ocupacionais += (agendados.ocupacionais || 0);
+            totaisAgendados.assistenciais += (agendados.assistenciais || 0);
+            totaisAgendados.acidente_trabalho += (agendados.acidente_trabalho || 0);
+            totaisAgendados.inss += (agendados.inss || 0);
+            totaisAgendados.sinistralidade += (agendados.sinistralidade || 0);
+            totaisAgendados.absenteismo += (agendados.absenteismo || 0);
+            totaisAgendados.pericia_indireta += (agendados.pericia_indireta || 0);
+        }
+        
+        if (agendados && compareceram) {
+            totaisFaltas.ocupacionais += Math.max(0, (agendados.ocupacionais || 0) - (compareceram.ocupacionais || 0));
+            totaisFaltas.assistenciais += Math.max(0, (agendados.assistenciais || 0) - (compareceram.assistenciais || 0));
+            totaisFaltas.acidente_trabalho += Math.max(0, (agendados.acidente_trabalho || 0) - (compareceram.acidente_trabalho || 0));
+            totaisFaltas.inss += Math.max(0, (agendados.inss || 0) - (compareceram.inss || 0));
+            totaisFaltas.sinistralidade += Math.max(0, (agendados.sinistralidade || 0) - (compareceram.sinistralidade || 0));
+            totaisFaltas.absenteismo += Math.max(0, (agendados.absenteismo || 0) - (compareceram.absenteismo || 0));
+            totaisFaltas.pericia_indireta += Math.max(0, (agendados.pericia_indireta || 0) - (compareceram.pericia_indireta || 0));
+        }
+    });
+    
+    const totaisCompareceram = {
+        ocupacionais: totaisAgendados.ocupacionais - totaisFaltas.ocupacionais,
+        assistenciais: totaisAgendados.assistenciais - totaisFaltas.assistenciais,
+        acidente_trabalho: totaisAgendados.acidente_trabalho - totaisFaltas.acidente_trabalho,
+        inss: totaisAgendados.inss - totaisFaltas.inss,
+        sinistralidade: totaisAgendados.sinistralidade - totaisFaltas.sinistralidade,
+        absenteismo: totaisAgendados.absenteismo - totaisFaltas.absenteismo,
+        pericia_indireta: totaisAgendados.pericia_indireta - totaisFaltas.pericia_indireta
+    };
+    
+    const meses = Object.keys(dadosPorMes).sort();
+    let periodoTexto = '';
+    if (meses.length > 0) {
+        const mesMaisRecente = meses[meses.length - 1];
+        const [ano, mes] = mesMaisRecente.split('-');
+        const mesesNomes = {
+            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+            '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+            '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+        };
+        periodoTexto = `Ano ${ano} até ${mesesNomes[mes] || mes}`;
+    }
+    
+    const categorias = [
+        { nome: 'Ocupacionais', key: 'ocupacionais' },
+        { nome: 'Assistenciais', key: 'assistenciais' },
+        { nome: 'Acidente de Trabalho', key: 'acidente_trabalho' },
+        { nome: 'INSS', key: 'inss' },
+        { nome: 'Sinistralidade', key: 'sinistralidade' },
+        { nome: 'Absenteísmo', key: 'absenteismo' },
+        { nome: 'Perícia Indireta', key: 'pericia_indireta' }
+    ];
+    
+    categorias.sort((a, b) => {
+        const totalA = totaisAgendados[a.key] || 0;
+        const totalB = totaisAgendados[b.key] || 0;
+        return totalB - totalA;
+    });
+    
+    const labelsOrdenados = categorias.map(c => c.nome);
+    const dataCompareceram = categorias.map(c => Math.max(0, totaisCompareceram[c.key]));
+    const dataFaltas = categorias.map(c => totaisFaltas[c.key]);
+    
+    charts['produtividade_categoria_agendados_faltas'] = new Chart(ctx, {
+        type: 'bar',
                 data: {
-                    labels: ['Ocupacionais', 'Assistenciais', 'Acidente de Trabalho', 'INSS', 'Absenteísmo'],
-                    datasets: [{
-                        label: 'Total de Consultas',
-                        data: [
-                            totais.ocupacionais,
-                            totais.assistenciais,
-                            totais.acidente_trabalho,
-                            totais.inss,
-                            totais.absenteismo
-                        ],
-                        backgroundColor: [
-                            CORES_EMPRESA.primary,
-                            CORES_EMPRESA.secondary,
-                            '#ff9800',
-                            '#9c27b0',
-                            '#f44336'
-                        ],
-                        borderColor: [
-                            CORES_EMPRESA.primaryDark,
-                            CORES_EMPRESA.secondaryDark,
-                            '#f57c00',
-                            '#7b1fa2',
-                            '#c62828'
-                        ],
-                        borderRadius: tipoGrafico === 'bar' ? 6 : 0,
-                        borderWidth: tipoGrafico === 'pie' || tipoGrafico === 'doughnut' ? 2 : 1
-                    }]
+            labels: labelsOrdenados,
+            datasets: [
+                {
+                    label: 'Compareceram',
+                    data: dataCompareceram,
+                    backgroundColor: getCoresApresentacao().primary || '#0056b3',
+                    borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 }
+                },
+                {
+                    label: 'Faltas',
+                    data: dataFaltas,
+                    backgroundColor: getCoresApresentacao().secondary || '#dc3545',
+                    borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 }
+                }
+            ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
+                title: {
+                    display: true,
+                    text: periodoTexto || 'Produtividade - Consultas por Categoria',
+                    font: { size: 14, weight: 'bold' },
+                    padding: { top: 10, bottom: 20 }
+                },
                         legend: { 
-                            display: tipoGrafico === 'pie' || tipoGrafico === 'doughnut' || tipoGrafico === 'radar',
-                            position: 'bottom'
+                    display: true,
+                    position: 'top',
+                    labels: { font: { size: 11 }, usePointStyle: true, padding: 12 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            const index = context.dataIndex;
+                            const categoriaKey = categorias[index].key;
+                            const total = totaisAgendados[categoriaKey];
+                            const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} consultas (${percent}%)`;
+                        },
+                        footer: function(tooltipItems) {
+                            if (tooltipItems.length > 0) {
+                                const index = tooltipItems[0].dataIndex;
+                                const categoriaKey = categorias[index].key;
+                                const total = totaisAgendados[categoriaKey];
+                                const compareceram = totaisCompareceram[categoriaKey];
+                                const faltas = totaisFaltas[categoriaKey];
+                                const percentCompareceram = total > 0 ? ((compareceram / total) * 100).toFixed(1) : 0;
+                                const percentFaltas = total > 0 ? ((faltas / total) * 100).toFixed(1) : 0;
+                                return [
+                                    `Total Agendados: ${total} consultas`,
+                                    `Comparecimento: ${percentCompareceram}%`,
+                                    `Faltas: ${percentFaltas}%`
+                                ];
+                            }
+                            return '';
                         }
-                    },
-                    scales: tipoGrafico !== 'pie' && tipoGrafico !== 'doughnut' && tipoGrafico !== 'radar' ? {
-                        y: { beginAtZero: true }
-                    } : undefined
+                    }
                 }
-            };
-            
-            charts['produtividade_categorias'] = new Chart(ctxCategorias, configChart);
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    stacked: true,
+                    ticks: { font: { size: 10 }, stepSize: 5 }
+                },
+                x: { 
+                    stacked: true,
+                    ticks: { font: { size: 10 } },
+                    grid: { display: false }
+                }
+            }
         }
+    });
+}
+
+// ==================== GRÁFICO PRODUTIVIDADE MENSAL POR CATEGORIA ====================
+function renderizarGraficoProdutividadeMensalCategoria(dados) {
+    const ctx = document.getElementById('chartProdutividadeMensalCategoria');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    if (charts['produtividade_mensal_categoria']) {
+        charts['produtividade_mensal_categoria'].destroy();
     }
     
-    // Gráfico de tipos
-    if (config.graficoTipo?.ativo !== false) {
-        const ctxTipos = document.getElementById('chartProdutividadeTipos');
-        if (ctxTipos && !charts['produtividade_tipos']) {
-            const tipos = dados.map(d => d.tipo_consulta || d.numero_tipo || 'N/A');
-            const totaisTipos = dados.map(d => d.total || 0);
-            const tipoGrafico = config.graficoTipo?.tipo || 'doughnut';
-            
-            const configChart = {
-                type: tipoGrafico,
+    // Agrupa por mês (dados anuais mês a mês)
+    const dadosPorMes = {};
+    dados.forEach(d => {
+        const mesRef = d.mes_referencia || 'sem-mes';
+        if (!dadosPorMes[mesRef]) {
+            dadosPorMes[mesRef] = [];
+        }
+        dadosPorMes[mesRef].push(d);
+    });
+    
+    const mesesOrdenados = Object.keys(dadosPorMes).sort();
+    
+    // Formata labels de mês
+    const mesesNomes = {
+        '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+        '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+        '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+    };
+    
+    const labels = mesesOrdenados.map(mesRef => {
+        const [ano, mes] = mesRef.split('-');
+        return `${mesesNomes[mes] || mes}/${ano}`;
+    });
+    
+    // Gera gradiente de cores baseado nas cores do cliente
+    const cores = getCoresApresentacao();
+    const paleta = getPaletaApresentacao();
+    
+    const categorias = [
+        { nome: 'Ocupacionais', key: 'ocupacionais', cor: cores.primary },
+        { nome: 'Assistenciais', key: 'assistenciais', cor: cores.primaryLight },
+        { nome: 'Acidente de Trabalho', key: 'acidente_trabalho', cor: paleta[2] || cores.primaryDark },
+        { nome: 'INSS', key: 'inss', cor: paleta[3] || cores.secondaryLight },
+        { nome: 'Sinistralidade', key: 'sinistralidade', cor: paleta[4] || cores.secondary },
+        { nome: 'Absenteísmo', key: 'absenteismo', cor: cores.secondary },
+        { nome: 'Perícia Indireta', key: 'pericia_indireta', cor: cores.secondaryDark }
+    ];
+    
+    const datasets = categorias.map(categoria => {
+        const data = mesesOrdenados.map(mesRef => {
+            const dadosMes = dadosPorMes[mesRef];
+            const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+            return agendados ? (agendados[categoria.key] || 0) : 0;
+        });
+        
+        return {
+            label: categoria.nome,
+            data: data,
+            backgroundColor: categoria.cor,
+            borderRadius: 4
+        };
+    });
+    
+    charts['produtividade_mensal_categoria'] = new Chart(ctx, {
+        type: 'bar',
                 data: {
-                    labels: tipos,
-                    datasets: [{
-                        label: 'Total',
-                        data: totaisTipos,
-                        backgroundColor: PALETA_EMPRESA
-                    }]
+            labels: labels,
+            datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
+                title: {
+                    display: true,
+                    text: 'Produtividade - Distribuição Anual (Mês a Mês) por Categoria',
+                    font: { size: 14, weight: 'bold' },
+                    padding: { top: 10, bottom: 20 }
+                },
                         legend: {
-                            position: 'bottom'
+                    display: true,
+                    position: 'top',
+                    labels: { font: { size: 10 }, usePointStyle: true, padding: 10 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            const mesIndex = context.dataIndex;
+                            const mesRef = mesesOrdenados[mesIndex];
+                            const dadosMes = dadosPorMes[mesRef];
+                            const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+                            
+                            let totalMes = 0;
+                            if (agendados) {
+                                categorias.forEach(cat => {
+                                    totalMes += (agendados[cat.key] || 0);
+                                });
+                            }
+                            
+                            const percent = totalMes > 0 ? ((value / totalMes) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} consultas (${percent}%)`;
+                        },
+                        footer: function(tooltipItems) {
+                            if (tooltipItems.length > 0) {
+                                const mesIndex = tooltipItems[0].dataIndex;
+                                const mesRef = mesesOrdenados[mesIndex];
+                                const dadosMes = dadosPorMes[mesRef];
+                                const agendados = dadosMes.find(d => d.tipo_consulta === 'Agendados');
+                                
+                                let totalMes = 0;
+                                if (agendados) {
+                                    categorias.forEach(cat => {
+                                        totalMes += (agendados[cat.key] || 0);
+                                    });
+                                }
+                                
+                                return `Total do Mês: ${totalMes} consultas`;
+                            }
+                            return '';
                         }
-                    },
-                    scales: tipoGrafico === 'bar' || tipoGrafico === 'line' ? {
-                        y: { beginAtZero: true }
-                    } : undefined
+                    }
                 }
-            };
-            
-            charts['produtividade_tipos'] = new Chart(ctxTipos, configChart);
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    ticks: { font: { size: 10 } },
+                    grid: { display: false }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: { font: { size: 10 }, stepSize: 5 },
+                    title: {
+                        display: true,
+                        text: 'Quantidade de Consultas',
+                        font: { size: 11, weight: 'bold' }
+                    }
+                }
+            }
         }
-    }
-    
-    // Gráfico de evolução mensal (se ativado)
-    if (config.graficoEvolucao?.ativo === true) {
-        renderizarGraficoEvolucaoMensal(config.graficoEvolucao?.tipo || 'line');
-    }
+    });
 }
 
 function renderizarGraficoEvolucaoMensal(tipoGrafico) {

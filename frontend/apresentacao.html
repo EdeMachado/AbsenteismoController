@@ -13,6 +13,8 @@
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Sistema de Cores por Cliente -->
+    <script src="/static/js/cores-cliente.js"></script>
     
     <style>
         * {
@@ -52,9 +54,51 @@
             font-weight: 600;
         }
         
+        .apresentacao-header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
         .slide-indicator {
             font-size: 14px;
             opacity: 0.9;
+        }
+        
+        .btn-fullscreen {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-fullscreen:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .btn-fullscreen i {
+            font-size: 16px;
+        }
+        
+        /* Estilo quando está em fullscreen */
+        body.fullscreen-mode .apresentacao-header {
+            padding: 12px 20px;
+        }
+        
+        body.fullscreen-mode .apresentacao-header h1 {
+            font-size: 18px;
+        }
+        
+        body.fullscreen-mode .apresentacao-content {
+            padding: 16px;
         }
         
         .apresentacao-content {
@@ -343,8 +387,14 @@
                 <i class="fas fa-chart-line"></i>
                 Apresentação Executiva - Absenteísmo
             </h1>
-            <div class="slide-indicator">
-                <span id="slideAtual">1</span> / <span id="totalSlides">0</span>
+            <div class="apresentacao-header-right">
+                <div class="slide-indicator">
+                    <span id="slideAtual">1</span> / <span id="totalSlides">0</span>
+                </div>
+                <button class="btn-fullscreen" onclick="toggleFullscreen()" id="btnFullscreen" title="Tela Cheia (F11)">
+                    <i class="fas fa-expand" id="fullscreenIcon"></i>
+                    <span>Tela Cheia</span>
+                </button>
             </div>
         </div>
         

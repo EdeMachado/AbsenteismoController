@@ -3,14 +3,25 @@ Excel processor - Lê e processa planilhas de atestados
 """
 import pandas as pd
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple, Optional
 import re
 import json
 from collections import OrderedDict
+from difflib import SequenceMatcher
 from .genero_detector import GeneroDetector
 
 class ExcelProcessor:
     """Processador de planilhas Excel"""
+    
+    # Mapeamento semântico de campos do sistema para variações comuns
+    CAMPOS_SISTEMA = {
+        'nomecompleto': ['nome', 'completo', 'funcionario', 'funcionário', 'empregado', 'colaborador'],
+        'setor': ['setor', 'departamento', 'depto', 'area', 'área', 'centro', 'custo'],
+        'dias_atestados': ['dias', 'atestado', 'atestados', 'afastamento', 'afastamentos'],
+        'cid': ['cid', 'codigo', 'código', 'diagnostico', 'diagnóstico'],
+        'data_do_atestado': ['data', 'atestado', 'emissao', 'emissão', 'entrega'],
+        'horas_perdi': ['horas', 'perdidas', 'perdi', 'perdido', 'ausencia', 'ausência']
+    }
     
     def __init__(self, file_path: str, custom_mapping: Dict[str, str] = None):
         """
@@ -41,28 +52,83 @@ class ExcelProcessor:
         
         # Se houver mapeamento customizado, aplica primeiro
         if self.custom_mapping:
+            print(f"🔧 Aplicando mapeamento customizado: {self.custom_mapping}")
+            print(f"📊 Colunas originais da planilha: {list(self.df.columns)}")
+            
             # Cria mapeamento reverso: coluna da planilha -> campo normalizado
             mapeamento_custom = {}
+            colunas_mapeadas = set()
+            
             for col_planilha, campo_sistema in self.custom_mapping.items():
-                # Procura a coluna na planilha (case-insensitive)
+                # Procura a coluna na planilha (case-insensitive, remove espaços extras)
+                col_planilha_limpa = col_planilha.strip()
+                encontrada = False
+                
+                # Normaliza o nome da coluna procurada (remove espaços, acentos, etc)
+                col_planilha_norm = self._normalizar_nome_coluna(col_planilha_limpa)
+                
+                # Primeiro tenta match exato (case-insensitive)
                 for col_atual in self.df.columns:
-                    if col_atual.strip().upper() == col_planilha.strip().upper():
-                        # Mapeia para o campo normalizado do sistema
+                    if col_atual in colunas_mapeadas:
+                        continue
+                    col_atual_limpa = col_atual.strip()
+                    # Compara normalizado (sem espaços, acentos, case)
+                    col_atual_norm = self._normalizar_nome_coluna(col_atual_limpa)
+                    if col_atual_norm == col_planilha_norm:
                         mapeamento_custom[col_atual] = campo_sistema.upper()
+                        colunas_mapeadas.add(col_atual)
+                        print(f"  ✅ Mapeado (exato normalizado): '{col_atual}' -> '{campo_sistema.upper()}' (procurando '{col_planilha}')")
+                        encontrada = True
                         break
+                    # Também tenta match direto case-insensitive
+                    elif col_atual_limpa.upper() == col_planilha_limpa.upper():
+                        mapeamento_custom[col_atual] = campo_sistema.upper()
+                        colunas_mapeadas.add(col_atual)
+                        print(f"  ✅ Mapeado (exato): '{col_atual}' -> '{campo_sistema.upper()}'")
+                        encontrada = True
+                        break
+                
+                # Se não encontrou exato, tenta fuzzy matching
+                if not encontrada:
+                    melhor_match = self._encontrar_coluna_similar(col_planilha_limpa, [c for c in self.df.columns if c not in colunas_mapeadas])
+                    if melhor_match and melhor_match[1] > 0.6:  # Threshold reduzido para 60% de similaridade
+                        col_atual = melhor_match[0]
+                        mapeamento_custom[col_atual] = campo_sistema.upper()
+                        colunas_mapeadas.add(col_atual)
+                        print(f"  ✅ Mapeado (fuzzy {melhor_match[1]:.0%}): '{col_atual}' -> '{campo_sistema.upper()}' (procurando '{col_planilha}')")
+                        encontrada = True
+                
+                if not encontrada:
+                    print(f"  ⚠️ Coluna '{col_planilha}' não encontrada na planilha")
+                    print(f"     Colunas disponíveis: {list(self.df.columns)}")
             
             # Aplica mapeamento customizado
-            self.df.rename(columns=mapeamento_custom, inplace=True)
+            if mapeamento_custom:
+                self.df.rename(columns=mapeamento_custom, inplace=True)
+                print(f"📊 Colunas após mapeamento: {list(self.df.columns)}")
+            else:
+                print("⚠️ Nenhuma coluna foi mapeada!")
         
         # Mapeamento padrão (fallback para colunas não mapeadas)
+        # Inclui variações comuns de nomes de colunas
         mapeamento_padrao = {
             'NOMECOMPLETO': 'NOMECOMPLETO',
+            'NOME COMPLETO': 'NOMECOMPLETO',  # Variação com espaço
+            'NOME_COMPLETO': 'NOMECOMPLETO',  # Variação com underscore
+            'NOMEFUNCIONARIO': 'NOMECOMPLETO',
+            'NOME FUNCIONARIO': 'NOMECOMPLETO',
+            'NOME_FUNCIONARIO': 'NOMECOMPLETO',
+            'FUNCIONARIO': 'NOMECOMPLETO',
+            'FUNCIONÁRIO': 'NOMECOMPLETO',
             'DESCRIÇÃO ATESTAD': 'DESCRICAO_ATESTAD',
             'DESCRICAO ATESTAD': 'DESCRICAO_ATESTAD',
             'DESCRIÇÃO ATESTADO': 'DESCRICAO_ATESTAD',
             'DESCRICAO ATESTADO': 'DESCRICAO_ATESTAD',
             'DIAS ATESTADOS': 'DIAS_ATESTADOS',
+            'DIAS_ATESTADOS': 'DIAS_ATESTADOS',
+            'DIAS': 'DIAS_ATESTADOS',
             'CID': 'CID',
+            'CID-10': 'CID',
             'DIAGNÓSTICO': 'DIAGNOSTICO',
             'DIAGNOSTICO': 'DIAGNOSTICO',
             'CENTROCUST': 'CENTRO_CUSTO',
@@ -70,6 +136,7 @@ class ExcelProcessor:
             'CENTROCUSTO': 'CENTRO_CUSTO',
             'setor': 'SETOR',
             'SETOR': 'SETOR',
+            'DEPARTAMENTO': 'SETOR',
             'motivo atestado': 'MOTIVO_ATESTADO',
             'MOTIVO ATESTADO': 'MOTIVO_ATESTADO',
             'escala': 'ESCALA',
@@ -89,14 +156,80 @@ class ExcelProcessor:
             # Se já foi mapeada pelo custom_mapping, pula
             if col_atual in mapeamento_custom_keys:
                 continue
-            # Aplica mapeamento padrão
-            if col_normalizada.upper() in mapeamento_padrao:
-                self.df.rename(columns={col_atual: mapeamento_padrao[col_normalizada.upper()]}, inplace=True)
+            # Aplica mapeamento padrão (case-insensitive)
+            col_upper = col_normalizada.upper()
+            if col_upper in mapeamento_padrao:
+                self.df.rename(columns={col_atual: mapeamento_padrao[col_upper]}, inplace=True)
+                print(f"  🔄 Mapeamento padrão: '{col_atual}' -> '{mapeamento_padrao[col_upper]}'")
             else:
                 # Se não estiver no mapeamento, normaliza para maiúsculas com underscore
-                col_nova = col_normalizada.upper().replace(' ', '_').replace('/', '_')
+                col_nova = col_normalizada.upper().replace(' ', '_').replace('/', '_').replace('-', '_')
                 if col_nova != col_normalizada:
                     self.df.rename(columns={col_atual: col_nova}, inplace=True)
+    
+    def _encontrar_coluna_similar(self, coluna_procurada: str, colunas_disponiveis: List[str], threshold: float = 0.6) -> Optional[Tuple[str, float]]:
+        """
+        Encontra a coluna mais similar usando fuzzy matching
+        
+        Args:
+            coluna_procurada: Nome da coluna que estamos procurando
+            colunas_disponiveis: Lista de colunas disponíveis na planilha
+            threshold: Similaridade mínima (0-1)
+        
+        Returns:
+            Tupla (nome_coluna, similaridade) ou None se não encontrar
+        """
+        if not colunas_disponiveis:
+            return None
+        
+        coluna_procurada_norm = self._normalizar_nome_coluna(coluna_procurada)
+        melhor_match = None
+        melhor_score = 0.0
+        
+        for coluna in colunas_disponiveis:
+            coluna_norm = self._normalizar_nome_coluna(coluna)
+            
+            # Se normalizados são iguais, é match perfeito
+            if coluna_procurada_norm == coluna_norm:
+                return (coluna, 1.0)
+            
+            # Calcula similaridade usando SequenceMatcher
+            score = SequenceMatcher(None, coluna_procurada_norm, coluna_norm).ratio()
+            
+            # Bonus se uma contém a outra (ex: "NOMECOMPLETO" contém "NOME" e "COMPLETO")
+            if coluna_procurada_norm in coluna_norm or coluna_norm in coluna_procurada_norm:
+                score = min(1.0, score + 0.3)
+            
+            # Bonus extra se palavras-chave importantes coincidem
+            palavras_procurada = set(coluna_procurada_norm.split()) if ' ' in coluna_procurada else {coluna_procurada_norm}
+            palavras_coluna = set(coluna_norm.split()) if ' ' in coluna_norm else {coluna_norm}
+            palavras_comuns = palavras_procurada.intersection(palavras_coluna)
+            if palavras_comuns and len(palavras_comuns) >= len(palavras_procurada) * 0.5:
+                score = min(1.0, score + 0.2)
+            
+            if score > melhor_score:
+                melhor_score = score
+                melhor_match = coluna
+        
+        if melhor_score >= threshold:
+            return (melhor_match, melhor_score)
+        return None
+    
+    def _normalizar_nome_coluna(self, nome: str) -> str:
+        """
+        Normaliza nome de coluna para comparação (remove acentos, espaços, case)
+        """
+        # Remove acentos básicos
+        nome = nome.upper().strip()
+        nome = nome.replace('Á', 'A').replace('À', 'A').replace('Â', 'A').replace('Ã', 'A')
+        nome = nome.replace('É', 'E').replace('Ê', 'E')
+        nome = nome.replace('Í', 'I')
+        nome = nome.replace('Ó', 'O').replace('Ô', 'O').replace('Õ', 'O')
+        nome = nome.replace('Ú', 'U')
+        nome = nome.replace('Ç', 'C')
+        # Remove espaços e caracteres especiais
+        nome = re.sub(r'[^A-Z0-9]', '', nome)
+        return nome
     
     def limpar_dados(self):
         """Limpa e valida os dados"""
@@ -159,6 +292,9 @@ class ExcelProcessor:
         self.df_original = self.df.copy()
         
         self.padronizar_colunas()
+        
+        # Debug: mostra colunas após padronização
+        print(f"📊 Colunas após padronização: {list(self.df.columns)}")
         
         # Após padronizar, cria mapeamento das colunas originais para normalizadas
         mapeamento_colunas = {}
@@ -225,8 +361,31 @@ class ExcelProcessor:
             
             # Mapeia campos da planilha padronizada - busca valores nas colunas normalizadas
             def get_valor(col_normalizada, default=''):
-                if col_normalizada and col_normalizada in self.df.columns:
-                    return row.get(col_normalizada)
+                if not col_normalizada:
+                    return default
+                
+                # Tenta match exato primeiro
+                if col_normalizada in self.df.columns:
+                    valor = row.get(col_normalizada)
+                    if valor is not None and pd.notna(valor) and str(valor).strip():
+                        return valor
+                
+                # Se não encontrou, tenta variações do nome (case-insensitive, sem espaços/underscores)
+                col_upper_clean = col_normalizada.upper().replace(' ', '').replace('_', '').replace('-', '')
+                for col_df in self.df.columns:
+                    col_df_clean = col_df.upper().replace(' ', '').replace('_', '').replace('-', '')
+                    if col_df_clean == col_upper_clean:
+                        valor = row.get(col_df)
+                        if valor is not None and pd.notna(valor) and str(valor).strip():
+                            return valor
+                
+                # Tenta fuzzy matching como último recurso
+                melhor_match = self._encontrar_coluna_similar(col_normalizada, list(self.df.columns), threshold=0.8)
+                if melhor_match:
+                    valor = row.get(melhor_match[0])
+                    if valor is not None and pd.notna(valor) and str(valor).strip():
+                        return valor
+                
                 return default
             
             def get_valor_float(col_normalizada, default=0):
@@ -237,6 +396,14 @@ class ExcelProcessor:
                     except:
                         return default
                 return default
+            
+            # Debug: verifica se NOMECOMPLETO existe
+            if idx == 0:  # Apenas na primeira linha para não poluir logs
+                print(f"🔍 Verificando colunas disponíveis para primeira linha:")
+                print(f"   Colunas no DataFrame: {list(self.df.columns)}")
+                print(f"   Procurando por 'NOMECOMPLETO': {'NOMECOMPLETO' in self.df.columns}")
+                valor_nome = get_valor('NOMECOMPLETO', '')
+                print(f"   Valor encontrado para NOMECOMPLETO: '{valor_nome}'")
             
             registro = {
                 # Campos principais da planilha padronizada

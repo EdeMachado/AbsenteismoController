@@ -11,6 +11,12 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    
+    <!-- Sistema de Cores por Cliente -->
+    <script src="/static/js/cores-cliente.js"></script>
+    
     <style>
         .clientes-page {
             display: flex;
@@ -835,8 +841,8 @@
             background: white;
             border-radius: 12px;
             width: 100%;
-            max-width: 700px;
-            max-height: 90vh;
+            max-width: 800px;
+            max-height: 95vh;
             overflow-y: auto;
             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             animation: modalFadeIn 0.3s;
@@ -923,6 +929,54 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+        }
+        
+        .cores-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .cor-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .cor-input-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .cor-picker {
+            width: 60px;
+            height: 40px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 2px;
+        }
+        
+        .cor-picker:hover {
+            border-color: #1a237e;
+        }
+        
+        .cor-text {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+        
+        .cor-text:focus {
+            outline: none;
+            border-color: #1a237e;
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
         }
         
         .form-section-content h3 {
@@ -1274,6 +1328,31 @@
                             <!-- Será preenchido dinamicamente -->
                         </div>
                     </div>
+                    
+                    <!-- Passo 4: Configurar Gráficos -->
+                    <div id="mapeamentoPasso4" class="mapeamento-passo" style="display: none;">
+                        <div style="margin-bottom: 24px;">
+                            <h3 style="margin-bottom: 8px;"><i class="fas fa-chart-bar"></i> Passo 4: Configurar Gráficos e Análises</h3>
+                            <p style="color: var(--text-secondary); font-size: 14px;">
+                                Configure quais gráficos e análises você deseja visualizar no dashboard. Você pode adicionar quantos gráficos quiser.
+                            </p>
+                            <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 12px; border-radius: 4px; margin-top: 12px;">
+                                <p style="margin: 0; font-size: 13px; color: #1565c0;">
+                                    <i class="fas fa-info-circle" style="margin-right: 6px;"></i>
+                                    <strong>Importante:</strong> Os gráficos usarão os campos que você mapeou nas colunas da planilha. 
+                                    Se ainda não mapeou, configure primeiro no Passo 2, ou use os campos padrão do sistema.
+                                </p>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <button type="button" onclick="abrirModalAdicionarGrafico()" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 14px;">
+                                <i class="fas fa-plus"></i> Adicionar Gráfico
+                            </button>
+                        </div>
+                        <div id="graficosConfigurados" style="display: flex; flex-direction: column; gap: 16px;">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="modal-footer" style="margin-top: 32px; display: flex; justify-content: space-between; align-items: center;">
@@ -1433,6 +1512,74 @@
                             </div>
                             <span class="form-hint">Formatos PNG, JPG, SVG ou WEBP com até 1 MB. Use imagens com fundo transparente sempre que possível.</span>
                             <input type="hidden" id="logoUrl" value="">
+                        </div>
+                    </div>
+
+                    <div class="form-section" id="secaoCores" style="border-top: 2px solid #1a237e; padding-top: 24px;">
+                        <div class="form-section-content">
+                            <h3 style="color: #1a237e; font-size: 18px; margin-bottom: 8px;">
+                                <i class="fas fa-palette" style="margin-right: 8px;"></i>Paleta de Cores
+                            </h3>
+                            <p style="margin-bottom: 16px;">Configure as cores da empresa para personalizar gráficos e visualizações.</p>
+                            
+                            <div class="cores-grid">
+                                <div class="cor-group">
+                                    <label class="form-label">Cor Primária</label>
+                                    <div class="cor-input-group">
+                                        <input type="color" id="corPrimary" value="#1a237e" class="cor-picker">
+                                        <input type="text" id="corPrimaryText" value="#1a237e" class="cor-text" maxlength="7">
+                                    </div>
+                                </div>
+                                
+                                <div class="cor-group">
+                                    <label class="form-label">Cor Primária Escura</label>
+                                    <div class="cor-input-group">
+                                        <input type="color" id="corPrimaryDark" value="#0d47a1" class="cor-picker">
+                                        <input type="text" id="corPrimaryDarkText" value="#0d47a1" class="cor-text" maxlength="7">
+                                    </div>
+                                </div>
+                                
+                                <div class="cor-group">
+                                    <label class="form-label">Cor Primária Clara</label>
+                                    <div class="cor-input-group">
+                                        <input type="color" id="corPrimaryLight" value="#3949ab" class="cor-picker">
+                                        <input type="text" id="corPrimaryLightText" value="#3949ab" class="cor-text" maxlength="7">
+                                    </div>
+                                </div>
+                                
+                                <div class="cor-group">
+                                    <label class="form-label">Cor Secundária</label>
+                                    <div class="cor-input-group">
+                                        <input type="color" id="corSecondary" value="#556B2F" class="cor-picker">
+                                        <input type="text" id="corSecondaryText" value="#556B2F" class="cor-text" maxlength="7">
+                                    </div>
+                                </div>
+                                
+                                <div class="cor-group">
+                                    <label class="form-label">Cor Secundária Escura</label>
+                                    <div class="cor-input-group">
+                                        <input type="color" id="corSecondaryDark" value="#4a5d23" class="cor-picker">
+                                        <input type="text" id="corSecondaryDarkText" value="#4a5d23" class="cor-text" maxlength="7">
+                                    </div>
+                                </div>
+                                
+                                <div class="cor-group">
+                                    <label class="form-label">Cor Secundária Clara</label>
+                                    <div class="cor-input-group">
+                                        <input type="color" id="corSecondaryLight" value="#6B8E23" class="cor-picker">
+                                        <input type="text" id="corSecondaryLightText" value="#6B8E23" class="cor-text" maxlength="7">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 16px;">
+                                <button type="button" class="btn btn-secondary" onclick="aplicarCoresPadrao()" style="font-size: 12px;">
+                                    <i class="fas fa-undo"></i> Restaurar Padrão
+                                </button>
+                                <button type="button" class="btn btn-primary" onclick="salvarCoresCliente()" style="font-size: 12px; margin-left: 8px;">
+                                    <i class="fas fa-save"></i> Salvar Cores
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>

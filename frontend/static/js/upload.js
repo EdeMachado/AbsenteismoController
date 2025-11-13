@@ -239,8 +239,26 @@ async function uploadFile() {
                 document.getElementById('progressFill').style.background = 'var(--success)';
                 loadUploads();
                 
-                if (confirm('Upload realizado com sucesso! Deseja ir para o dashboard?')) {
-                    window.location.href = '/';
+                // Recarrega dashboard automaticamente se estiver na página do dashboard
+                if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+                    // Se já está no dashboard, recarrega os dados
+                    if (typeof carregarDashboard === 'function') {
+                        console.log('🔄 Recarregando dashboard após upload...');
+                        setTimeout(async () => {
+                            try {
+                                await carregarDashboard();
+                                mostrarMensagemSucesso('Upload realizado com sucesso! Dashboard atualizado automaticamente.');
+                            } catch (error) {
+                                console.error('Erro ao recarregar dashboard:', error);
+                                mostrarMensagemSucesso('Upload realizado com sucesso! Recarregue a página para ver os gráficos.');
+                            }
+                        }, 500);
+                    }
+                } else {
+                    // Se não está no dashboard, pergunta se quer ir
+                    if (confirm('Upload realizado com sucesso! Deseja ir para o dashboard para ver os gráficos e análises?')) {
+                        window.location.href = '/';
+                    }
                 }
             }, 2000);
             
@@ -271,6 +289,41 @@ async function uploadFile() {
             document.getElementById('progressFill').style.background = 'var(--success)';
         }, 5000);
     }
+}
+
+async function mostrarMensagemSucesso(mensagem) {
+    // Remove mensagens anteriores
+    const mensagensExistentes = document.querySelectorAll('.mensagem-upload-sucesso');
+    mensagensExistentes.forEach(msg => msg.remove());
+    
+    const mensagemDiv = document.createElement('div');
+    mensagemDiv.className = 'mensagem-upload-sucesso';
+    mensagemDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #e8f5e9;
+        border: 2px solid #4caf50;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        z-index: 10000;
+        max-width: 400px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    `;
+    mensagemDiv.innerHTML = `
+        <i class="fas fa-check-circle" style="font-size: 24px; color: #2e7d32;"></i>
+        <div style="flex: 1; color: #2e7d32; font-size: 14px; line-height: 1.4;">${mensagem}</div>
+    `;
+    
+    document.body.appendChild(mensagemDiv);
+    
+    // Remove após 5 segundos
+    setTimeout(() => {
+        mensagemDiv.remove();
+    }, 5000);
 }
 
 async function loadUploads() {

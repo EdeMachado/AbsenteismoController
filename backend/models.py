@@ -29,6 +29,7 @@ class Client(Base):
     data_abertura = Column(Date, nullable=True)
     atividade_principal = Column(String(500), nullable=True)
     logo_url = Column(String(500), nullable=True)
+    cores_personalizadas = Column(Text, nullable=True)  # JSON com paleta de cores personalizada
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
@@ -130,6 +131,9 @@ class ClientColumnMapping(Base):
     # Mapeamento de colunas da planilha para campos do sistema (JSON)
     # Exemplo: {"NOMECOMPLETO": "nomecompleto", "SETOR_EMPRESA": "setor", ...}
     column_mapping = Column(Text, nullable=False)  # JSON com mapeamento
+    
+    # Configurações de gráficos personalizados (JSON)
+    graficos_configurados = Column(Text, nullable=True)  # JSON com array de gráficos
     
     # Metadata
     created_at = Column(DateTime, default=datetime.now)

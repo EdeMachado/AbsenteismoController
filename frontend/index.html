@@ -13,6 +13,8 @@
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Sistema de Cores por Cliente -->
+    <script src="/static/js/cores-cliente.js"></script>
 </head>
 <body>
     <div class="container">
@@ -412,8 +414,8 @@
                 <!-- Produtividade por Mês e Categoria -->
                 <div class="chart-container" style="margin-bottom: 16px;">
                     <div class="chart-header">
-                        <h3 class="chart-title">Produtividade - Distribuição Mensal por Categoria</h3>
-                        <p class="chart-subtitle">Barras empilhadas mostrando a distribuição percentual por mês</p>
+                        <h3 class="chart-title">Produtividade - Distribuição Anual (Mês a Mês) por Categoria</h3>
+                        <p class="chart-subtitle">Barras empilhadas mostrando a distribuição percentual mês a mês</p>
                     </div>
                     <div class="chart-wrapper" style="height: 400px;">
                         <canvas id="chartProdutividadeMensalCategoria"></canvas>
@@ -425,6 +427,31 @@
     
     <script src="/static/js/menu.js"></script>
     <script src="/static/js/dashboard.js"></script>
+    <script>
+        // Aguarda cores do cliente carregarem antes de inicializar dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                if (typeof carregarCoresCliente === 'function') {
+                    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+                    if (clientId) {
+                        carregarCoresCliente(clientId).then(() => {
+                            if (typeof carregarDashboard === 'function') {
+                                carregarDashboard();
+                            }
+                        });
+                    } else {
+                        if (typeof carregarDashboard === 'function') {
+                            carregarDashboard();
+                        }
+                    }
+                } else {
+                    if (typeof carregarDashboard === 'function') {
+                        carregarDashboard();
+                    }
+                }
+            }, 800);
+        });
+    </script>
     <script>
         // Fecha dropdowns ao clicar fora
         document.addEventListener('click', function(event) {

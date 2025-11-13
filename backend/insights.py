@@ -12,69 +12,98 @@ class InsightsEngine:
     def __init__(self, db: Session):
         self.db = db
     
+    def _verificar_campo_disponivel(self, client_id: int, campo: str) -> bool:
+        """Verifica se um campo tem dados disponíveis para o cliente"""
+        try:
+            amostra = self.db.query(Atestado).join(Upload).filter(
+                Upload.client_id == client_id
+            ).limit(100).all()
+            
+            if not amostra:
+                return False
+            
+            return any(
+                getattr(reg, campo, None) not in (None, '', 0, 0.0) 
+                for reg in amostra
+            )
+        except:
+            return False
+    
     def gerar_insights(self, client_id: int) -> List[Dict[str, Any]]:
-        """Gera insights automáticos"""
+        """Gera insights automáticos baseados nos campos disponíveis"""
         insights = []
         
-        # 1. TOP CID mais frequente
-        top_cid = self.db.query(
-            Atestado.cid,
-            Atestado.diagnostico,
-            func.count(Atestado.id).label('qtd')
-        ).join(Upload).filter(
-            Upload.client_id == client_id,
-            Atestado.cid != '',
-            Atestado.cid.isnot(None)
-        ).group_by(Atestado.cid, Atestado.diagnostico).order_by(func.count(Atestado.id).desc()).first()
-        
-        if top_cid and top_cid.qtd > 0:
-            insights.append({
-                'tipo': 'alerta',
-                'icone': '🩺',
-                'titulo': f'CID {top_cid.cid} - Mais Frequente',
-                'descricao': f'{top_cid.diagnostico or "Doença não especificada"} aparece em {top_cid.qtd} atestados ({self._percentual(top_cid.qtd, client_id)}% do total)',
-                'recomendacao': self._get_recomendacao_cid(top_cid.cid)
-            })
-        
-        # 2. Setor com mais atestados
-        top_setor = self.db.query(
-            Atestado.setor,
-            func.count(Atestado.id).label('qtd')
-        ).join(Upload).filter(
-            Upload.client_id == client_id,
-            Atestado.setor != ''
-        ).group_by(Atestado.setor).order_by(func.count(Atestado.id).desc()).first()
-        
-        if top_setor and top_setor.qtd > 0:
-            insights.append({
-                'tipo': 'atencao',
-                'icone': '🏢',
-                'titulo': f'Setor {top_setor.setor} - Maior Índice',
-                'descricao': f'{top_setor.qtd} atestados registrados ({self._percentual(top_setor.qtd, client_id)}% do total)',
-                'recomendacao': 'Avaliar condições de trabalho e ergonomia neste setor'
-            })
-        
-        # 3. Análise de gênero
-        generos = self.db.query(
-            Atestado.genero,
-            func.count(Atestado.id).label('qtd')
-        ).join(Upload).filter(
-            Upload.client_id == client_id,
-            Atestado.genero != ''
-        ).group_by(Atestado.genero).all()
-        
-        if len(generos) >= 2:
-            total = sum(g.qtd for g in generos)
-            for g in generos:
-                pct = (g.qtd / total * 100) if total > 0 else 0
-                if pct > 60:
+        # 1. TOP CID mais frequente (só se tiver campo CID)
+        if self._verificar_campo_disponivel(client_id, 'cid') or self._verificar_campo_disponivel(client_id, 'diagnostico'):
+            try:
+                top_cid = self.db.query(
+                    Atestado.cid,
+                    Atestado.diagnostico,
+                    func.count(Atestado.id).label('qtd')
+                ).join(Upload).filter(
+                    Upload.client_id == client_id,
+                    Atestado.cid != '',
+                    Atestado.cid.isnot(None)
+                ).group_by(Atestado.cid, Atestado.diagnostico).order_by(func.count(Atestado.id).desc()).first()
+                
+                if top_cid and top_cid.qtd > 0:
                     insights.append({
-                        'tipo': 'info',
-                        'icone': '👥',
-                        'titulo': f'Gênero {"Masculino" if g.genero == "M" else "Feminino"} - Maior Incidência',
-                        'descricao': f'{pct:.1f}% dos atestados são de funcionários do sexo {"masculino" if g.genero == "M" else "feminino"}',
-                        'recomendacao': 'Investigar possíveis causas específicas deste grupo'
+                        'tipo': 'alerta',
+                        'icone': '🩺',
+                        'titulo': f'CID {top_cid.cid} - Mais Frequente',
+                        'descricao': f'{top_cid.diagnostico or "Doença não especificada"} aparece em {top_cid.qtd} atestados ({self._percentual(top_cid.qtd, client_id)}% do total)',
+                        'recomendacao': self._get_recomendacao_cid(top_cid.cid)
                     })
+            except Exception as e:
+                print(f"Erro ao gerar insight de CID: {e}")
+        
+        # 2. Setor com mais atestados (só se tiver campo setor)
+        if self._verificar_campo_disponivel(client_id, 'setor'):
+            try:
+                top_setor = self.db.query(
+                    Atestado.setor,
+                    func.count(Atestado.id).label('qtd')
+                ).join(Upload).filter(
+                    Upload.client_id == client_id,
+                    Atestado.setor != ''
+                ).group_by(Atestado.setor).order_by(func.count(Atestado.id).desc()).first()
+                
+                if top_setor and top_setor.qtd > 0:
+                    insights.append({
+                        'tipo': 'atencao',
+                        'icone': '🏢',
+                        'titulo': f'Setor {top_setor.setor} - Maior Índice',
+                        'descricao': f'{top_setor.qtd} atestados registrados ({self._percentual(top_setor.qtd, client_id)}% do total)',
+                        'recomendacao': 'Avaliar condições de trabalho e ergonomia neste setor'
+                    })
+            except Exception as e:
+                print(f"Erro ao gerar insight de setor: {e}")
+        
+        # 3. Análise de gênero (só se tiver campo genero)
+        if self._verificar_campo_disponivel(client_id, 'genero'):
+            try:
+                generos = self.db.query(
+                    Atestado.genero,
+                    func.count(Atestado.id).label('qtd')
+                ).join(Upload).filter(
+                    Upload.client_id == client_id,
+                    Atestado.genero != ''
+                ).group_by(Atestado.genero).all()
+                
+                if len(generos) >= 2:
+                    total = sum(g.qtd for g in generos)
+                    for g in generos:
+                        pct = (g.qtd / total * 100) if total > 0 else 0
+                        if pct > 60:
+                            insights.append({
+                                'tipo': 'info',
+                                'icone': '👥',
+                                'titulo': f'Gênero {"Masculino" if g.genero == "M" else "Feminino"} - Maior Incidência',
+                                'descricao': f'{pct:.1f}% dos atestados são de funcionários do sexo {"masculino" if g.genero == "M" else "feminino"}',
+                                'recomendacao': 'Investigar possíveis causas específicas deste grupo'
+                            })
+            except Exception as e:
+                print(f"Erro ao gerar insight de gênero: {e}")
         
         # 4. Tendência mensal
         ultimos_meses = self.db.query(

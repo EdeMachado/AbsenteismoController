@@ -431,6 +431,9 @@ function renderizarCards() {
                         <button type="button" class="btn-card btn-card-info" onclick="event.stopPropagation(); configurarMapeamento(${cliente.id})" title="Configurar Mapeamento de Planilha">
                             <i class="fas fa-table-columns"></i>
                         </button>
+                        <button type="button" class="btn-card btn-card-success" onclick="event.stopPropagation(); configurarGraficos(${cliente.id})" title="Configurar Gráficos Personalizados">
+                            <i class="fas fa-chart-bar"></i>
+                        </button>
                         <button type="button" class="btn-card ${actionClass}" onclick="event.stopPropagation(); confirmarDeletar(${cliente.id})" title="${actionLabel}">
                             <i class="fas ${actionIcon}"></i>
                         </button>
@@ -805,6 +808,22 @@ function abrirModalNovo() {
     document.getElementById('formCliente').reset();
     document.getElementById('clienteId').value = '';
     resetLogoPreview('', gerarIniciais('Novo Cliente'));
+    
+    // Inicializa cores para novo cliente
+    setTimeout(() => {
+        sincronizarCores();
+        aplicarCoresPadrao();
+        // Scroll para a seção de cores se existir
+        const secaoCores = document.getElementById('secaoCores');
+        if (secaoCores) {
+            setTimeout(() => {
+                secaoCores.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 500);
+        } else {
+            console.warn('Seção de cores não encontrada!');
+        }
+    }, 300);
+    
     document.getElementById('modalCliente').classList.add('show');
     document.getElementById('cnpj').focus();
 }
@@ -851,6 +870,21 @@ async function carregarDadosCliente(id) {
 
         const iniciaisLogo = gerarIniciais(cliente.nome_fantasia || cliente.nome || '');
         resetLogoPreview(cliente.logo_url || '', iniciaisLogo);
+        
+        // Carrega cores do cliente
+        setTimeout(() => {
+            sincronizarCores();
+            carregarCoresClienteModal(id);
+            // Scroll para a seção de cores se existir
+            const secaoCores = document.getElementById('secaoCores');
+            if (secaoCores) {
+                setTimeout(() => {
+                    secaoCores.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 500);
+            } else {
+                console.warn('Seção de cores não encontrada!');
+            }
+        }, 300);
         
         document.getElementById('modalCliente').classList.add('show');
     } catch (error) {
@@ -1137,4 +1171,162 @@ window.confirmarDeletar = confirmarDeletar;
 window.abrirModalNovo = abrirModalNovo;
 window.arquivarCliente = arquivarCliente;
 window.removerLogoSelecionado = removerLogoSelecionado;
+
+// ==================== GERENCIAMENTO DE CORES ====================
+function sincronizarCores() {
+    console.log('Sincronizando cores...');
+    // Sincroniza color picker com text input
+    const cores = ['Primary', 'PrimaryDark', 'PrimaryLight', 'Secondary', 'SecondaryDark', 'SecondaryLight'];
+    let encontrados = 0;
+    cores.forEach(cor => {
+        const picker = document.getElementById(`cor${cor}`);
+        const text = document.getElementById(`cor${cor}Text`);
+        if (picker && text) {
+            encontrados++;
+            // Remove listeners antigos se existirem
+            const novoPicker = picker.cloneNode(true);
+            picker.parentNode.replaceChild(novoPicker, picker);
+            const novoText = text.cloneNode(true);
+            text.parentNode.replaceChild(novoText, text);
+            
+            // Adiciona novos listeners
+            novoPicker.addEventListener('input', (e) => {
+                novoText.value = e.target.value.toUpperCase();
+            });
+            novoText.addEventListener('input', (e) => {
+                const valor = e.target.value;
+                if (/^#[0-9A-F]{6}$/i.test(valor)) {
+                    novoPicker.value = valor;
+                }
+            });
+        }
+    });
+    console.log(`Elementos de cores encontrados: ${encontrados}/${cores.length}`);
+}
+
+async function carregarCoresClienteModal(clienteId) {
+    console.log('Carregando cores para cliente:', clienteId);
+    
+    // Verifica se os elementos existem
+    const corPrimary = document.getElementById('corPrimary');
+    if (!corPrimary) {
+        console.error('Elementos de cores não encontrados no DOM!');
+        return;
+    }
+    
+    if (!clienteId) {
+        aplicarCoresPadrao();
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/clientes/${clienteId}/cores`);
+        if (!response.ok) {
+            aplicarCoresPadrao();
+            return;
+        }
+        
+        const data = await response.json();
+        if (data.success && data.cores) {
+            document.getElementById('corPrimary').value = data.cores.primary || '#1a237e';
+            document.getElementById('corPrimaryText').value = (data.cores.primary || '#1a237e').toUpperCase();
+            document.getElementById('corPrimaryDark').value = data.cores.primaryDark || '#0d47a1';
+            document.getElementById('corPrimaryDarkText').value = (data.cores.primaryDark || '#0d47a1').toUpperCase();
+            document.getElementById('corPrimaryLight').value = data.cores.primaryLight || '#3949ab';
+            document.getElementById('corPrimaryLightText').value = (data.cores.primaryLight || '#3949ab').toUpperCase();
+            document.getElementById('corSecondary').value = data.cores.secondary || '#556B2F';
+            document.getElementById('corSecondaryText').value = (data.cores.secondary || '#556B2F').toUpperCase();
+            document.getElementById('corSecondaryDark').value = data.cores.secondaryDark || '#4a5d23';
+            document.getElementById('corSecondaryDarkText').value = (data.cores.secondaryDark || '#4a5d23').toUpperCase();
+            document.getElementById('corSecondaryLight').value = data.cores.secondaryLight || '#6B8E23';
+            document.getElementById('corSecondaryLightText').value = (data.cores.secondaryLight || '#6B8E23').toUpperCase();
+            console.log('Cores carregadas com sucesso');
+        } else {
+            aplicarCoresPadrao();
+        }
+    } catch (error) {
+        console.error('Erro ao carregar cores:', error);
+        aplicarCoresPadrao();
+    }
+}
+
+function aplicarCoresPadrao() {
+    document.getElementById('corPrimary').value = '#1a237e';
+    document.getElementById('corPrimaryText').value = '#1A237E';
+    document.getElementById('corPrimaryDark').value = '#0d47a1';
+    document.getElementById('corPrimaryDarkText').value = '#0D47A1';
+    document.getElementById('corPrimaryLight').value = '#3949ab';
+    document.getElementById('corPrimaryLightText').value = '#3949AB';
+    document.getElementById('corSecondary').value = '#556B2F';
+    document.getElementById('corSecondaryText').value = '#556B2F';
+    document.getElementById('corSecondaryDark').value = '#4a5d23';
+    document.getElementById('corSecondaryDarkText').value = '#4A5D23';
+    document.getElementById('corSecondaryLight').value = '#6B8E23';
+    document.getElementById('corSecondaryLightText').value = '#6B8E23';
+}
+
+async function salvarCoresCliente() {
+    const clienteId = document.getElementById('clienteId').value;
+    if (!clienteId) {
+        alert('Salve o cliente primeiro antes de configurar as cores');
+        return;
+    }
+    
+    const cores = {
+        primary: document.getElementById('corPrimary').value,
+        primaryDark: document.getElementById('corPrimaryDark').value,
+        primaryLight: document.getElementById('corPrimaryLight').value,
+        secondary: document.getElementById('corSecondary').value,
+        secondaryDark: document.getElementById('corSecondaryDark').value,
+        secondaryLight: document.getElementById('corSecondaryLight').value,
+        // Gera paleta automaticamente
+        paleta: [
+            document.getElementById('corPrimary').value,
+            document.getElementById('corSecondary').value,
+            document.getElementById('corPrimaryDark').value,
+            document.getElementById('corSecondaryLight').value,
+            document.getElementById('corPrimaryLight').value,
+            document.getElementById('corSecondaryDark').value
+        ]
+    };
+    
+    try {
+        const response = await fetch(`/api/clientes/${clienteId}/cores`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ cores })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao salvar cores');
+        }
+        
+        const data = await response.json();
+        if (data.success) {
+            alert('Cores salvas com sucesso! Os gráficos serão atualizados automaticamente.');
+            // Recarrega cores se o cliente estiver selecionado
+            if (typeof carregarCoresCliente === 'function') {
+                await carregarCoresCliente(clienteId);
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao salvar cores:', error);
+        alert('Erro ao salvar cores. Tente novamente.');
+    }
+}
+
+// Sincroniza cores quando cria novo cliente
+const originalAbrirModalNovo = window.abrirModalNovo;
+window.abrirModalNovo = function() {
+    originalAbrirModalNovo();
+    setTimeout(() => {
+        sincronizarCores();
+        aplicarCoresPadrao();
+    }, 100);
+};
+
+window.aplicarCoresPadrao = aplicarCoresPadrao;
+window.salvarCoresCliente = salvarCoresCliente;
 
