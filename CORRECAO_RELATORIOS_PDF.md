@@ -41,9 +41,14 @@
 
 ---
 
-## ⚠️ PROBLEMA PERSISTENTE
+## ✅ PROBLEMA RESOLVIDO!
 
-O PDF ainda aparece como "danificado" no Adobe Acrobat Reader mesmo após todas as correções.
+**Data da correção:** 14/11/2025  
+**Causa raiz identificada:** Passar `None` para `onFirstPage` e `onLaterPages` no `doc.build()` causava erro `TypeError: 'NoneType' object is not callable`
+
+**Solução:** Removidos os parâmetros `onFirstPage=None, onLaterPages=None` do `doc.build()`
+
+**Teste com dados reais:** ✅ PDF gerado com sucesso (557564 bytes, header válido)
 
 ### ✅ TESTES REALIZADOS (14/11/2025):
 1. **PDF Mínimo** - ✅ Funciona (2025 bytes, header válido)

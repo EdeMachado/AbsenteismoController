@@ -1272,8 +1272,8 @@ class ReportGenerator:
                         bottomMargin=2*cm
                     )
                     
-                    # Gera PDF no arquivo temporário
-                    doc_temp.build(story, onFirstPage=None, onLaterPages=None)
+                    # Gera PDF no arquivo temporário (sem callbacks de página)
+                    doc_temp.build(story)
                     
                     # Fecha explicitamente
                     del doc_temp
