@@ -45,11 +45,19 @@
 
 O PDF ainda aparece como "danificado" no Adobe Acrobat Reader mesmo após todas as correções.
 
-### Possíveis Causas:
-1. **Problema com reportlab/SimpleDocTemplate** - Pode haver incompatibilidade de versão
-2. **Caracteres especiais não tratados** - Pode haver caracteres problemáticos nos dados
-3. **Problema com imagens matplotlib** - Gráficos podem estar corrompendo o PDF
-4. **Encoding/Charset** - Problema de encoding ao escrever o arquivo
+### ✅ TESTES REALIZADOS (14/11/2025):
+1. **PDF Mínimo** - ✅ Funciona (2025 bytes, header válido)
+2. **PDF com Imagem** - ✅ Funciona (48836 bytes, header válido)
+3. **PDF Relatório Simulado** - ✅ Funciona (50809 bytes, header válido)
+
+### 🔍 CONCLUSÃO DOS TESTES:
+**A estrutura básica do PDF funciona corretamente!**
+
+O problema provavelmente está em:
+1. **Dados específicos da Roda de Ouro** - Caracteres problemáticos ou valores inválidos
+2. **Gráfico específico** - Algum gráfico pode estar gerando imagem corrompida
+3. **Volume de dados** - Muitos gráficos podem estar causando problema
+4. **Estruturas dict complexas** - Dados específicos da Roda de Ouro (dias_ano_coerencia, analise_coerencia)
 
 ---
 
