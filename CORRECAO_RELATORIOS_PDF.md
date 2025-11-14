@@ -3,7 +3,7 @@
 ## 📋 STATUS ATUAL
 **Data:** 14/11/2025  
 **Problema:** PDF gerado aparece como "danificado" no Adobe Acrobat Reader  
-**Status:** ⚠️ **AINDA NÃO RESOLVIDO** - Requer investigação adicional
+**Status:** ⚠️ **AINDA NÃO RESOLVIDO** - Correção aplicada mas PDF ainda não abre corretamente
 
 ---
 
@@ -41,14 +41,16 @@
 
 ---
 
-## ✅ PROBLEMA RESOLVIDO!
+## ⚠️ CORREÇÃO PARCIAL APLICADA
 
-**Data da correção:** 14/11/2025  
+**Data:** 14/11/2025  
 **Causa raiz identificada:** Passar `None` para `onFirstPage` e `onLaterPages` no `doc.build()` causava erro `TypeError: 'NoneType' object is not callable`
 
-**Solução:** Removidos os parâmetros `onFirstPage=None, onLaterPages=None` do `doc.build()`
+**Solução aplicada:** Removidos os parâmetros `onFirstPage=None, onLaterPages=None` do `doc.build()`
 
-**Teste com dados reais:** ✅ PDF gerado com sucesso (557564 bytes, header válido)
+**Resultado:** PDF é gerado sem erro (557564 bytes, header válido), mas **AINDA NÃO ABRE** no Adobe Acrobat Reader
+
+**Status:** ⚠️ **PROBLEMA PERSISTE** - PDF é gerado mas aparece como danificado
 
 ### ✅ TESTES REALIZADOS (14/11/2025):
 1. **PDF Mínimo** - ✅ Funciona (2025 bytes, header válido)
@@ -93,11 +95,28 @@ O problema provavelmente está em:
 
 ---
 
-## 🚨 AÇÃO NECESSÁRIA
+## 🚨 AÇÃO NECESSÁRIA - URGENTE
 
-**URGENTE:** Investigar por que o PDF ainda está corrompido mesmo após todas as correções implementadas.
+**PROBLEMA:** PDF é gerado (557KB, header válido) mas **NÃO ABRE** no Adobe Acrobat Reader - aparece como "danificado"
 
-**Alternativa:** Considerar usar biblioteca diferente para geração de PDF ou gerar HTML e converter para PDF.
+**POSSÍVEIS CAUSAS:**
+1. **Problema com reportlab versão** - Pode haver incompatibilidade
+2. **Estrutura do PDF corrompida** - Apesar do header válido, estrutura interna pode estar errada
+3. **Problema com imagens matplotlib** - Gráficos podem estar corrompendo estrutura interna
+4. **Encoding/Charset** - Problema de encoding ao escrever conteúdo
+
+**AÇÕES IMEDIATAS:**
+1. ✅ Testar PDF mínimo - FUNCIONA
+2. ✅ Testar PDF com imagem - FUNCIONA  
+3. ✅ Testar PDF relatório simulado - FUNCIONA
+4. ⚠️ Testar PDF com dados reais - GERA mas NÃO ABRE
+5. 🔄 **PRÓXIMO:** Testar versão diferente do reportlab ou usar biblioteca alternativa
+
+**ALTERNATIVAS:**
+- Usar `fpdf` ou `fpdf2` (mais simples, menos recursos)
+- Usar `weasyprint` (HTML para PDF)
+- Usar `xhtml2pdf` (HTML para PDF)
+- Gerar HTML e usar `wkhtmltopdf` ou `puppeteer`
 
 ---
 
