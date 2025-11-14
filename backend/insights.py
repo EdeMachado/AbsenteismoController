@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any
 from .models import Atestado, Upload
+import json
 
 class InsightsEngine:
     """Engine de geração de insights"""
@@ -15,93 +16,194 @@ class InsightsEngine:
     def _verificar_campo_disponivel(self, client_id: int, campo: str) -> bool:
         """Verifica se um campo tem dados disponíveis para o cliente"""
         try:
+            print(f"[INSIGHTS DEBUG] Verificando campo '{campo}' para client_id={client_id}")
             amostra = self.db.query(Atestado).join(Upload).filter(
                 Upload.client_id == client_id
             ).limit(100).all()
             
+            print(f"[INSIGHTS DEBUG] Amostra encontrada: {len(amostra)} registros para client_id={client_id}")
+            
             if not amostra:
+                print(f"[INSIGHTS DEBUG] Nenhuma amostra encontrada para client_id={client_id}")
                 return False
             
-            return any(
+            tem_campo = any(
                 getattr(reg, campo, None) not in (None, '', 0, 0.0) 
                 for reg in amostra
             )
-        except:
+            print(f"[INSIGHTS DEBUG] Campo '{campo}' {'disponível' if tem_campo else 'não disponível'} para client_id={client_id}")
+            return tem_campo
+        except Exception as e:
+            print(f"[INSIGHTS DEBUG] Erro ao verificar campo '{campo}' para client_id={client_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _verificar_coluna_original(self, client_id: int, nomes_colunas: List[str]) -> bool:
+        """Verifica se há uma coluna específica nos dados originais da planilha"""
+        try:
+            import json
+            amostra = self.db.query(Atestado.dados_originais).join(Upload).filter(
+                Upload.client_id == client_id,
+                Atestado.dados_originais.isnot(None)
+            ).limit(10).all()
+            
+            if not amostra:
+                return False
+            
+            # Verifica se alguma das colunas existe nos dados originais
+            for row in amostra:
+                if row[0]:
+                    try:
+                        dados = json.loads(row[0])
+                        # Verifica se alguma das colunas procuradas existe (case-insensitive)
+                        for col_original in dados.keys():
+                            col_upper = col_original.upper()
+                            for nome_procurado in nomes_colunas:
+                                if nome_procurado.upper() in col_upper or col_upper in nome_procurado.upper():
+                                    print(f"[INSIGHTS] Coluna de gênero encontrada nos dados originais: '{col_original}'")
+                                    return True
+                    except:
+                        continue
+            
+            return False
+        except Exception as e:
+            print(f"[INSIGHTS] Erro ao verificar coluna original: {e}")
             return False
     
     def gerar_insights(self, client_id: int) -> List[Dict[str, Any]]:
         """Gera insights automáticos baseados nos campos disponíveis"""
         insights = []
         
-        # 1. TOP CID mais frequente (só se tiver campo CID)
-        if self._verificar_campo_disponivel(client_id, 'cid') or self._verificar_campo_disponivel(client_id, 'diagnostico'):
-            try:
-                top_cid = self.db.query(
-                    Atestado.cid,
-                    Atestado.diagnostico,
-                    func.count(Atestado.id).label('qtd')
-                ).join(Upload).filter(
-                    Upload.client_id == client_id,
-                    Atestado.cid != '',
-                    Atestado.cid.isnot(None)
-                ).group_by(Atestado.cid, Atestado.diagnostico).order_by(func.count(Atestado.id).desc()).first()
+        # 1. Doença mais frequente - USA OS MESMOS DADOS DO GRÁFICO
+        # Para Roda de Ouro: usa classificacao_doencas_roda_ouro (por nome da doença)
+        # Para outros: usa top_cids (por CID)
+        try:
+            from .analytics import Analytics
+            analytics = Analytics(self.db)
+            
+            # RODA DE OURO: usa classificação por doença (mesma do gráfico)
+            if client_id == 4:
+                print(f"[INSIGHTS DEBUG] Gerando insight de doença para RODA DE OURO (client_id={client_id})")
+                doencas_list = analytics.classificacao_doencas_roda_ouro(client_id, limit=1)
                 
-                if top_cid and top_cid.qtd > 0:
+                if doencas_list and len(doencas_list) > 0:
+                    top_doenca_data = doencas_list[0]  # Primeiro item (mais dias)
+                    nome_doenca = top_doenca_data.get('tipo_doenca', 'Não informado')
+                    dias_doenca = top_doenca_data.get('quantidade', 0)
+                    
+                    print(f"[INSIGHTS DEBUG] TOP Doença RO encontrada: {nome_doenca}, {int(dias_doenca)} dias")
+                    
+                    # Calcula total de dias para percentual
+                    total_dias = self.db.query(
+                        func.sum(Atestado.dias_atestados)
+                    ).join(Upload).filter(
+                        Upload.client_id == client_id,
+                        Atestado.dias_atestados > 0
+                    ).scalar() or 0
+                    
+                    pct_dias = (dias_doenca / total_dias * 100) if total_dias > 0 else 0
+                    
                     insights.append({
                         'tipo': 'alerta',
                         'icone': '🩺',
-                        'titulo': f'CID {top_cid.cid} - Mais Frequente',
-                        'descricao': f'{top_cid.diagnostico or "Doença não especificada"} aparece em {top_cid.qtd} atestados ({self._percentual(top_cid.qtd, client_id)}% do total)',
-                        'recomendacao': self._get_recomendacao_cid(top_cid.cid)
+                        'titulo': f'Doença com Maior Impacto',
+                        'descricao': f'{nome_doenca} apresenta {int(dias_doenca)} dias de afastamento ({pct_dias:.1f}% do total de dias perdidos)',
+                        'recomendacao': 'Desenvolver programa de prevenção específico para esta condição, incluindo ações educativas e acompanhamento médico especializado'
                     })
-            except Exception as e:
-                print(f"Erro ao gerar insight de CID: {e}")
+                else:
+                    print(f"[INSIGHTS DEBUG] Nenhuma doença encontrada para RODA DE OURO")
+            else:
+                # OUTROS CLIENTES: usa top_cids (por CID)
+                print(f"[INSIGHTS DEBUG] Gerando insight de CID para client_id={client_id}")
+                top_cids_list = analytics.top_cids(client_id, limit=1)
+                
+                if top_cids_list and len(top_cids_list) > 0:
+                    top_cid_data = top_cids_list[0]
+                    cid = top_cid_data.get('cid')
+                    diagnostico = top_cid_data.get('descricao', '')
+                    quantidade = top_cid_data.get('quantidade', 0)
+                    dias_perdidos = top_cid_data.get('dias_perdidos', 0)
+                    
+                    print(f"[INSIGHTS DEBUG] TOP CID encontrado: CID={cid}, Qtd={quantidade}, Diagnóstico={diagnostico}")
+                    
+                    diagnostico_texto = diagnostico
+                    if not diagnostico_texto or diagnostico_texto.strip() == '' or diagnostico_texto == 'Não informado':
+                        diagnostico_texto = self._get_descricao_cid(cid)
+                    
+                    dias_perdidos_texto = f" e {int(dias_perdidos)} dias de afastamento" if dias_perdidos and dias_perdidos > 0 else ""
+                    
+                    insights.append({
+                        'tipo': 'alerta',
+                        'icone': '🩺',
+                        'titulo': f'CID {cid} - Mais Frequente',
+                        'descricao': f'{diagnostico_texto} aparece em {quantidade} atestados ({self._percentual(quantidade, client_id)}% do total){dias_perdidos_texto}',
+                        'recomendacao': self._get_recomendacao_cid(cid)
+                    })
+                else:
+                    print(f"[INSIGHTS DEBUG] Nenhum CID encontrado para client_id={client_id}")
+        except Exception as e:
+            print(f"Erro ao gerar insight de doença/CID: {e}")
+            import traceback
+            traceback.print_exc()
         
-        # 2. Setor com mais atestados (só se tiver campo setor)
+        # 2. Setor com mais atestados (usa a mesma lógica do gráfico para garantir consistência)
         if self._verificar_campo_disponivel(client_id, 'setor'):
             try:
-                top_setor = self.db.query(
-                    Atestado.setor,
-                    func.count(Atestado.id).label('qtd')
-                ).join(Upload).filter(
-                    Upload.client_id == client_id,
-                    Atestado.setor != ''
-                ).group_by(Atestado.setor).order_by(func.count(Atestado.id).desc()).first()
+                # USA A MESMA FUNÇÃO DO GRÁFICO para garantir que o insight sempre bata com o gráfico
+                from .analytics import Analytics
+                analytics = Analytics(self.db)
+                top_setores_list = analytics.top_setores(client_id, limit=1)  # Pega apenas o primeiro (mais frequente)
                 
-                if top_setor and top_setor.qtd > 0:
+                if top_setores_list and len(top_setores_list) > 0:
+                    top_setor_data = top_setores_list[0]  # Primeiro item da lista (mais frequente)
+                    setor = top_setor_data.get('setor')
+                    quantidade = top_setor_data.get('quantidade', 0)
+                    dias_perdidos = top_setor_data.get('dias_perdidos', 0)
+                    
+                    dias_texto = f" e {int(dias_perdidos)} dias de afastamento" if dias_perdidos and dias_perdidos > 0 else ""
+                    
                     insights.append({
                         'tipo': 'atencao',
                         'icone': '🏢',
-                        'titulo': f'Setor {top_setor.setor} - Maior Índice',
-                        'descricao': f'{top_setor.qtd} atestados registrados ({self._percentual(top_setor.qtd, client_id)}% do total)',
+                        'titulo': f'Setor {setor} - Maior Índice',
+                        'descricao': f'{quantidade} atestados registrados ({self._percentual(quantidade, client_id)}% do total){dias_texto}',
                         'recomendacao': 'Avaliar condições de trabalho e ergonomia neste setor'
                     })
             except Exception as e:
                 print(f"Erro ao gerar insight de setor: {e}")
         
-        # 3. Análise de gênero (só se tiver campo genero)
+        # 3. Análise de gênero (só se tiver campo genero E se vier da planilha, não detectado automaticamente)
+        # Verifica se há coluna de gênero nos dados originais (não apenas detecção automática)
         if self._verificar_campo_disponivel(client_id, 'genero'):
             try:
-                generos = self.db.query(
-                    Atestado.genero,
-                    func.count(Atestado.id).label('qtd')
-                ).join(Upload).filter(
-                    Upload.client_id == client_id,
-                    Atestado.genero != ''
-                ).group_by(Atestado.genero).all()
+                # Verifica se há coluna de gênero nos dados originais
+                tem_coluna_genero = self._verificar_coluna_original(client_id, ['genero', 'gênero', 'sexo', 'gender'])
                 
-                if len(generos) >= 2:
-                    total = sum(g.qtd for g in generos)
-                    for g in generos:
-                        pct = (g.qtd / total * 100) if total > 0 else 0
-                        if pct > 60:
-                            insights.append({
-                                'tipo': 'info',
-                                'icone': '👥',
-                                'titulo': f'Gênero {"Masculino" if g.genero == "M" else "Feminino"} - Maior Incidência',
-                                'descricao': f'{pct:.1f}% dos atestados são de funcionários do sexo {"masculino" if g.genero == "M" else "feminino"}',
-                                'recomendacao': 'Investigar possíveis causas específicas deste grupo'
-                            })
+                if not tem_coluna_genero:
+                    # Se não tem coluna de gênero na planilha, não mostra insight (é detecção automática)
+                    print(f"[INSIGHTS] Gênero detectado automaticamente, mas não há coluna na planilha. Pulando insight de gênero.")
+                else:
+                    generos = self.db.query(
+                        Atestado.genero,
+                        func.count(Atestado.id).label('qtd')
+                    ).join(Upload).filter(
+                        Upload.client_id == client_id,
+                        Atestado.genero != ''
+                    ).group_by(Atestado.genero).all()
+                    
+                    if len(generos) >= 2:
+                        total = sum(g.qtd for g in generos)
+                        for g in generos:
+                            pct = (g.qtd / total * 100) if total > 0 else 0
+                            if pct > 60:
+                                insights.append({
+                                    'tipo': 'info',
+                                    'icone': '👥',
+                                    'titulo': f'Gênero {"Masculino" if g.genero == "M" else "Feminino"} - Maior Incidência',
+                                    'descricao': f'{pct:.1f}% dos atestados são de funcionários do sexo {"masculino" if g.genero == "M" else "feminino"}',
+                                    'recomendacao': 'Investigar possíveis causas específicas deste grupo'
+                                })
             except Exception as e:
                 print(f"Erro ao gerar insight de gênero: {e}")
         
@@ -127,7 +229,33 @@ class InsightsEngine:
                     'recomendacao': 'Monitorar nos próximos meses' if variacao > 0 else 'Manter as ações atuais'
                 })
         
-        # 5. Dias perdidos alto
+        # 5. Funcionário com mais atestados (usa a mesma lógica do gráfico para garantir consistência)
+        if self._verificar_campo_disponivel(client_id, 'nomecompleto') or self._verificar_campo_disponivel(client_id, 'nome_funcionario'):
+            try:
+                # USA A MESMA FUNÇÃO DO GRÁFICO para garantir que o insight sempre bata com o gráfico
+                from .analytics import Analytics
+                analytics = Analytics(self.db)
+                top_funcionarios_list = analytics.top_funcionarios(client_id, limit=1)  # Pega apenas o primeiro (mais frequente)
+                
+                if top_funcionarios_list and len(top_funcionarios_list) > 0:
+                    top_funcionario_data = top_funcionarios_list[0]  # Primeiro item da lista (mais frequente)
+                    nome = top_funcionario_data.get('nome', 'N/A')
+                    quantidade = top_funcionario_data.get('quantidade', 0)
+                    dias_perdidos = top_funcionario_data.get('dias_perdidos', 0)
+                    
+                    dias_texto = f" e {int(dias_perdidos)} dias de afastamento" if dias_perdidos and dias_perdidos > 0 else ""
+                    
+                    insights.append({
+                        'tipo': 'atencao',
+                        'icone': '👤',
+                        'titulo': f'Funcionário com Mais Atestados',
+                        'descricao': f'{nome} registrou {quantidade} atestados ({self._percentual(quantidade, client_id)}% do total){dias_texto}',
+                        'recomendacao': 'Acompanhar individualmente este funcionário e avaliar necessidade de apoio médico ou psicológico'
+                    })
+            except Exception as e:
+                print(f"Erro ao gerar insight de funcionário: {e}")
+        
+        # 6. Dias perdidos alto
         total_dias = self.db.query(
             func.sum(Atestado.dias_atestados)
         ).join(Upload).filter(
@@ -144,6 +272,30 @@ class InsightsEngine:
                 'recomendacao': 'Implementar programa de saúde preventiva e qualidade de vida'
             })
         
+        # 7. Análise de Tempo de Serviço (especialmente para RODA DE OURO)
+        if client_id == 4:  # RODA DE OURO
+            try:
+                from .analytics import Analytics
+                analytics = Analytics(self.db)
+                tempo_servico = analytics.tempo_servico_atestados(client_id)
+                
+                if tempo_servico and len(tempo_servico) > 0:
+                    # Encontra a faixa com mais dias
+                    faixa_mais_dias = max(tempo_servico, key=lambda x: x.get('dias_afastamento', 0))
+                    total_dias_tempo = sum(t.get('dias_afastamento', 0) for t in tempo_servico)
+                    pct = (faixa_mais_dias.get('dias_afastamento', 0) / total_dias_tempo * 100) if total_dias_tempo > 0 else 0
+                    
+                    if pct > 30:  # Se uma faixa concentra mais de 30% dos dias
+                        insights.append({
+                            'tipo': 'info',
+                            'icone': '⏱️',
+                            'titulo': f'Funcionários com {faixa_mais_dias.get("faixa_tempo_servico", "N/A")} - Maior Incidência',
+                            'descricao': f'{pct:.1f}% dos dias de afastamento ({int(faixa_mais_dias.get("dias_afastamento", 0))} dias) concentram-se em funcionários com {faixa_mais_dias.get("faixa_tempo_servico", "N/A")} de empresa',
+                            'recomendacao': 'Avaliar se funcionários mais antigos ou mais novos precisam de atenção especial em programas de saúde ocupacional'
+                        })
+            except Exception as e:
+                print(f"Erro ao gerar insight de tempo de serviço: {e}")
+        
         return insights
     
     def _percentual(self, valor: int, client_id: int) -> float:
@@ -153,6 +305,33 @@ class InsightsEngine:
         ).scalar() or 1
         
         return round((valor / total * 100), 1)
+    
+    def _get_descricao_cid(self, cid: str) -> str:
+        """Retorna descrição mais específica baseada no CID"""
+        descricoes = {
+            'A09': 'Gastroenterite e colite de origem infecciosa',
+            'J11': 'Influenza (gripe)',
+            'J06': 'Infecções agudas das vias aéreas superiores',
+            'J069': 'Infecção aguda das vias aéreas superiores não especificada',
+            'M54': 'Dorsalgia (dor nas costas)',
+            'M54.5': 'Cervicalgia (dor no pescoço)',
+            'M79': 'Outros transtornos dos tecidos moles',
+            'M796': 'Dor em membro',
+            'M650': 'Tenossinovite estenosante',
+            'R51': 'Cefaleia (dor de cabeça)',
+            'Z00': 'Exame médico geral',
+            'Z00.8': 'Outros exames médicos gerais',
+        }
+        
+        # Tenta primeiro o CID completo, depois os primeiros 3 caracteres
+        if cid in descricoes:
+            return descricoes[cid]
+        
+        cid_grupo = cid[:3] if cid else ''
+        if cid_grupo in descricoes:
+            return descricoes[cid_grupo]
+        
+        return f'Doença relacionada ao CID {cid}'
     
     def _get_recomendacao_cid(self, cid: str) -> str:
         """Retorna recomendação baseada no CID"""
@@ -164,6 +343,8 @@ class InsightsEngine:
             'K29': 'Orientar sobre alimentação saudável',
             'F32': 'Implementar programa de saúde mental',
             'M79': 'Avaliar ergonomia e pausas durante o trabalho',
+            'J11': 'Reforçar medidas de prevenção de gripe e vacinação',
+            'J06': 'Melhorar higiene e ventilação dos ambientes',
         }
         
         # Pega primeiros 3 caracteres do CID
@@ -389,7 +570,175 @@ Esta análise permite identificar padrões específicos por setor e gênero, ori
 💡 **Recomendação**: Investigar causas específicas da diferença observada e desenvolver ações preventivas considerando as particularidades de cada grupo."""
             else:
                 analise = "Não foi possível identificar padrões significativos na distribuição por setor e gênero."
+        
+        elif tipo_grafico == 'tempo_servico_atestados':
+            if not dados or len(dados) == 0:
+                return "Não há dados suficientes para análise."
             
+            # Encontra faixa com mais dias
+            faixa_mais_dias = max(dados, key=lambda x: x.get('dias_afastamento', 0))
+            total_dias = sum(d.get('dias_afastamento', 0) for d in dados)
+            pct = (faixa_mais_dias.get('dias_afastamento', 0) / total_dias * 100) if total_dias > 0 else 0
+            
+            analise = f"""⏱️ **Análise: Tempo Serviço x Atestados**
+
+Funcionários com **{faixa_mais_dias.get('faixa_tempo_servico', 'N/A')}** de empresa apresentam o maior índice de dias de afastamento, com **{int(faixa_mais_dias.get('dias_afastamento', 0))} dias ({pct:.1f}% do total)** e **{faixa_mais_dias.get('quantidade_atestados', 0)} atestados**.
+
+Esta análise permite identificar se funcionários mais antigos (com mais tempo na empresa) ou mais novos (recém-admitidos) apresentam maior incidência de atestados.
+
+💡 **Recomendação**: Desenvolver programas de saúde ocupacional específicos conforme o tempo de serviço, considerando as necessidades de cada grupo (integração para novos funcionários, prevenção de doenças ocupacionais para funcionários mais antigos)."""
+        
+        elif tipo_grafico == 'classificacao_funcionarios_ro':
+            if not dados or len(dados) == 0:
+                return "Não há dados suficientes para análise."
+            
+            top = dados[0]
+            top5_total = sum(d.get('quantidade', 0) for d in dados[:5])
+            total_dias = metricas.get('total_dias_perdidos', 0) if metricas else top5_total
+            pct_top5 = (top5_total / total_dias * 100) if total_dias > 0 else 0
+            
+            analise = f"""👤 **Análise: Classificação por Funcionário**
+
+O funcionário **{top.get('nome', 'N/A')}** apresenta **{int(top.get('quantidade', 0))} dias de atestados**, representando o maior índice individual de afastamento.
+
+Os **5 funcionários com maior incidência** concentram **{pct_top5:.1f}%** do total de dias perdidos, indicando necessidade de foco em ações preventivas específicas para este grupo.
+
+💡 **Recomendação**: Implementar programa de acompanhamento individualizado para funcionários com alto índice de absenteísmo, incluindo avaliação de saúde ocupacional e apoio multidisciplinar."""
+        
+        elif tipo_grafico == 'classificacao_setores_ro':
+            if not dados or len(dados) == 0:
+                return "Não há dados suficientes para análise."
+            
+            top = dados[0]
+            total_dias = sum(d.get('dias_afastamento', 0) for d in dados)
+            pct = (top.get('dias_afastamento', 0) / total_dias * 100) if total_dias > 0 else 0
+            
+            analise = f"""🏢 **Análise: Classificação por Setor**
+
+O setor **{top.get('setor', 'N/A')}** apresenta o maior índice de dias de afastamento, com **{int(top.get('dias_afastamento', 0))} dias ({pct:.1f}% do total)**.
+
+Esta concentração pode indicar questões específicas relacionadas a condições de trabalho, carga horária, ergonomia ou fatores organizacionais deste setor.
+
+💡 **Recomendação**: Realizar avaliação detalhada das condições de trabalho no setor, incluindo análise ergonômica, gestão de carga de trabalho e programa de saúde ocupacional específico."""
+        
+        elif tipo_grafico == 'classificacao_doencas_ro':
+            # NOVA ANÁLISE - GARANTE 100% SINCRONIZAÇÃO COM O GRÁFICO
+            try:
+                # Validação inicial
+                if not dados:
+                    return "Não há dados suficientes para análise."
+                
+                # Converte para lista se necessário
+                if isinstance(dados, dict):
+                    dados_lista = [dados]
+                elif isinstance(dados, list):
+                    dados_lista = dados.copy()  # Cópia para não modificar original
+                else:
+                    dados_lista = list(dados) if dados else []
+                
+                if len(dados_lista) == 0:
+                    return "Não há dados suficientes para análise."
+                
+                # ORDENA EXATAMENTE COMO O GRÁFICO FAZ (por quantidade decrescente)
+                # Usa a mesma lógica do frontend: sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0))
+                dados_ordenados = sorted(
+                    dados_lista,
+                    key=lambda x: float(x.get('quantidade', 0) or 0),
+                    reverse=True
+                )
+                
+                # Pega o TOP 1 (mesmo que o gráfico mostra no topo)
+                top_doenca = dados_ordenados[0] if dados_ordenados else None
+                
+                if not top_doenca:
+                    return "Não há dados suficientes para análise."
+                
+                # Extrai dados da doença do topo
+                nome_doenca = top_doenca.get('tipo_doenca', 'Não informado')
+                dias_doenca = float(top_doenca.get('quantidade', 0) or 0)
+                
+                # Calcula total de dias de TODAS as doenças (mesmo conjunto do gráfico)
+                total_dias_todas = sum(float(d.get('quantidade', 0) or 0) for d in dados_ordenados)
+                
+                # Calcula percentual
+                percentual = (dias_doenca / total_dias_todas * 100) if total_dias_todas > 0 else 0
+                
+                # Pega TOP 3 para contexto
+                top3 = dados_ordenados[:3]
+                top3_info = []
+                for i, doenca in enumerate(top3, 1):
+                    nome = doenca.get('tipo_doenca', 'N/A')
+                    dias = float(doenca.get('quantidade', 0) or 0)
+                    pct_item = (dias / total_dias_todas * 100) if total_dias_todas > 0 else 0
+                    top3_info.append(f"{i}º: {nome} ({int(dias)} dias, {pct_item:.1f}%)")
+                
+                # LOG DETALHADO PARA DEBUG
+                print(f"[ANALISE DOENÇAS] ===== INÍCIO =====")
+                print(f"[ANALISE DOENÇAS] Total de doenças recebidas: {len(dados_lista)}")
+                print(f"[ANALISE DOENÇAS] Doença TOP 1: {nome_doenca} - {int(dias_doenca)} dias ({percentual:.1f}%)")
+                print(f"[ANALISE DOENÇAS] Total de dias (todas doenças): {int(total_dias_todas)}")
+                print(f"[ANALISE DOENÇAS] TOP 3: {', '.join(top3_info)}")
+                print(f"[ANALISE DOENÇAS] ===== FIM =====")
+                
+                # GERA ANÁLISE COMPLETA E PRECISA
+                analise = f"""🩺 **Análise: Classificação por Doença**
+
+**Doença com Maior Impacto:**
+A doença **{nome_doenca}** apresenta o maior número de dias de afastamento, com **{int(dias_doenca)} dias**, representando **{percentual:.1f}%** do total de dias perdidos por todas as doenças analisadas.
+
+**Contexto:**
+- Total de dias perdidos (todas doenças): **{int(total_dias_todas)} dias**
+- Doenças analisadas: **{len(dados_ordenados)}**
+- TOP 3 doenças concentram: **{sum(float(d.get('quantidade', 0) or 0) for d in top3) / total_dias_todas * 100 if total_dias_todas > 0 else 0:.1f}%** dos dias perdidos
+
+**Interpretação:**
+Esta análise identifica as condições de saúde que geram maior impacto em termos de tempo de afastamento, permitindo direcionar ações preventivas e de gestão de saúde ocupacional de forma estratégica.
+
+💡 **Recomendação**: Desenvolver programa de prevenção específico para **{nome_doenca}**, incluindo ações educativas, avaliações preventivas e acompanhamento médico especializado."""
+                
+                return analise
+                
+            except Exception as e:
+                import traceback
+                print(f"[ANALISE DOENÇAS] ERRO ao gerar análise: {e}")
+                traceback.print_exc()
+                return f"Erro ao gerar análise: {str(e)}"
+        
+        elif tipo_grafico == 'dias_ano_coerencia':
+            if not dados:
+                return "Não há dados suficientes para análise."
+            
+            # Usa dados mensais se disponíveis, senão usa anuais
+            usar_mensal = dados.get('meses') and len(dados.get('meses', [])) > 0
+            coerente_total = sum(dados.get('coerente_mensal', dados.get('coerente', [])) or [])
+            sem_coerencia_total = sum(dados.get('sem_coerencia_mensal', dados.get('sem_coerencia', [])) or [])
+            total = coerente_total + sem_coerencia_total
+            pct_coerente = (coerente_total / total * 100) if total > 0 else 0
+            pct_sem_coerencia = (sem_coerencia_total / total * 100) if total > 0 else 0
+            
+            analise = f"""📊 **Análise: Dias Atestados por Ano - Coerência**
+
+A análise de coerência mostra que **{pct_coerente:.1f}% dos dias ({int(coerente_total)} dias)** são de atestados **coerentes**, enquanto **{pct_sem_coerencia:.1f}% ({int(sem_coerencia_total)} dias)** são **sem coerência**.
+
+Esta análise permite identificar a qualidade e consistência dos atestados, orientando ações de gestão e controle.
+
+💡 **Recomendação**: Investigar causas dos atestados sem coerência e implementar ações para melhorar a qualidade e consistência dos registros."""
+        
+        elif tipo_grafico == 'analise_coerencia':
+            if not dados or dados.get('total', 0) == 0:
+                return "Não há dados suficientes para análise."
+            
+            pct_coerente = dados.get('percentual_coerente', 0)
+            pct_sem_coerencia = dados.get('percentual_sem_coerencia', 0)
+            
+            analise = f"""📊 **Análise: Análise Atestados - Coerência**
+
+A análise de coerência mostra que **{pct_coerente:.1f}% dos dias ({int(dados.get('coerente', 0))} dias)** são de atestados **coerentes**, enquanto **{pct_sem_coerencia:.1f}% ({int(dados.get('sem_coerencia', 0))} dias)** são **sem coerência**.
+
+Esta distribuição permite identificar a qualidade e consistência dos atestados, orientando ações de gestão e controle.
+
+💡 **Recomendação**: Investigar causas dos atestados sem coerência e implementar ações para melhorar a qualidade e consistência dos registros."""
+        
         else:
             analise = "Análise não disponível para este tipo de gráfico."
         

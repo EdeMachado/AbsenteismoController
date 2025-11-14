@@ -97,8 +97,10 @@ function renderSidebar() {
                     ${SIDEBAR_MENU_ITEMS.map(item => {
                         const itemPath = normalizePath(item.path);
                         const isActive = currentPath === itemPath || (itemPath !== '/' && currentPath.startsWith(itemPath));
+                        // Adiciona classe especial para Dashboard se for Roda de Ouro
+                        const isRodaOuroDashboard = clientId === 4 && item.label === 'Dashboard' && isActive;
                         return `
-                            <a href="${item.path}" class="nav-item${isActive ? ' active' : ''}">
+                            <a href="${item.path}" class="nav-item${isActive ? ' active' : ''}${isRodaOuroDashboard ? ' roda-ouro-dashboard' : ''}">
                                 <span class="nav-item-icon"><i class="${item.icon}"></i></span>
                                 <span class="nav-item-text">
                                     <span class="nav-item-title">${item.label}</span>
@@ -112,6 +114,19 @@ function renderSidebar() {
         </div>
         <div class="sidebar-bottom"></div>
     `;
+    
+    // Aplica cor dourada ao Dashboard se for Roda de Ouro
+    if (clientId === 4) {
+        setTimeout(() => {
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                const span = item.querySelector('.nav-item-title');
+                if (span && span.textContent.trim() === 'Dashboard' && item.classList.contains('active')) {
+                    item.classList.add('roda-ouro-dashboard');
+                }
+            });
+        }, 50);
+    }
 }
 
 // Verifica se está autenticado

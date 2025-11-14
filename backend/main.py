@@ -18,7 +18,7 @@ from collections import OrderedDict
 import pandas as pd
 
 from .database import get_db, init_db, run_migrations
-from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade
+from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade, ClientLogo, SavedFilter
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
@@ -145,13 +145,31 @@ async def startup_event():
     init_db()
     run_migrations()
     os.makedirs(LOGOS_DIR, exist_ok=True)
-    # Cria cliente padrão se não existir
     db = next(get_db())
-    client = db.query(Client).filter(Client.id == 1).first()
-    if not client:
-        client = Client(id=1, nome="GrupoBiomed", cnpj="00.000.000/0001-00")
-        db.add(client)
+    
+    # Remove cliente fictício GrupoBiomed se existir (não cria mais automaticamente)
+    from sqlalchemy import or_, func
+    client_grupobiomed = db.query(Client).filter(
+        or_(
+            func.lower(Client.nome).like("%grupobiomed%"),
+            func.lower(Client.nome_fantasia).like("%grupobiomed%"),
+            Client.nome == "GrupoBiomed",
+            Client.id == 1  # Remove também se for ID 1 (cliente padrão antigo)
+        )
+    ).first()
+    if client_grupobiomed:
+        # Deleta todos os dados relacionados primeiro
+        from .models import Atestado, Upload, ClientLogo, ClientColumnMapping, SavedFilter
+        for upload in client_grupobiomed.uploads:
+            db.query(Atestado).filter(Atestado.upload_id == upload.id).delete()
+        db.query(Upload).filter(Upload.client_id == client_grupobiomed.id).delete()
+        db.query(ClientLogo).filter(ClientLogo.client_id == client_grupobiomed.id).delete()
+        db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_grupobiomed.id).delete()
+        db.query(SavedFilter).filter(SavedFilter.client_id == client_grupobiomed.id).delete()
+        db.delete(client_grupobiomed)
         db.commit()
+        print("✅ Cliente fictício GrupoBiomed removido permanentemente")
+    
     # Cria usuário admin padrão se não existir
     admin = db.query(User).filter(User.username == "admin").first()
     if not admin:
@@ -783,9 +801,16 @@ async def dashboard(
             dias_setor_genero = []
         
         try:
+            print(f"[DASHBOARD DEBUG] Gerando insights para client_id={client_id}")
             insights = insights_engine.gerar_insights(client_id)
+            print(f"[DASHBOARD DEBUG] Insights gerados: {len(insights)} insights para client_id={client_id}")
+            if insights:
+                for i, insight in enumerate(insights):
+                    print(f"[DASHBOARD DEBUG] Insight {i+1}: {insight.get('titulo', 'N/A')}")
         except Exception as e:
             print(f"Erro ao gerar insights: {e}")
+            import traceback
+            traceback.print_exc()
             insights = []
         
         # Busca alertas
@@ -869,7 +894,7 @@ async def dashboard(
         except Exception as e:
             print(f"Erro ao verificar campos com dados: {e}")
         
-        # Dados específicos para Roda de Ouro
+        # Dados específicos para Roda de Ouro (APENAS para client_id = 4)
         classificacao_funcionarios_ro = []
         classificacao_setores_ro = []
         classificacao_doencas_ro = []
@@ -877,39 +902,81 @@ async def dashboard(
         analise_coerencia = {'coerente': 0, 'sem_coerencia': 0, 'total': 0, 'percentual_coerente': 0, 'percentual_sem_coerencia': 0}
         tempo_servico_atestados = []
         
-        try:
-            classificacao_funcionarios_ro = analytics.classificacao_funcionarios_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
-        except Exception as e:
-            print(f"Erro ao calcular classificação funcionários RO: {e}")
+        # Novas análises de horas e gênero (especialmente para Roda de Ouro)
+        horas_perdidas_genero = []
+        horas_perdidas_setor = []
+        evolucao_mensal_horas = []
+        analise_detalhada_genero_data = {}
+        comparativo_dias_horas_genero_data = []
+        horas_perdidas_setor_genero_data = []
         
-        try:
-            classificacao_setores_ro = analytics.classificacao_setores_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
-            print(f"✅ Classificação Setores RO retornou {len(classificacao_setores_ro)} registros")
-        except Exception as e:
-            print(f"❌ Erro ao calcular classificação setores RO: {e}")
-            import traceback
-            traceback.print_exc()
-            classificacao_setores_ro = []
-        
-        try:
-            classificacao_doencas_ro = analytics.classificacao_doencas_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
-        except Exception as e:
-            print(f"Erro ao calcular classificação doenças RO: {e}")
-        
-        try:
-            dias_ano_coerencia = analytics.dias_atestados_por_ano_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
-        except Exception as e:
-            print(f"Erro ao calcular dias por ano coerência: {e}")
-        
-        try:
-            analise_coerencia = analytics.analise_atestados_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
-        except Exception as e:
-            print(f"Erro ao calcular análise coerência: {e}")
-        
-        try:
-            tempo_servico_atestados = analytics.tempo_servico_atestados(client_id, mes_inicio, mes_fim, funcionario, setor)
-        except Exception as e:
-            print(f"Erro ao calcular tempo serviço: {e}")
+        # Só calcula se for Roda de Ouro (ID = 4)
+        if client_id == 4:
+            try:
+                classificacao_funcionarios_ro = analytics.classificacao_funcionarios_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular classificação funcionários RO: {e}")
+            
+            try:
+                classificacao_setores_ro = analytics.classificacao_setores_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+                print(f"✅ Classificação Setores RO retornou {len(classificacao_setores_ro)} registros")
+            except Exception as e:
+                print(f"❌ Erro ao calcular classificação setores RO: {e}")
+                import traceback
+                traceback.print_exc()
+                classificacao_setores_ro = []
+            
+            try:
+                classificacao_doencas_ro = analytics.classificacao_doencas_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular classificação doenças RO: {e}")
+            
+            try:
+                dias_ano_coerencia = analytics.dias_atestados_por_ano_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular dias por ano coerência: {e}")
+            
+            try:
+                analise_coerencia = analytics.analise_atestados_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular análise coerência: {e}")
+            
+            try:
+                tempo_servico_atestados = analytics.tempo_servico_atestados(client_id, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular tempo serviço: {e}")
+            
+            # Novas análises de horas e gênero
+            try:
+                horas_perdidas_genero = analytics.horas_perdidas_por_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular horas perdidas por gênero: {e}")
+            
+            try:
+                horas_perdidas_setor = analytics.horas_perdidas_por_setor(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular horas perdidas por setor: {e}")
+            
+            try:
+                # Remove limite de meses para mostrar todos os meses disponíveis na planilha
+                evolucao_mensal_horas = analytics.evolucao_mensal_horas(client_id, meses=0, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
+            except Exception as e:
+                print(f"Erro ao calcular evolução mensal de horas: {e}")
+            
+            try:
+                analise_detalhada_genero_data = analytics.analise_detalhada_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular análise detalhada por gênero: {e}")
+            
+            try:
+                comparativo_dias_horas_genero_data = analytics.comparativo_dias_horas_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular comparativo dias/horas por gênero: {e}")
+            
+            try:
+                horas_perdidas_setor_genero_data = analytics.horas_perdidas_setor_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+            except Exception as e:
+                print(f"Erro ao calcular horas perdidas por setor e gênero: {e}")
         
         resultado = {
             "metricas": metricas,
@@ -938,8 +1005,29 @@ async def dashboard(
             "classificacao_doencas_ro": classificacao_doencas_ro,
             "dias_ano_coerencia": dias_ano_coerencia,
             "analise_coerencia": analise_coerencia,
-            "tempo_servico_atestados": tempo_servico_atestados
+            "tempo_servico_atestados": tempo_servico_atestados,
+            # Novas análises de horas e gênero (especialmente para Roda de Ouro)
+            "horas_perdidas_genero": horas_perdidas_genero,
+            "horas_perdidas_setor": horas_perdidas_setor,
+            "evolucao_mensal_horas": evolucao_mensal_horas,
+            "analise_detalhada_genero": analise_detalhada_genero_data,
+            "comparativo_dias_horas_genero": comparativo_dias_horas_genero_data,
+            "horas_perdidas_setor_genero": horas_perdidas_setor_genero_data,
+            # Comparativo entre períodos
+            "comparativo_periodos_mes": {},
+            "comparativo_periodos_trimestre": {}
         }
+        
+        # Calcula comparativo entre períodos
+        try:
+            resultado["comparativo_periodos_mes"] = analytics.comparativo_periodos(client_id, tipo_comparacao='mes', funcionario=funcionario, setor=setor)
+        except Exception as e:
+            print(f"Erro ao calcular comparativo mensal: {e}")
+        
+        try:
+            resultado["comparativo_periodos_trimestre"] = analytics.comparativo_periodos(client_id, tipo_comparacao='trimestre', funcionario=funcionario, setor=setor)
+        except Exception as e:
+            print(f"Erro ao calcular comparativo trimestral: {e}")
         
         # Corrige encoding antes de retornar
         return corrigir_encoding_json(resultado)
@@ -1173,6 +1261,15 @@ async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
         
+        # Busca logo principal da tabela client_logos
+        logo_principal = db.query(ClientLogo).filter(
+            ClientLogo.client_id == cliente_id,
+            ClientLogo.is_principal == True
+        ).first()
+        
+        # Usa logo principal se existir, senão usa o logo_url do cliente (compatibilidade)
+        logo_url_final = logo_principal.logo_url if logo_principal else cliente.logo_url
+        
         return {
             "id": cliente.id,
             "nome": cliente.nome,
@@ -1190,7 +1287,7 @@ async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
             "telefone": cliente.telefone,
             "email": cliente.email,
             "situacao": cliente.situacao,
-            "logo_url": cliente.logo_url,
+            "logo_url": logo_url_final,
             "cores_personalizadas": json.loads(cliente.cores_personalizadas) if cliente.cores_personalizadas else None,
             "data_abertura": cliente.data_abertura.isoformat() if cliente.data_abertura else None,
             "atividade_principal": cliente.atividade_principal,
@@ -1388,16 +1485,17 @@ async def atualizar_cliente(cliente_id: int, cliente: ClienteCreate, db: Session
             if cliente_existente:
                 raise HTTPException(status_code=400, detail="CNPJ já cadastrado em outro cliente")
         
-        # Atualiza campos
+        # NÃO atualiza logo_url aqui quando vem null, pois agora usamos múltiplos logos via tabela client_logos
+        # O logo_url do cliente é atualizado automaticamente quando um logo é marcado como principal
+        # Apenas remove o logo se explicitamente enviado como string vazia
         logo_url_novo = cliente.logo_url
         if logo_url_novo is not None:
-            logo_url_novo = logo_url_novo.strip()
-            if not logo_url_novo:
-                if cliente_db.logo_url:
-                    remover_logo_arquivo(cliente_db.logo_url)
-                cliente_db.logo_url = None
-            else:
-                cliente_db.logo_url = logo_url_novo
+            logo_url_novo = logo_url_novo.strip() if isinstance(logo_url_novo, str) else None
+            if logo_url_novo == '':
+                # Se enviado como string vazia, não remove (mantém o atual)
+                # Os logos são gerenciados via tabela client_logos
+                pass
+            # Se null, também não faz nada (mantém o atual)
 
         cliente_db.nome = cliente.nome
         cliente_db.cnpj = re.sub(r'\D', '', cliente.cnpj) if cliente.cnpj else None
@@ -1442,10 +1540,12 @@ async def atualizar_cliente(cliente_id: int, cliente: ClienteCreate, db: Session
 async def upload_logo_cliente(
     cliente_id: int,
     arquivo: UploadFile = File(...),
+    descricao: Optional[str] = Form(None),
+    is_principal: Optional[str] = Form("false"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Realiza upload/atualização do logo de um cliente."""
+    """Adiciona um novo logo para um cliente (suporte a múltiplos logos)."""
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
@@ -1487,17 +1587,54 @@ async def upload_logo_cliente(
 
         novo_logo_url = f"/static/logos/{nome_arquivo}"
 
-        if cliente.logo_url and cliente.logo_url != novo_logo_url:
-            remover_logo_arquivo(cliente.logo_url)
+        # Converte is_principal de string para boolean
+        is_principal_bool = str(is_principal).lower() in ('true', '1', 'yes', 'on')
 
-        cliente.logo_url = novo_logo_url
+        # IMPORTANTE: NÃO remove logos antigos, apenas adiciona um novo
+        # Se este logo for marcado como principal, remove a marcação dos outros (mas mantém os logos)
+        if is_principal_bool:
+            db.query(ClientLogo).filter(
+                ClientLogo.client_id == cliente_id,
+                ClientLogo.is_principal == True
+            ).update({"is_principal": False})
+
+        # Cria novo registro de logo (NÃO substitui, ADICIONA)
+        novo_logo = ClientLogo(
+            client_id=cliente_id,
+            logo_url=novo_logo_url,
+            is_principal=is_principal_bool,
+            descricao=descricao
+        )
+        db.add(novo_logo)
+        print(f"[DEBUG] Adicionando novo logo para cliente {cliente_id}: {novo_logo_url}")
+
+        # Se não há logo principal definido, define este como principal
+        if not is_principal_bool:
+            logo_principal_existente = db.query(ClientLogo).filter(
+                ClientLogo.client_id == cliente_id,
+                ClientLogo.is_principal == True
+            ).first()
+            if not logo_principal_existente:
+                novo_logo.is_principal = True
+
+        # Atualiza logo_url do cliente para o logo principal (compatibilidade)
+        logo_principal = db.query(ClientLogo).filter(
+            ClientLogo.client_id == cliente_id,
+            ClientLogo.is_principal == True
+        ).first()
+        if logo_principal:
+            cliente.logo_url = logo_principal.logo_url
+
         cliente.updated_at = datetime.now()
         db.commit()
-        db.refresh(cliente)
+        db.refresh(novo_logo)
 
         return {
-            "logo_url": cliente.logo_url,
-            "message": "Logo atualizado com sucesso"
+            "id": novo_logo.id,
+            "logo_url": novo_logo.logo_url,
+            "is_principal": novo_logo.is_principal,
+            "descricao": novo_logo.descricao,
+            "message": "Logo adicionado com sucesso"
         }
     except HTTPException:
         raise
@@ -1507,22 +1644,176 @@ async def upload_logo_cliente(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao enviar logo: {str(e)}")
 
+@app.get("/api/clientes/{cliente_id}/logos")
+async def listar_logos_cliente(
+    cliente_id: int,
+    db: Session = Depends(get_db)
+):
+    """Lista todos os logos de um cliente."""
+    try:
+        logos = db.query(ClientLogo).filter(ClientLogo.client_id == cliente_id).order_by(
+            ClientLogo.is_principal.desc(),
+            ClientLogo.created_at.desc()
+        ).all()
+        
+        return {
+            "logos": [
+                {
+                    "id": logo.id,
+                    "logo_url": logo.logo_url,
+                    "is_principal": logo.is_principal,
+                    "descricao": logo.descricao,
+                    "created_at": logo.created_at.isoformat() if logo.created_at else None
+                }
+                for logo in logos
+            ]
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao listar logos: {str(e)}")
+
+@app.put("/api/clientes/{cliente_id}/logos/{logo_id}/principal")
+async def definir_logo_principal(
+    cliente_id: int,
+    logo_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Define um logo como principal."""
+    try:
+        logo = db.query(ClientLogo).filter(
+            ClientLogo.id == logo_id,
+            ClientLogo.client_id == cliente_id
+        ).first()
+        
+        if not logo:
+            raise HTTPException(status_code=404, detail="Logo não encontrado")
+        
+        # Remove marcação de principal dos outros logos
+        db.query(ClientLogo).filter(
+            ClientLogo.client_id == cliente_id,
+            ClientLogo.is_principal == True,
+            ClientLogo.id != logo_id
+        ).update({"is_principal": False})
+        
+        # Define este como principal
+        logo.is_principal = True
+        
+        # Atualiza logo_url do cliente (compatibilidade)
+        cliente = db.query(Client).filter(Client.id == cliente_id).first()
+        if cliente:
+            cliente.logo_url = logo.logo_url
+            cliente.updated_at = datetime.now()
+        
+        db.commit()
+        db.refresh(logo)
+        
+        return {
+            "id": logo.id,
+            "logo_url": logo.logo_url,
+            "is_principal": logo.is_principal,
+            "message": "Logo definido como principal"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao definir logo principal: {str(e)}")
+
+@app.delete("/api/clientes/{cliente_id}/logos/{logo_id}")
+async def deletar_logo_cliente(
+    cliente_id: int,
+    logo_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Deleta um logo de um cliente."""
+    try:
+        logo = db.query(ClientLogo).filter(
+            ClientLogo.id == logo_id,
+            ClientLogo.client_id == cliente_id
+        ).first()
+        
+        if not logo:
+            raise HTTPException(status_code=404, detail="Logo não encontrado")
+        
+        # Remove arquivo físico
+        if logo.logo_url:
+            remover_logo_arquivo(logo.logo_url)
+        
+        # Se era o principal, define outro como principal (se houver)
+        if logo.is_principal:
+            outro_logo = db.query(ClientLogo).filter(
+                ClientLogo.client_id == cliente_id,
+                ClientLogo.id != logo_id
+            ).first()
+            
+            if outro_logo:
+                outro_logo.is_principal = True
+                cliente = db.query(Client).filter(Client.id == cliente_id).first()
+                if cliente:
+                    cliente.logo_url = outro_logo.logo_url
+            else:
+                cliente = db.query(Client).filter(Client.id == cliente_id).first()
+                if cliente:
+                    cliente.logo_url = None
+        
+        db.delete(logo)
+        db.commit()
+        
+        return {"message": "Logo deletado com sucesso"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar logo: {str(e)}")
+
 @app.delete("/api/clientes/{cliente_id}")
-async def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):
-    """Deleta um cliente"""
+async def deletar_cliente(
+    cliente_id: int, 
+    forcar: bool = Query(False, description="Forçar exclusão mesmo com dados"),
+    db: Session = Depends(get_db)
+):
+    """Deleta um cliente. Se forcar=True, deleta também todos os dados relacionados."""
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
         
         # Verifica se tem uploads
-        if len(cliente.uploads) > 0:
-            raise HTTPException(status_code=400, detail="Cliente possui dados. Utilize o arquivo morto.")
+        tem_uploads = len(cliente.uploads) > 0
         
+        if tem_uploads and not forcar:
+            raise HTTPException(status_code=400, detail="Cliente possui dados. Utilize o arquivo morto ou force a exclusão com forcar=true.")
+        
+        # Se forçar exclusão, deleta todos os dados relacionados primeiro
+        if forcar and tem_uploads:
+            # Deleta todos os atestados relacionados aos uploads
+            from .models import Atestado
+            for upload in cliente.uploads:
+                db.query(Atestado).filter(Atestado.upload_id == upload.id).delete()
+            
+            # Deleta todos os uploads
+            db.query(Upload).filter(Upload.client_id == cliente_id).delete()
+            
+            # Deleta todos os logos
+            from .models import ClientLogo
+            db.query(ClientLogo).filter(ClientLogo.client_id == cliente_id).delete()
+            
+            # Deleta mapeamentos de colunas
+            from .models import ClientColumnMapping
+            db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == cliente_id).delete()
+        
+        # Deleta o cliente
         db.delete(cliente)
         db.commit()
         
-        return {"message": "Cliente deletado com sucesso"}
+        return {"message": "Cliente deletado com sucesso" + (" (incluindo todos os dados)" if forcar else "")}
     except HTTPException:
         raise
     except Exception as e:
@@ -1950,10 +2241,13 @@ async def dados_apresentacao(
     """Retorna todos os dados necessários para a apresentação com análises IA"""
     try:
         # Log para debug
-        print(f"[APRESENTACAO] Recebido client_id: {client_id} (tipo: {type(client_id)})")
+        print(f"[APRESENTACAO] ===== INÍCIO - Recebido client_id: {client_id} (tipo: {type(client_id)}) =====")
+        import time
+        inicio = time.time()
         
         # Valida client_id
         client = validar_client_id(db, client_id)
+        print(f"[APRESENTACAO] Cliente validado: {client.nome}")
         
         analytics = Analytics(db)
         insights_engine = InsightsEngine(db)
@@ -2041,10 +2335,10 @@ async def dados_apresentacao(
             print(f"Erro ao calcular dias por setor e gênero: {e}")
             dias_setor_genero = []
         
-        # Gera análises IA para cada gráfico
+        # Gera análises IA para cada gráfico - ISOLADO POR EMPRESA
         slides = []
         
-        # Slide 0: Título/Capa
+        # Slide 0: Título/Capa (sempre presente)
         slides.append({
             "id": 0,
             "tipo": "capa",
@@ -2054,224 +2348,551 @@ async def dados_apresentacao(
             "analise": None
         })
         
-        # Slide 1: KPIs
-        if metricas:
-            slides.append({
-                "id": 1,
-                "tipo": "kpis",
-                "titulo": "Indicadores Principais",
-                "subtitulo": "Visão geral do absenteísmo",
-                "dados": metricas,
-                "analise": insights_engine.gerar_analise_grafico('kpis', None, metricas)
-            })
-        
-        # Slide 2: Dias Perdidos por Funcionário
-        if top_funcionarios:
-            slides.append({
-                "id": 2,
-                "tipo": "funcionarios_dias",
-                "titulo": "Dias Perdidos por Funcionário",
-                "subtitulo": "TOP 10 funcionários com maior índice",
-                "dados": top_funcionarios,
-                "analise": insights_engine.gerar_analise_grafico('funcionarios_dias', top_funcionarios, metricas)
-            })
-        
-        # Slide 3: TOP 10 CIDs
-        if top_cids:
-            slides.append({
-                "id": 3,
-                "tipo": "top_cids",
-                "titulo": "TOP 10 Doenças mais Frequentes",
-                "subtitulo": "Principais causas de afastamento",
-                "dados": top_cids,
-                "analise": insights_engine.gerar_analise_grafico('top_cids', top_cids, metricas)
-            })
-        
-        # Slide 4: Evolução Mensal
-        if evolucao:
-            slides.append({
-                "id": 4,
-                "tipo": "evolucao_mensal",
-                "titulo": "Evolução Mensal",
-                "subtitulo": "Últimos 12 meses",
-                "dados": evolucao,
-                "analise": insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao, metricas)
-            })
-        
-        # Slide 5: TOP 5 Setores
-        if top_setores:
-            slides.append({
-                "id": 5,
-                "tipo": "top_setores",
-                "titulo": "TOP 5 Setores",
-                "subtitulo": "Setores com mais atestados",
-                "dados": top_setores,
-                "analise": insights_engine.gerar_analise_grafico('top_setores', top_setores, metricas)
-            })
-        
-        # Slide 6: Por Gênero
-        if distribuicao_genero:
-            slides.append({
-                "id": 6,
-                "tipo": "genero",
-                "titulo": "Distribuição por Gênero",
-                "subtitulo": "Masculino vs Feminino",
-                "dados": distribuicao_genero,
-                "analise": insights_engine.gerar_analise_grafico('genero', distribuicao_genero, metricas)
-            })
-        
-        # Slide 7: Dias por Doença
-        if top_cids_dias:
-            slides.append({
-                "id": 7,
-                "tipo": "dias_doenca",
-                "titulo": "Dias por Doença",
-                "subtitulo": "Total de dias perdidos",
-                "dados": top_cids_dias,
-                "analise": insights_engine.gerar_analise_grafico('dias_doenca', top_cids_dias, metricas)
-            })
-        
-        # Slide 8: Escalas
-        if top_escalas:
-            slides.append({
-                "id": 8,
-                "tipo": "escalas",
-                "titulo": "Escalas com mais Atestados",
-                "subtitulo": "TOP 10 escalas com maior incidência",
-                "dados": top_escalas,
-                "analise": insights_engine.gerar_analise_grafico('escalas', top_escalas, metricas)
-            })
-        
-        # Slide 9: Motivos
-        if top_motivos:
-            slides.append({
-                "id": 9,
-                "tipo": "motivos",
-                "titulo": "Motivos de Incidência",
-                "subtitulo": "Distribuição percentual dos motivos",
-                "dados": top_motivos,
-                "analise": insights_engine.gerar_analise_grafico('motivos', top_motivos, metricas)
-            })
-        
-        # Slide 10: Centro de Custo
-        if dias_centro_custo:
-            slides.append({
-                "id": 10,
-                "tipo": "centro_custo",
-                "titulo": "Dias Perdidos por Centro de Custo",
-                "subtitulo": "TOP 10 setores",
-                "dados": dias_centro_custo,
-                "analise": insights_engine.gerar_analise_grafico('centro_custo', dias_centro_custo, metricas)
-            })
-        
-        # Slide 11: Distribuição de Dias
-        if distribuicao_dias:
-            slides.append({
-                "id": 11,
-                "tipo": "distribuicao_dias",
-                "titulo": "Distribuição de Dias por Atestado",
-                "subtitulo": "Histograma de frequência",
-                "dados": distribuicao_dias,
-                "analise": insights_engine.gerar_analise_grafico('distribuicao_dias', distribuicao_dias, metricas)
-            })
-        
-        # Busca dados de produtividade (todos os meses para gráficos mês a mês)
-        try:
-            produtividade_data = db.query(Produtividade).filter(
-                Produtividade.client_id == client_id
-            ).order_by(Produtividade.mes_referencia.desc(), Produtividade.numero_tipo).all()
-            
-            if produtividade_data:
-                # Retorna TODOS os meses para permitir gráficos mês a mês
-                produtividade_todos = [
-                    {
-                        "numero_tipo": p.numero_tipo,
-                        "tipo_consulta": p.tipo_consulta,
-                        "ocupacionais": p.ocupacionais or 0,
-                        "assistenciais": p.assistenciais or 0,
-                        "acidente_trabalho": p.acidente_trabalho or 0,
-                        "inss": p.inss or 0,
-                        "sinistralidade": p.sinistralidade or 0,
-                        "absenteismo": p.absenteismo or 0,
-                        "pericia_indireta": p.pericia_indireta or 0,
-                        "total": p.total or 0,
-                        "mes_referencia": p.mes_referencia
-                    }
-                    for p in produtividade_data
-                ]
+        # ==================== CONVERPLAST (client_id = 2) ====================
+        if client_id == 2:
+            # Slide 1: KPIs
+            if metricas:
+                try:
+                    analise_kpis = insights_engine.gerar_analise_grafico('kpis', None, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise KPIs: {e}")
+                    analise_kpis = "Análise não disponível."
                 
                 slides.append({
                     "id": len(slides),
-                    "tipo": "produtividade",
-                    "titulo": "Produtividade",
-                    "subtitulo": "Consultas realizadas - Anual (Mês a Mês)",
-                    "dados": produtividade_todos,
-                    "analise": insights_engine.gerar_analise_grafico('produtividade', produtividade_todos, metricas) if hasattr(insights_engine, 'gerar_analise_grafico') else None
+                    "tipo": "kpis",
+                    "titulo": "Indicadores Principais",
+                    "subtitulo": "Visão geral do absenteísmo",
+                    "dados": metricas,
+                    "analise": analise_kpis
                 })
-        except Exception as e:
-            print(f"Erro ao buscar produtividade: {e}")
+            
+            # Slide 2: Dias Perdidos por Funcionário
+            if top_funcionarios:
+                try:
+                    analise_func = insights_engine.gerar_analise_grafico('funcionarios_dias', top_funcionarios, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise funcionários: {e}")
+                    analise_func = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "funcionarios_dias",
+                    "titulo": "Dias Perdidos por Funcionário",
+                    "subtitulo": "TOP 10 funcionários com maior índice",
+                    "dados": top_funcionarios,
+                    "analise": analise_func
+                })
+            
+            # Slide 3: TOP 10 CIDs
+            if top_cids:
+                try:
+                    analise_cids = insights_engine.gerar_analise_grafico('top_cids', top_cids, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise CIDs: {e}")
+                    analise_cids = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "top_cids",
+                    "titulo": "TOP 10 Doenças mais Frequentes",
+                    "subtitulo": "Principais causas de afastamento",
+                    "dados": top_cids,
+                    "analise": analise_cids
+                })
+            
+            # Slide 4: Evolução Mensal
+            if evolucao:
+                try:
+                    analise_evol = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise evolução: {e}")
+                    analise_evol = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "evolucao_mensal",
+                    "titulo": "Evolução Mensal",
+                    "subtitulo": "Últimos 12 meses",
+                    "dados": evolucao,
+                    "analise": analise_evol
+                })
+            
+            # Slide 5: TOP 5 Setores
+            if top_setores:
+                try:
+                    analise_setores = insights_engine.gerar_analise_grafico('top_setores', top_setores, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise setores: {e}")
+                    analise_setores = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "top_setores",
+                    "titulo": "TOP 5 Setores",
+                    "subtitulo": "Setores com mais atestados",
+                    "dados": top_setores,
+                    "analise": analise_setores
+                })
+            
+            # Slide 6: Por Gênero
+            if distribuicao_genero:
+                try:
+                    analise_genero = insights_engine.gerar_analise_grafico('genero', distribuicao_genero, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise gênero: {e}")
+                    analise_genero = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "genero",
+                    "titulo": "Distribuição por Gênero",
+                    "subtitulo": "Masculino vs Feminino",
+                    "dados": distribuicao_genero,
+                    "analise": analise_genero
+                })
+            
+            # Slide 7: Dias por Doença
+            if top_cids_dias:
+                try:
+                    analise_doenca = insights_engine.gerar_analise_grafico('dias_doenca', top_cids_dias, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise doença: {e}")
+                    analise_doenca = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "dias_doenca",
+                    "titulo": "Dias por Doença",
+                    "subtitulo": "Total de dias perdidos",
+                    "dados": top_cids_dias,
+                    "analise": analise_doenca
+                })
+            
+            # Slide 8: Escalas
+            if top_escalas:
+                try:
+                    analise_escalas = insights_engine.gerar_analise_grafico('escalas', top_escalas, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise escalas: {e}")
+                    analise_escalas = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "escalas",
+                    "titulo": "Escalas com mais Atestados",
+                    "subtitulo": "TOP 10 escalas com maior incidência",
+                    "dados": top_escalas,
+                    "analise": analise_escalas
+                })
+            
+            # Slide 9: Motivos
+            if top_motivos:
+                try:
+                    analise_motivos = insights_engine.gerar_analise_grafico('motivos', top_motivos, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise motivos: {e}")
+                    analise_motivos = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "motivos",
+                    "titulo": "Motivos de Incidência",
+                    "subtitulo": "Distribuição percentual dos motivos",
+                    "dados": top_motivos,
+                    "analise": analise_motivos
+                })
+            
+            # Slide 10: Centro de Custo
+            if dias_centro_custo:
+                try:
+                    analise_centro = insights_engine.gerar_analise_grafico('centro_custo', dias_centro_custo, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise centro custo: {e}")
+                    analise_centro = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "centro_custo",
+                    "titulo": "Dias Perdidos por Centro de Custo",
+                    "subtitulo": "TOP 10 setores",
+                    "dados": dias_centro_custo,
+                    "analise": analise_centro
+                })
+            
+            # Slide 11: Distribuição de Dias
+            if distribuicao_dias:
+                try:
+                    analise_dist = insights_engine.gerar_analise_grafico('distribuicao_dias', distribuicao_dias, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise distribuição: {e}")
+                    analise_dist = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "distribuicao_dias",
+                    "titulo": "Distribuição de Dias por Atestado",
+                    "subtitulo": "Histograma de frequência",
+                    "dados": distribuicao_dias,
+                    "analise": analise_dist
+                })
+            
+            # Busca dados de produtividade (todos os meses para gráficos mês a mês) - APENAS CONVERPLAST
+            try:
+                produtividade_data = db.query(Produtividade).filter(
+                    Produtividade.client_id == client_id
+                ).order_by(Produtividade.mes_referencia.desc(), Produtividade.numero_tipo).all()
+                
+                if produtividade_data:
+                    produtividade_todos = [
+                        {
+                            "numero_tipo": p.numero_tipo,
+                            "tipo_consulta": p.tipo_consulta,
+                            "ocupacionais": p.ocupacionais or 0,
+                            "assistenciais": p.assistenciais or 0,
+                            "acidente_trabalho": p.acidente_trabalho or 0,
+                            "inss": p.inss or 0,
+                            "sinistralidade": p.sinistralidade or 0,
+                            "absenteismo": p.absenteismo or 0,
+                            "pericia_indireta": p.pericia_indireta or 0,
+                            "total": p.total or 0,
+                            "mes_referencia": p.mes_referencia
+                        }
+                        for p in produtividade_data
+                    ]
+                    
+                    try:
+                        analise_prod = insights_engine.gerar_analise_grafico('produtividade', produtividade_todos, metricas) if hasattr(insights_engine, 'gerar_analise_grafico') else None
+                    except Exception as e:
+                        print(f"Erro ao gerar análise produtividade: {e}")
+                        analise_prod = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "produtividade",
+                        "titulo": "Produtividade",
+                        "subtitulo": "Consultas realizadas - Anual (Mês a Mês)",
+                        "dados": produtividade_todos,
+                        "analise": analise_prod
+                    })
+            except Exception as e:
+                print(f"Erro ao buscar produtividade: {e}")
+            
+            # Slide 12: Média por CID
+            if media_cid:
+                try:
+                    analise_media = insights_engine.gerar_analise_grafico('media_cid', media_cid, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise média CID: {e}")
+                    analise_media = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "media_cid",
+                    "titulo": "Média de Dias por CID",
+                    "subtitulo": "Doenças com maior média de dias",
+                    "dados": media_cid,
+                    "analise": analise_media
+                })
+            
+            # Slide 13: Setor e Gênero
+            if dias_setor_genero:
+                try:
+                    analise_setor_gen = insights_engine.gerar_analise_grafico('setor_genero', dias_setor_genero, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise setor/gênero: {e}")
+                    analise_setor_gen = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "setor_genero",
+                    "titulo": "Dias Perdidos por Setor e Gênero",
+                    "subtitulo": "Comparativo entre gêneros por setor",
+                    "dados": dias_setor_genero,
+                    "analise": analise_setor_gen
+                })
         
-        # Slide 12: Média por CID
-        if media_cid:
+        # ==================== RODA DE OURO (client_id = 4) - ISOLADO ====================
+        elif client_id == 4:
+            # Slide 1: KPIs (RODA DE OURO) - primeiro slide após capa
+            if metricas:
+                try:
+                    analise_kpis_ro = insights_engine.gerar_analise_grafico('kpis', None, metricas)
+                except Exception as e:
+                    print(f"Erro ao gerar análise KPIs RO: {e}")
+                    analise_kpis_ro = "Análise não disponível."
+                
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "kpis",
+                    "titulo": "Indicadores Principais",
+                    "subtitulo": "Visão geral do absenteísmo",
+                    "dados": metricas,
+                    "analise": analise_kpis_ro
+                })
+            
+            try:
+                classificacao_funcionarios_ro = analytics.classificacao_funcionarios_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+                if classificacao_funcionarios_ro:
+                    try:
+                        analise_func_ro = insights_engine.gerar_analise_grafico('classificacao_funcionarios_ro', classificacao_funcionarios_ro, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise funcionários RO: {e}")
+                        analise_func_ro = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "classificacao_funcionarios_ro",
+                        "titulo": "Classificação por Funcionário",
+                        "subtitulo": "Funcionários com mais dias de atestados",
+                        "dados": classificacao_funcionarios_ro,
+                        "analise": analise_func_ro
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular classificação funcionários RO para apresentação: {e}")
+            
+            try:
+                classificacao_setores_ro = analytics.classificacao_setores_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+                if classificacao_setores_ro:
+                    try:
+                        analise_setores_ro = insights_engine.gerar_analise_grafico('classificacao_setores_ro', classificacao_setores_ro, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise setores RO: {e}")
+                        analise_setores_ro = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "classificacao_setores_ro",
+                        "titulo": "Classificação por Setor",
+                        "subtitulo": "Setores com mais dias de afastamento",
+                        "dados": classificacao_setores_ro,
+                        "analise": analise_setores_ro
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular classificação setores RO para apresentação: {e}")
+            
+            try:
+                classificacao_doencas_ro = analytics.classificacao_doencas_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+                if classificacao_doencas_ro:
+                    try:
+                        analise_doencas_ro = insights_engine.gerar_analise_grafico('classificacao_doencas_ro', classificacao_doencas_ro, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise doenças RO: {e}")
+                        analise_doencas_ro = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "classificacao_doencas_ro",
+                        "titulo": "Classificação por Doença",
+                        "subtitulo": "Doenças x Dias de Afastamento",
+                        "dados": classificacao_doencas_ro,
+                        "analise": analise_doencas_ro
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular classificação doenças RO para apresentação: {e}")
+            
+            try:
+                dias_ano_coerencia = analytics.dias_atestados_por_ano_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if dias_ano_coerencia and (dias_ano_coerencia.get('anos') or dias_ano_coerencia.get('meses')):
+                    try:
+                        analise_dias_ano = insights_engine.gerar_analise_grafico('dias_ano_coerencia', dias_ano_coerencia, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise dias ano: {e}")
+                        analise_dias_ano = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "dias_ano_coerencia",
+                        "titulo": "Dias Atestados por Ano",
+                        "subtitulo": "Coerente vs Sem Coerência",
+                        "dados": dias_ano_coerencia,
+                        "analise": analise_dias_ano
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular dias ano coerência para apresentação: {e}")
+            
+            try:
+                analise_coerencia = analytics.analise_atestados_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if analise_coerencia and analise_coerencia.get('total', 0) > 0:
+                    try:
+                        analise_coer = insights_engine.gerar_analise_grafico('analise_coerencia', analise_coerencia, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise coerência: {e}")
+                        analise_coer = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "analise_coerencia",
+                        "titulo": "Análise Atestados",
+                        "subtitulo": "Coerente vs Sem Coerência",
+                        "dados": analise_coerencia,
+                        "analise": analise_coer
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular análise coerência para apresentação: {e}")
+            
+            try:
+                tempo_servico_atestados = analytics.tempo_servico_atestados(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if tempo_servico_atestados and len(tempo_servico_atestados) > 0:
+                    try:
+                        analise_tempo = insights_engine.gerar_analise_grafico('tempo_servico_atestados', tempo_servico_atestados, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise tempo serviço: {e}")
+                        analise_tempo = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "tempo_servico_atestados",
+                        "titulo": "Tempo Serviço x Atestados",
+                        "subtitulo": "Análise por tempo de serviço na empresa",
+                        "dados": tempo_servico_atestados,
+                        "analise": analise_tempo
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular tempo serviço atestados para apresentação: {e}")
+            
+            # NOVOS SLIDES DE HORAS PERDIDAS (RODA DE OURO)
+            try:
+                horas_perdidas_genero = analytics.horas_perdidas_por_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if horas_perdidas_genero and len(horas_perdidas_genero) > 0:
+                    try:
+                        analise_horas_genero = insights_engine.gerar_analise_grafico('genero', horas_perdidas_genero, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise horas por gênero: {e}")
+                        analise_horas_genero = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "horas_perdidas_genero",
+                        "titulo": "Horas Perdidas por Gênero",
+                        "subtitulo": "Distribuição de horas perdidas (44h = 1 semana)",
+                        "dados": horas_perdidas_genero,
+                        "analise": analise_horas_genero
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular horas perdidas por gênero para apresentação: {e}")
+            
+            try:
+                horas_perdidas_setor = analytics.horas_perdidas_por_setor(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+                if horas_perdidas_setor and len(horas_perdidas_setor) > 0:
+                    try:
+                        analise_horas_setor = insights_engine.gerar_analise_grafico('centro_custo', horas_perdidas_setor, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise horas por setor: {e}")
+                        analise_horas_setor = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "horas_perdidas_setor",
+                        "titulo": "TOP 10 Setores - Horas Perdidas",
+                        "subtitulo": "Setores com mais horas perdidas",
+                        "dados": horas_perdidas_setor,
+                        "analise": analise_horas_setor
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular horas perdidas por setor para apresentação: {e}")
+            
+            try:
+                # Remove limite de meses para mostrar todos os meses disponíveis na planilha
+                evolucao_mensal_horas = analytics.evolucao_mensal_horas(client_id, meses=0, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
+                if evolucao_mensal_horas and len(evolucao_mensal_horas) > 0:
+                    try:
+                        analise_evol_horas = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_mensal_horas, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise evolução horas: {e}")
+                        analise_evol_horas = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "evolucao_mensal_horas",
+                        "titulo": "Evolução Mensal de Horas Perdidas",
+                        "subtitulo": "Tendência de horas perdidas ao longo do tempo",
+                        "dados": evolucao_mensal_horas,
+                        "analise": analise_evol_horas
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular evolução mensal horas para apresentação: {e}")
+            
+            try:
+                comparativo_dias_horas_genero = analytics.comparativo_dias_horas_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if comparativo_dias_horas_genero and len(comparativo_dias_horas_genero) > 0:
+                    try:
+                        analise_comp = insights_engine.gerar_analise_grafico('setor_genero', comparativo_dias_horas_genero, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise comparativo: {e}")
+                        analise_comp = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_dias_horas_genero",
+                        "titulo": "Comparativo: Dias vs Horas vs Semanas",
+                        "subtitulo": "Comparação por gênero",
+                        "dados": comparativo_dias_horas_genero,
+                        "analise": analise_comp
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo dias/horas por gênero para apresentação: {e}")
+            
+            try:
+                analise_detalhada_genero = analytics.analise_detalhada_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if analise_detalhada_genero and analise_detalhada_genero.get('generos') and len(analise_detalhada_genero['generos']) > 0:
+                    try:
+                        analise_det = insights_engine.gerar_analise_grafico('genero', analise_detalhada_genero['generos'], metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise detalhada gênero: {e}")
+                        analise_det = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "analise_detalhada_genero",
+                        "titulo": "Análise Detalhada por Gênero",
+                        "subtitulo": "Percentuais de dias, horas e registros",
+                        "dados": analise_detalhada_genero,
+                        "analise": analise_det
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular análise detalhada gênero para apresentação: {e}")
+        
+        # Slide de Ações (comum para todas as empresas)
+        if client_id in [2, 4]:  # Converplast ou Roda de Ouro
             slides.append({
-                "id": 12,
-                "tipo": "media_cid",
-                "titulo": "Média de Dias por CID",
-                "subtitulo": "Doenças com maior média de dias",
-                "dados": media_cid,
-                "analise": insights_engine.gerar_analise_grafico('media_cid', media_cid, metricas)
+                "id": len(slides),
+                "tipo": "acoes_intro",
+                "titulo": "Ações",
+                "subtitulo": "Intervenções junto aos colaboradores",
+                "dados": None,
+                "analise": None
+            })
+            
+            slides.append({
+                "id": len(slides),
+                "tipo": "acoes_saude_fisica",
+                "titulo": "Ações – Saúde Física",
+                "subtitulo": "Promoção da saúde preventiva",
+                "dados": None,
+                "analise": None
+            })
+            
+            slides.append({
+                "id": len(slides),
+                "tipo": "acoes_saude_emocional",
+                "titulo": "Ações – Saúde Emocional",
+                "subtitulo": "Bem-estar psicológico e emocional",
+                "dados": None,
+                "analise": None
+            })
+            
+            slides.append({
+                "id": len(slides),
+                "tipo": "acoes_saude_social",
+                "titulo": "Ações – Saúde Social",
+                "subtitulo": "Integração e relacionamento interpessoal",
+                "dados": None,
+                "analise": None
             })
         
-        # Slide 13: Setor e Gênero
-        if dias_setor_genero:
-            slides.append({
-                "id": 13,
-                "tipo": "setor_genero",
-                "titulo": "Dias Perdidos por Setor e Gênero",
-                "subtitulo": "Comparativo entre gêneros por setor",
-                "dados": dias_setor_genero,
-                "analise": insights_engine.gerar_analise_grafico('setor_genero', dias_setor_genero, metricas)
-            })
-        
-        # Slide 14: Ações - Introdução
-        slides.append({
-            "id": 14,
-            "tipo": "acoes_intro",
-            "titulo": "Ações",
-            "subtitulo": "Intervenções junto aos colaboradores",
-            "dados": None,
-            "analise": None
-        })
-        
-        # Slide 15: Ações - Saúde Física
-        slides.append({
-            "id": 15,
-            "tipo": "acoes_saude_fisica",
-            "titulo": "Ações – Saúde Física",
-            "subtitulo": "Promoção da saúde preventiva",
-            "dados": None,
-            "analise": None
-        })
-        
-        # Slide 16: Ações - Saúde Emocional
-        slides.append({
-            "id": 16,
-            "tipo": "acoes_saude_emocional",
-            "titulo": "Ações – Saúde Emocional",
-            "subtitulo": "Bem-estar psicológico e emocional",
-            "dados": None,
-            "analise": None
-        })
-        
-        # Slide 17: Ações - Saúde Social
-        slides.append({
-            "id": 17,
-            "tipo": "acoes_saude_social",
-            "titulo": "Ações – Saúde Social",
-            "subtitulo": "Integração e relacionamento interpessoal",
-            "dados": None,
-            "analise": None
-        })
+        tempo_total = time.time() - inicio
+        print(f"[APRESENTACAO] ===== FIM - Total de slides: {len(slides)} - Tempo: {tempo_total:.2f}s =====")
         
         return {
             "slides": slides,
@@ -2280,17 +2901,31 @@ async def dados_apresentacao(
         
     except Exception as e:
         import traceback
+        print(f"[APRESENTACAO] ===== ERRO =====")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao gerar apresentação: {str(e)}")
 
 @app.get("/api/preview/{upload_id}")
 async def preview_data(
     upload_id: int,
+    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
     page: int = 1,
     per_page: int = 50,
     db: Session = Depends(get_db)
 ):
     """Preview dos dados do upload"""
+    # Valida client_id
+    validar_client_id(db, client_id)
+    
+    # Valida se o upload pertence ao cliente
+    upload = db.query(Upload).filter(
+        Upload.id == upload_id,
+        Upload.client_id == client_id
+    ).first()
+    
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload não encontrado ou não pertence ao cliente")
+    
     offset = (page - 1) * per_page
     
     atestados = db.query(Atestado).filter(Atestado.upload_id == upload_id).offset(offset).limit(per_page).all()
@@ -2397,17 +3032,314 @@ async def tendencias(
 @app.delete("/api/uploads/{upload_id}")
 async def delete_upload(
     upload_id: int,
+    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
     db: Session = Depends(get_db)
 ):
     """Deleta um upload e seus dados"""
-    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    # Valida client_id
+    validar_client_id(db, client_id)
+    
+    # Valida se o upload pertence ao cliente
+    upload = db.query(Upload).filter(
+        Upload.id == upload_id,
+        Upload.client_id == client_id
+    ).first()
+    
     if not upload:
-        raise HTTPException(status_code=404, detail="Upload não encontrado")
+        raise HTTPException(status_code=404, detail="Upload não encontrado ou não pertence ao cliente")
     
     db.delete(upload)
     db.commit()
     
     return {"success": True, "message": "Upload deletado com sucesso"}
+
+# ==================== ROUTES - EXPORTS ====================
+
+# Função helper para buscar dados EXATAMENTE como o dashboard
+def buscar_dados_dashboard_completo(
+    client_id: int,
+    mes_inicio: Optional[str] = None,
+    mes_fim: Optional[str] = None,
+    funcionario: Optional[List[str]] = None,
+    setor: Optional[List[str]] = None,
+    db: Session = None
+):
+    """Busca TODOS os dados exatamente como o endpoint /api/dashboard faz"""
+    analytics = Analytics(db)
+    insights_engine = InsightsEngine(db)
+    
+    # REPLICA EXATAMENTE A LÓGICA DO DASHBOARD
+    try:
+        metricas = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular métricas gerais: {e}")
+        metricas = {
+            "total_atestados_dias": 0,
+            "total_dias_perdidos": 0,
+            "total_horas_perdidas": 0
+        }
+    
+    try:
+        top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular top CIDs: {e}")
+        top_cids = []
+    
+    try:
+        top_setores = analytics.top_setores(client_id, 5, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular top setores: {e}")
+        top_setores = []
+    
+    try:
+        evolucao = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular evolução mensal: {e}")
+        evolucao = []
+    
+    try:
+        distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular distribuição de gênero: {e}")
+        distribuicao_genero = []
+    
+    try:
+        top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular top funcionários: {e}")
+        top_funcionarios = []
+    
+    try:
+        top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular top escalas: {e}")
+        top_escalas = []
+    
+    try:
+        top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular top motivos: {e}")
+        top_motivos = []
+    
+    try:
+        dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular dias por centro de custo: {e}")
+        dias_centro_custo = []
+    
+    try:
+        distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular distribuição de dias: {e}")
+        distribuicao_dias = []
+    
+    try:
+        media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular média por CID: {e}")
+        media_cid = []
+    
+    try:
+        top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular top CIDs para dias: {e}")
+        top_cids_dias = []
+    
+    try:
+        dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+    except Exception as e:
+        print(f"Erro ao calcular dias por setor e gênero: {e}")
+        dias_setor_genero = []
+    
+    # Busca insights gerais
+    insights = []
+    try:
+        insights = insights_engine.gerar_insights(client_id)
+    except Exception as e:
+        print(f"Erro ao gerar insights gerais: {e}")
+        insights = []
+    
+    # Dados específicos para Roda de Ouro (APENAS para client_id = 4)
+    classificacao_funcionarios_ro = []
+    classificacao_setores_ro = []
+    classificacao_doencas_ro = []
+    dias_ano_coerencia = {'anos': [], 'coerente': [], 'sem_coerencia': []}
+    analise_coerencia = {'coerente': 0, 'sem_coerencia': 0, 'total': 0, 'percentual_coerente': 0, 'percentual_sem_coerencia': 0}
+    tempo_servico_atestados = []
+    horas_perdidas_genero = []
+    horas_perdidas_setor = []
+    evolucao_mensal_horas = []
+    analise_detalhada_genero_data = {}
+    comparativo_dias_horas_genero_data = []
+    horas_perdidas_setor_genero_data = []
+    
+    # Só calcula se for Roda de Ouro (ID = 4)
+    if client_id == 4:
+        try:
+            classificacao_funcionarios_ro = analytics.classificacao_funcionarios_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular classificação funcionários RO: {e}")
+        
+        try:
+            classificacao_setores_ro = analytics.classificacao_setores_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular classificação setores RO: {e}")
+            classificacao_setores_ro = []
+        
+        try:
+            classificacao_doencas_ro = analytics.classificacao_doencas_roda_ouro(client_id, 15, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular classificação doenças RO: {e}")
+        
+        try:
+            dias_ano_coerencia = analytics.dias_atestados_por_ano_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular dias por ano coerência: {e}")
+        
+        try:
+            analise_coerencia = analytics.analise_atestados_coerencia(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular análise coerência: {e}")
+        
+        try:
+            tempo_servico_atestados = analytics.tempo_servico_atestados(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular tempo serviço: {e}")
+        
+        try:
+            horas_perdidas_genero = analytics.horas_perdidas_por_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular horas perdidas por gênero: {e}")
+        
+        try:
+            horas_perdidas_setor = analytics.horas_perdidas_por_setor(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular horas perdidas por setor: {e}")
+        
+        try:
+            evolucao_mensal_horas = analytics.evolucao_mensal_horas(client_id, meses=0, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
+        except Exception as e:
+            print(f"Erro ao calcular evolução mensal de horas: {e}")
+        
+        try:
+            analise_detalhada_genero_data = analytics.analise_detalhada_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular análise detalhada por gênero: {e}")
+        
+        try:
+            comparativo_dias_horas_genero_data = analytics.comparativo_dias_horas_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular comparativo dias/horas por gênero: {e}")
+        
+        try:
+            horas_perdidas_setor_genero_data = analytics.horas_perdidas_setor_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular horas perdidas por setor e gênero: {e}")
+    
+    # Adiciona análises de todos os gráficos
+    tipos_graficos = [
+        ('top_cids', top_cids, '📊', 'TOP 10 Doenças Mais Frequentes'),
+        ('funcionarios_dias', top_funcionarios, '👤', 'Dias Perdidos por Funcionário'),
+        ('evolucao_mensal', evolucao, '📈', 'Evolução Mensal'),
+        ('top_setores', top_setores, '🏢', 'TOP 5 Setores'),
+        ('genero', distribuicao_genero, '👥', 'Distribuição por Gênero'),
+        ('dias_doenca', top_cids_dias, '🩺', 'Dias por Doença'),
+        ('escalas', top_escalas, '⏰', 'Escalas com Mais Atestados'),
+        ('motivos', top_motivos, '📋', 'Motivos de Incidência'),
+        ('centro_custo', dias_centro_custo, '💰', 'Dias Perdidos por Centro de Custo'),
+        ('distribuicao_dias', distribuicao_dias, '📊', 'Distribuição de Dias por Atestado'),
+        ('media_cid', media_cid, '📊', 'Média de Dias por CID'),
+        ('setor_genero', dias_setor_genero, '👥', 'Dias Perdidos por Setor e Gênero'),
+    ]
+    
+    for tipo_grafico, dados_grafico, icone, titulo in tipos_graficos:
+        if dados_grafico:
+            try:
+                analise = insights_engine.gerar_analise_grafico(tipo_grafico, dados_grafico, metricas)
+                if analise:
+                    partes = analise.split('💡')
+                    insights.append({
+                        'tipo': 'analise',
+                        'icone': icone,
+                        'titulo': f'Análise: {titulo}',
+                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
+                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                    })
+            except Exception as e:
+                print(f"Erro ao gerar análise para {tipo_grafico}: {e}")
+    
+    # Adiciona análises específicas da Roda de Ouro
+    if client_id == 4:
+        tipos_graficos_ro = [
+            ('classificacao_funcionarios_ro', classificacao_funcionarios_ro, '👤', 'Classificação por Funcionário'),
+            ('classificacao_setores_ro', classificacao_setores_ro, '🏢', 'Classificação por Setor'),
+            ('classificacao_doencas_ro', classificacao_doencas_ro, '🩺', 'Classificação por Doença'),
+            ('dias_ano_coerencia', dias_ano_coerencia, '📅', 'Dias Atestados por Ano'),
+            ('analise_coerencia', analise_coerencia, '✅', 'Análise Atestados'),
+            ('tempo_servico_atestados', tempo_servico_atestados, '⏱️', 'Tempo Serviço x Atestados'),
+            ('horas_perdidas_genero', horas_perdidas_genero, '👥', 'Horas Perdidas por Gênero'),
+            ('horas_perdidas_setor', horas_perdidas_setor, '🏢', 'Horas Perdidas por Setor'),
+            ('evolucao_mensal_horas', evolucao_mensal_horas, '📈', 'Evolução Mensal de Horas Perdidas'),
+            ('comparativo_dias_horas_genero', comparativo_dias_horas_genero_data, '📊', 'Comparativo: Dias vs Horas vs Semanas'),
+            ('horas_perdidas_setor_genero', horas_perdidas_setor_genero_data, '👥', 'Horas Perdidas por Setor e Gênero'),
+            ('analise_detalhada_genero', analise_detalhada_genero_data, '📊', 'Análise Detalhada por Gênero')
+        ]
+        
+        for tipo_grafico, dados_grafico, icone, titulo in tipos_graficos_ro:
+            if dados_grafico and (isinstance(dados_grafico, list) and len(dados_grafico) > 0 or isinstance(dados_grafico, dict) and dados_grafico):
+                try:
+                    analise = insights_engine.gerar_analise_grafico(tipo_grafico, dados_grafico, metricas)
+                    if analise:
+                        partes = analise.split('💡')
+                        insights.append({
+                            'tipo': 'analise',
+                            'icone': icone,
+                            'titulo': f'Análise: {titulo}',
+                            'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
+                            'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                        })
+                except Exception as e:
+                    print(f"Erro ao gerar análise para {tipo_grafico}: {e}")
+    
+    # Retorna todos os dados
+    dados_relatorio = {
+        'top_cids': top_cids,
+        'top_funcionarios': top_funcionarios,
+        'top_setores': top_setores,
+        'evolucao_mensal': evolucao,
+        'distribuicao_genero': distribuicao_genero,
+        'top_escalas': top_escalas,
+        'top_motivos': top_motivos,
+        'dias_centro_custo': dias_centro_custo,
+        'distribuicao_dias': distribuicao_dias,
+        'media_cid': media_cid,
+        'top_cids_dias': top_cids_dias,
+        'dias_setor_genero': dias_setor_genero
+    }
+    
+    # Adiciona dados específicos da Roda de Ouro
+    if client_id == 4:
+        dados_relatorio.update({
+            'classificacao_funcionarios_ro': classificacao_funcionarios_ro,
+            'classificacao_setores_ro': classificacao_setores_ro,
+            'classificacao_doencas_ro': classificacao_doencas_ro,
+            'dias_ano_coerencia': dias_ano_coerencia,
+            'analise_coerencia': analise_coerencia,
+            'tempo_servico_atestados': tempo_servico_atestados,
+            'horas_perdidas_genero': horas_perdidas_genero,
+            'horas_perdidas_setor': horas_perdidas_setor,
+            'evolucao_mensal_horas': evolucao_mensal_horas,
+            'comparativo_dias_horas_genero': comparativo_dias_horas_genero_data,
+            'horas_perdidas_setor_genero': horas_perdidas_setor_genero_data,
+            'analise_detalhada_genero': analise_detalhada_genero_data
+        })
+    
+    return {
+        'metricas': metricas,
+        'dados_relatorio': dados_relatorio,
+        'insights': insights,
+        'insights_engine': insights_engine
+    }
 
 @app.get("/api/export/excel")
 async def export_excel(
@@ -2416,81 +3348,30 @@ async def export_excel(
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
     upload_id: Optional[int] = None,
+    funcionario: Optional[List[str]] = Query(None),
+    setor: Optional[List[str]] = Query(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Exporta relatório completo para Excel"""
+    """Exporta relatório completo para Excel - USA DADOS EXATOS DO DASHBOARD"""
     try:
         # Valida client_id
         print(f"[EXPORT EXCEL] Recebido client_id: {client_id}")
         client = validar_client_id(db, client_id)
         print(f"[EXPORT EXCEL] Cliente encontrado: {client.nome} (ID: {client.id})")
         
-        analytics = Analytics(db)
-        report_gen = ReportGenerator()
+        # USA DADOS EXATOS DO DASHBOARD
+        print(f"[EXPORT EXCEL] Buscando dados do dashboard para replicar nos relatórios...")
+        dados_completos = buscar_dados_dashboard_completo(
+            client_id, mes_inicio, mes_fim, funcionario, setor, db
+        )
         
-        # Busca todos os dados (igual ao PDF)
-        metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
-        top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, None, None)
-        top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, None, None)
-        top_setores = analytics.top_setores(client_id, 10, mes_inicio, mes_fim, None, None)
+        metricas_gerais = dados_completos['metricas']
+        dados_relatorio = dados_completos['dados_relatorio']
         
-        # Busca outros dados
-        evolucao_mensal = []
-        try:
-            evolucao_mensal = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, None, None)
-        except:
-            pass
+        report_gen = ReportGenerator(db=db, client_id=client_id)
         
-        distribuicao_genero = []
-        try:
-            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        top_escalas = []
-        try:
-            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        top_motivos = []
-        try:
-            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        dias_centro_custo = []
-        try:
-            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        distribuicao_dias = []
-        try:
-            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        media_cid = []
-        try:
-            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        top_cids_dias = []
-        try:
-            top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        dias_setor_genero = []
-        try:
-            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, None, None)
-        except:
-            pass
-        
-        # Busca dados completos
+        # Busca dados completos para Excel (todos os atestados)
         query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
         if upload_id:
             query = query.filter(Upload.id == upload_id)
@@ -2498,6 +3379,12 @@ async def export_excel(
             query = query.filter(Upload.mes_referencia == mes)
         elif mes_inicio and mes_fim:
             query = query.filter(Upload.mes_referencia >= mes_inicio, Upload.mes_referencia <= mes_fim)
+        
+        # Aplica filtros de funcionário e setor se fornecidos
+        if funcionario:
+            query = query.filter(Atestado.nomecompleto.in_(funcionario))
+        if setor:
+            query = query.filter(Atestado.setor.in_(setor))
         
         atestados = query.all()
         
@@ -2518,22 +3405,6 @@ async def export_excel(
                 'Escala': a.escala,
             })
         
-        # Preparar dados para relatório
-        dados_relatorio = {
-            'top_cids': top_cids,
-            'top_funcionarios': top_funcionarios,
-            'top_setores': top_setores,
-            'evolucao_mensal': evolucao_mensal,
-            'distribuicao_genero': distribuicao_genero,
-            'top_escalas': top_escalas,
-            'top_motivos': top_motivos,
-            'dias_centro_custo': dias_centro_custo,
-            'distribuicao_dias': distribuicao_dias,
-            'media_cid': media_cid,
-            'top_cids_dias': top_cids_dias,
-            'dias_setor_genero': dias_setor_genero
-        }
-        
         # Gerar arquivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"relatorio_absenteismo_{timestamp}.xlsx"
@@ -2543,7 +3414,7 @@ async def export_excel(
         
         # Usar gerador de relatórios
         periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
-        success = report_gen.generate_excel_report(filepath, dados, metricas_gerais, dados_relatorio, periodo)
+        success = report_gen.generate_excel_report(filepath, dados, metricas_gerais, dados_relatorio, periodo, client_id=client_id)
         
         if not success:
             raise HTTPException(status_code=500, detail="Erro ao gerar relatório Excel")
@@ -2567,145 +3438,30 @@ async def export_pdf(
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
     upload_id: Optional[int] = None,
+    funcionario: Optional[List[str]] = Query(None),
+    setor: Optional[List[str]] = Query(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Exporta relatório completo para PDF"""
+    """Exporta relatório completo para PDF - USA DADOS EXATOS DO DASHBOARD"""
     try:
         # Valida client_id
         print(f"[EXPORT PDF] Recebido client_id: {client_id}")
         client = validar_client_id(db, client_id)
         print(f"[EXPORT PDF] Cliente encontrado: {client.nome} (ID: {client.id})")
         
-        analytics = Analytics(db)
-        report_gen = ReportGenerator()
+        # USA DADOS EXATOS DO DASHBOARD
+        print(f"[EXPORT PDF] Buscando dados do dashboard para replicar nos relatórios...")
+        dados_completos = buscar_dados_dashboard_completo(
+            client_id, mes_inicio, mes_fim, funcionario, setor, db
+        )
         
-        # Busca dados e métricas (igual à apresentação)
-        insights_engine = InsightsEngine(db)
+        metricas_gerais = dados_completos['metricas']
+        dados_relatorio = dados_completos['dados_relatorio']
+        insights = dados_completos['insights']
+        insights_engine = dados_completos['insights_engine']
         
-        # Busca todos os dados (igual à apresentação)
-        metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
-        top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, None, None)
-        top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, None, None)
-        top_setores = analytics.top_setores(client_id, 10, mes_inicio, mes_fim, None, None)
-        
-        # Busca evolução mensal
-        evolucao_mensal = []
-        try:
-            evolucao_mensal = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular evolução mensal: {e}")
-        
-        # Busca distribuição por gênero
-        distribuicao_genero = []
-        try:
-            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular distribuição de gênero: {e}")
-        
-        # Busca top escalas
-        top_escalas = []
-        try:
-            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular top escalas: {e}")
-        
-        # Busca top motivos
-        top_motivos = []
-        try:
-            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular top motivos: {e}")
-        
-        # Busca dias por centro de custo
-        dias_centro_custo = []
-        try:
-            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular dias por centro de custo: {e}")
-        
-        # Busca distribuição de dias
-        distribuicao_dias = []
-        try:
-            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular distribuição de dias: {e}")
-        
-        # Busca média por CID
-        media_cid = []
-        try:
-            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular média por CID: {e}")
-        
-        # Busca top CIDs para dias (dias por doença)
-        top_cids_dias = []
-        try:
-            top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular top CIDs para dias: {e}")
-        
-        # Busca dias por setor e gênero
-        dias_setor_genero = []
-        try:
-            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular dias por setor e gênero: {e}")
-        
-        # Busca insights gerais
-        insights = []
-        try:
-            insights = insights_engine.gerar_insights(client_id)
-        except Exception as e:
-            print(f"Erro ao gerar insights gerais: {e}")
-        
-        # Adiciona análises de todos os gráficos
-        tipos_graficos = [
-            ('top_cids', top_cids, '📊', 'TOP 10 Doenças Mais Frequentes'),
-            ('funcionarios_dias', top_funcionarios, '👤', 'Dias Perdidos por Funcionário'),
-            ('evolucao_mensal', evolucao_mensal, '📈', 'Evolução Mensal'),
-            ('top_setores', top_setores, '🏢', 'TOP 5 Setores'),
-            ('genero', distribuicao_genero, '👥', 'Distribuição por Gênero'),
-            ('dias_doenca', top_cids_dias, '🩺', 'Dias por Doença'),
-            ('escalas', top_escalas, '⏰', 'Escalas com Mais Atestados'),
-            ('motivos', top_motivos, '📋', 'Motivos de Incidência'),
-            ('centro_custo', dias_centro_custo, '💰', 'Dias Perdidos por Centro de Custo'),
-            ('distribuicao_dias', distribuicao_dias, '📊', 'Distribuição de Dias por Atestado'),
-            ('media_cid', media_cid, '📊', 'Média de Dias por CID'),
-            ('setor_genero', dias_setor_genero, '👥', 'Dias Perdidos por Setor e Gênero'),
-        ]
-        
-        for tipo_grafico, dados_grafico, icone, titulo in tipos_graficos:
-            if dados_grafico:
-                try:
-                    analise = insights_engine.gerar_analise_grafico(tipo_grafico, dados_grafico, metricas_gerais)
-                    if analise:
-                        partes = analise.split('💡')
-                        insights.append({
-                            'tipo': 'analise',
-                            'icone': icone,
-                            'titulo': f'Análise: {titulo}',
-                            'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
-                            'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
-                        })
-                except Exception as e:
-                    print(f"Erro ao gerar análise para {tipo_grafico}: {e}")
-        
-        # Preparar dados para relatório
-        dados_relatorio = {
-            'top_cids': top_cids,
-            'top_funcionarios': top_funcionarios,
-            'top_setores': top_setores,
-            'evolucao_mensal': evolucao_mensal,
-            'distribuicao_genero': distribuicao_genero,
-            'top_escalas': top_escalas,
-            'top_motivos': top_motivos,
-            'dias_centro_custo': dias_centro_custo,
-            'distribuicao_dias': distribuicao_dias,
-            'media_cid': media_cid,
-            'top_cids_dias': top_cids_dias,
-            'dias_setor_genero': dias_setor_genero
-        }
+        report_gen = ReportGenerator(db=db, client_id=client_id)
         
         # Gerar arquivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2718,7 +3474,7 @@ async def export_pdf(
         periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
         
         # Gerar PDF com gráficos e insights
-        success = report_gen.generate_pdf_report(filepath, dados_relatorio, metricas_gerais, insights, periodo, insights_engine)
+        success = report_gen.generate_pdf_report(filepath, dados_relatorio, metricas_gerais, insights, periodo, insights_engine, client_id=client_id)
         
         if not success:
             raise HTTPException(status_code=500, detail="Erro ao gerar relatório PDF")
@@ -2742,146 +3498,30 @@ async def export_pptx(
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
     upload_id: Optional[int] = None,
+    funcionario: Optional[List[str]] = Query(None),
+    setor: Optional[List[str]] = Query(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Exporta apresentação completa para PowerPoint"""
+    """Exporta apresentação completa para PowerPoint - USA DADOS EXATOS DO DASHBOARD"""
     try:
         # Valida client_id
         print(f"[EXPORT PPTX] Recebido client_id: {client_id}")
         client = validar_client_id(db, client_id)
         print(f"[EXPORT PPTX] Cliente encontrado: {client.nome} (ID: {client.id})")
         
-        analytics = Analytics(db)
-        report_gen = ReportGenerator()
+        # USA DADOS EXATOS DO DASHBOARD
+        print(f"[EXPORT PPTX] Buscando dados do dashboard para replicar nos relatórios...")
+        dados_completos = buscar_dados_dashboard_completo(
+            client_id, mes_inicio, mes_fim, funcionario, setor, db
+        )
         
-        # Busca dados e métricas (igual ao PDF)
-        insights_engine = InsightsEngine(db)
+        metricas_gerais = dados_completos['metricas']
+        dados_relatorio = dados_completos['dados_relatorio']
+        insights = dados_completos['insights']
+        insights_engine = dados_completos['insights_engine']
         
-        # Busca todos os dados (igual ao PDF)
-        metricas_gerais = analytics.metricas_gerais(client_id, mes_inicio, mes_fim, None, None)
-        top_cids = analytics.top_cids(client_id, 10, mes_inicio, mes_fim, None, None)
-        top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, None, None)
-        top_setores = analytics.top_setores(client_id, 10, mes_inicio, mes_fim, None, None)
-        
-        # Busca evolução mensal
-        evolucao_mensal = []
-        try:
-            evolucao_mensal = analytics.evolucao_mensal(client_id, 12, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular evolução mensal: {e}")
-        
-        # Busca distribuição por gênero
-        distribuicao_genero = []
-        try:
-            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular distribuição de gênero: {e}")
-        
-        # Busca top escalas
-        top_escalas = []
-        try:
-            top_escalas = analytics.top_escalas(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular top escalas: {e}")
-        
-        # Busca top motivos
-        top_motivos = []
-        try:
-            top_motivos = analytics.top_motivos(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular top motivos: {e}")
-        
-        # Busca dias por centro de custo
-        dias_centro_custo = []
-        try:
-            dias_centro_custo = analytics.dias_perdidos_por_centro_custo(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular dias por centro de custo: {e}")
-        
-        # Busca distribuição de dias
-        distribuicao_dias = []
-        try:
-            distribuicao_dias = analytics.distribuicao_dias_por_atestado(client_id, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular distribuição de dias: {e}")
-        
-        # Busca média por CID
-        media_cid = []
-        try:
-            media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular média por CID: {e}")
-        
-        # Busca top CIDs para dias (dias por doença)
-        top_cids_dias = []
-        try:
-            top_cids_dias = analytics.top_cids(client_id, 5, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular top CIDs para dias: {e}")
-        
-        # Busca dias por setor e gênero
-        dias_setor_genero = []
-        try:
-            dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, None, None)
-        except Exception as e:
-            print(f"Erro ao calcular dias por setor e gênero: {e}")
-        
-        # Busca insights gerais
-        insights = []
-        try:
-            insights = insights_engine.gerar_insights(client_id)
-        except Exception as e:
-            print(f"Erro ao gerar insights gerais: {e}")
-        
-        # Adiciona análises de todos os gráficos
-        tipos_graficos = [
-            ('top_cids', top_cids, '📊', 'TOP 10 Doenças Mais Frequentes'),
-            ('funcionarios_dias', top_funcionarios, '👤', 'Dias Perdidos por Funcionário'),
-            ('evolucao_mensal', evolucao_mensal, '📈', 'Evolução Mensal'),
-            ('top_setores', top_setores, '🏢', 'TOP 5 Setores'),
-            ('genero', distribuicao_genero, '👥', 'Distribuição por Gênero'),
-            ('dias_doenca', top_cids_dias, '🩺', 'Dias por Doença'),
-            ('escalas', top_escalas, '⏰', 'Escalas com Mais Atestados'),
-            ('motivos', top_motivos, '📋', 'Motivos de Incidência'),
-            ('centro_custo', dias_centro_custo, '💰', 'Dias Perdidos por Centro de Custo'),
-            ('distribuicao_dias', distribuicao_dias, '📊', 'Distribuição de Dias por Atestado'),
-            ('media_cid', media_cid, '📊', 'Média de Dias por CID'),
-            ('setor_genero', dias_setor_genero, '👥', 'Dias Perdidos por Setor e Gênero'),
-        ]
-        
-        for tipo_grafico, dados_grafico, icone, titulo in tipos_graficos:
-            if dados_grafico:
-                try:
-                    analise = insights_engine.gerar_analise_grafico(tipo_grafico, dados_grafico, metricas_gerais)
-                    if analise:
-                        partes = analise.split('💡')
-                        insights.append({
-                            'tipo': 'analise',
-                            'icone': icone,
-                            'titulo': f'Análise: {titulo}',
-                            'texto': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
-                            'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise.replace('**', ''),
-                            'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
-                        })
-                except Exception as e:
-                    print(f"Erro ao gerar análise para {tipo_grafico}: {e}")
-        
-        # Preparar dados para relatório
-        dados_relatorio = {
-            'top_cids': top_cids,
-            'top_funcionarios': top_funcionarios,
-            'top_setores': top_setores,
-            'evolucao_mensal': evolucao_mensal,
-            'distribuicao_genero': distribuicao_genero,
-            'top_escalas': top_escalas,
-            'top_motivos': top_motivos,
-            'dias_centro_custo': dias_centro_custo,
-            'distribuicao_dias': distribuicao_dias,
-            'media_cid': media_cid,
-            'top_cids_dias': top_cids_dias,
-            'dias_setor_genero': dias_setor_genero
-        }
+        report_gen = ReportGenerator(db=db, client_id=client_id)
         
         # Gerar arquivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2894,7 +3534,7 @@ async def export_pptx(
         periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
         
         # Gerar PowerPoint com gráficos e insights
-        success = report_gen.generate_powerpoint_report(filepath, dados_relatorio, metricas_gerais, insights, periodo, insights_engine)
+        success = report_gen.generate_powerpoint_report(filepath, dados_relatorio, metricas_gerais, insights, periodo, insights_engine, client_id=client_id)
         
         if not success:
             raise HTTPException(status_code=500, detail="Erro ao gerar relatório PowerPoint")
@@ -3002,11 +3642,14 @@ async def perfil_funcionario_page():
 @app.get("/api/funcionario/perfil")
 async def perfil_funcionario(
     nome: str = Query(...),
-    client_id: int = 1,
+    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório - sem valor padrão
     db: Session = Depends(get_db)
 ):
     """Retorna perfil completo de um funcionário"""
     try:
+        # Valida client_id
+        validar_client_id(db, client_id)
+        
         analytics = Analytics(db)
         
         # Busca todos os atestados do funcionário
@@ -3456,14 +4099,22 @@ async def salvar_produtividade(
 @app.put("/api/produtividade/{produtividade_id}")
 async def atualizar_produtividade(
     produtividade_id: int,
-    request: Request,
+    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
+    request: Request = ...,
     db: Session = Depends(get_db)
 ):
     """Atualiza um registro de produtividade"""
     try:
-        registro = db.query(Produtividade).filter(Produtividade.id == produtividade_id).first()
+        # Valida client_id
+        validar_client_id(db, client_id)
+        
+        # Busca registro e valida que pertence ao cliente
+        registro = db.query(Produtividade).filter(
+            Produtividade.id == produtividade_id,
+            Produtividade.client_id == client_id
+        ).first()
         if not registro:
-            raise HTTPException(status_code=404, detail="Registro não encontrado")
+            raise HTTPException(status_code=404, detail="Registro não encontrado ou não pertence ao cliente")
         
         data = await request.json()
         
@@ -3520,13 +4171,21 @@ async def atualizar_produtividade(
 @app.delete("/api/produtividade/{produtividade_id}")
 async def excluir_produtividade(
     produtividade_id: int,
+    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
     db: Session = Depends(get_db)
 ):
     """Exclui um registro de produtividade"""
     try:
-        registro = db.query(Produtividade).filter(Produtividade.id == produtividade_id).first()
+        # Valida client_id
+        validar_client_id(db, client_id)
+        
+        # Busca registro e valida que pertence ao cliente
+        registro = db.query(Produtividade).filter(
+            Produtividade.id == produtividade_id,
+            Produtividade.client_id == client_id
+        ).first()
         if not registro:
-            raise HTTPException(status_code=404, detail="Registro não encontrado")
+            raise HTTPException(status_code=404, detail="Registro não encontrado ou não pertence ao cliente")
         
         db.delete(registro)
         db.commit()
@@ -3964,6 +4623,226 @@ def analyze_column(column_name: str, column_data):
         "include": analysis_important,
         "ai_notes": "; ".join(ai_notes) if ai_notes else "Coluna analisada automaticamente"
     }
+
+# ==================== SAVED FILTERS API ====================
+
+@app.get("/api/filtros-salvos")
+async def listar_filtros_salvos(
+    client_id: int = Query(..., description="ID do cliente"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Lista filtros salvos do usuário para um cliente"""
+    try:
+        filtros = db.query(SavedFilter).filter(
+            SavedFilter.user_id == current_user.id,
+            SavedFilter.client_id == client_id
+        ).order_by(SavedFilter.updated_at.desc()).all()
+        
+        return [
+            {
+                "id": f.id,
+                "nome": f.nome,
+                "mes_inicio": f.mes_inicio,
+                "mes_fim": f.mes_fim,
+                "funcionarios": json.loads(f.funcionarios) if f.funcionarios else [],
+                "setores": json.loads(f.setores) if f.setores else [],
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+                "updated_at": f.updated_at.isoformat() if f.updated_at else None
+            }
+            for f in filtros
+        ]
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao listar filtros salvos: {str(e)}")
+
+@app.post("/api/filtros-salvos")
+async def salvar_filtro(
+    client_id: int = Form(...),
+    nome: str = Form(...),
+    mes_inicio: Optional[str] = Form(None),
+    mes_fim: Optional[str] = Form(None),
+    funcionarios: Optional[str] = Form(None),  # JSON string array
+    setores: Optional[str] = Form(None),  # JSON string array
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Salva um novo filtro"""
+    try:
+        # Valida client_id
+        validar_client_id(db, client_id)
+        
+        # Valida nome
+        if not nome or len(nome.strip()) == 0:
+            raise HTTPException(status_code=400, detail="Nome do filtro é obrigatório")
+        
+        # Valida JSON de funcionários e setores
+        funcionarios_list = []
+        setores_list = []
+        
+        if funcionarios:
+            try:
+                funcionarios_list = json.loads(funcionarios)
+                if not isinstance(funcionarios_list, list):
+                    funcionarios_list = []
+            except:
+                funcionarios_list = []
+        
+        if setores:
+            try:
+                setores_list = json.loads(setores)
+                if not isinstance(setores_list, list):
+                    setores_list = []
+            except:
+                setores_list = []
+        
+        # Cria filtro salvo
+        filtro = SavedFilter(
+            user_id=current_user.id,
+            client_id=client_id,
+            nome=nome.strip(),
+            mes_inicio=mes_inicio.strip() if mes_inicio else None,
+            mes_fim=mes_fim.strip() if mes_fim else None,
+            funcionarios=json.dumps(funcionarios_list) if funcionarios_list else None,
+            setores=json.dumps(setores_list) if setores_list else None
+        )
+        
+        db.add(filtro)
+        db.commit()
+        db.refresh(filtro)
+        
+        return {
+            "id": filtro.id,
+            "nome": filtro.nome,
+            "mes_inicio": filtro.mes_inicio,
+            "mes_fim": filtro.mes_fim,
+            "funcionarios": funcionarios_list,
+            "setores": setores_list,
+            "message": "Filtro salvo com sucesso"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar filtro: {str(e)}")
+
+@app.put("/api/filtros-salvos/{filtro_id}")
+async def atualizar_filtro(
+    filtro_id: int,
+    nome: Optional[str] = Form(None),
+    mes_inicio: Optional[str] = Form(None),
+    mes_fim: Optional[str] = Form(None),
+    funcionarios: Optional[str] = Form(None),
+    setores: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Atualiza um filtro salvo"""
+    try:
+        filtro = db.query(SavedFilter).filter(
+            SavedFilter.id == filtro_id,
+            SavedFilter.user_id == current_user.id
+        ).first()
+        
+        if not filtro:
+            raise HTTPException(status_code=404, detail="Filtro não encontrado")
+        
+        if nome:
+            filtro.nome = nome.strip()
+        if mes_inicio is not None:
+            filtro.mes_inicio = mes_inicio.strip() if mes_inicio else None
+        if mes_fim is not None:
+            filtro.mes_fim = mes_fim.strip() if mes_fim else None
+        
+        if funcionarios is not None:
+            try:
+                funcionarios_list = json.loads(funcionarios) if funcionarios else []
+                filtro.funcionarios = json.dumps(funcionarios_list) if funcionarios_list else None
+            except:
+                pass
+        
+        if setores is not None:
+            try:
+                setores_list = json.loads(setores) if setores else []
+                filtro.setores = json.dumps(setores_list) if setores_list else None
+            except:
+                pass
+        
+        filtro.updated_at = datetime.now()
+        db.commit()
+        
+        return {
+            "id": filtro.id,
+            "nome": filtro.nome,
+            "message": "Filtro atualizado com sucesso"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar filtro: {str(e)}")
+
+@app.delete("/api/filtros-salvos/{filtro_id}")
+async def deletar_filtro(
+    filtro_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Deleta um filtro salvo"""
+    try:
+        filtro = db.query(SavedFilter).filter(
+            SavedFilter.id == filtro_id,
+            SavedFilter.user_id == current_user.id
+        ).first()
+        
+        if not filtro:
+            raise HTTPException(status_code=404, detail="Filtro não encontrado")
+        
+        db.delete(filtro)
+        db.commit()
+        
+        return {"message": "Filtro deletado com sucesso"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar filtro: {str(e)}")
+
+@app.get("/api/filtros-salvos/{filtro_id}/aplicar")
+async def aplicar_filtro_salvo(
+    filtro_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Retorna os parâmetros de um filtro salvo para aplicação"""
+    try:
+        filtro = db.query(SavedFilter).filter(
+            SavedFilter.id == filtro_id,
+            SavedFilter.user_id == current_user.id
+        ).first()
+        
+        if not filtro:
+            raise HTTPException(status_code=404, detail="Filtro não encontrado")
+        
+        return {
+            "mes_inicio": filtro.mes_inicio,
+            "mes_fim": filtro.mes_fim,
+            "funcionarios": json.loads(filtro.funcionarios) if filtro.funcionarios else [],
+            "setores": json.loads(filtro.setores) if filtro.setores else []
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao obter filtro: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

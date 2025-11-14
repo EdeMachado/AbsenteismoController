@@ -7,6 +7,23 @@ from .models import Atestado, Upload, Client
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Union
 import calendar
+try:
+    from dateutil.relativedelta import relativedelta
+except ImportError:
+    # Fallback simples se dateutil não estiver disponível
+    class relativedelta:
+        def __init__(self, months=0):
+            self.months = months
+        def __rsub__(self, other):
+            # Implementação simples para subtração
+            if isinstance(other, datetime):
+                year = other.year
+                month = other.month - self.months
+                while month <= 0:
+                    month += 12
+                    year -= 1
+                return datetime(year, month, other.day, other.hour, other.minute, other.second)
+            return other
 
 class Analytics:
     """Classe para cálculos analíticos"""
@@ -740,16 +757,17 @@ class Analytics:
         ]
     
     def classificacao_funcionarios_roda_ouro(self, client_id: int, limit: int = 15, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
-        """Classificação por Funcionário - Roda de Ouro (conta atestados, não dias)"""
+        """Classificação por Funcionário - Roda de Ouro (soma dias de atestados, não conta atestados)"""
         query = self.db.query(
             Atestado.nomecompleto,
-            func.count(Atestado.id).label('quantidade')
+            func.sum(Atestado.dias_atestados).label('dias_atestados')
         ).join(Upload).filter(
             Upload.client_id == client_id,
             or_(
                 Atestado.nomecompleto != '',
                 Atestado.nomecompleto.isnot(None)
-            )
+            ),
+            Atestado.dias_atestados > 0  # Só inclui funcionários com dias de atestados
         )
         
         if mes_inicio:
@@ -761,14 +779,14 @@ class Analytics:
         query = aplicar_filtro_funcionario(query, funcionario)
         query = aplicar_filtro_setor(query, setor)
         
-        query = query.group_by(Atestado.nomecompleto).order_by(func.count(Atestado.id).desc()).limit(limit)
+        query = query.group_by(Atestado.nomecompleto).order_by(func.sum(Atestado.dias_atestados).desc()).limit(limit)
         
         results = query.all()
         
         return [
             {
                 'nome': r.nomecompleto or 'Não informado',
-                'quantidade': r.quantidade or 0
+                'quantidade': float(r.dias_atestados or 0)  # Mantém 'quantidade' para compatibilidade com frontend, mas agora é dias
             }
             for r in results
         ]
@@ -814,23 +832,16 @@ class Analytics:
         return resultado
     
     def classificacao_doencas_roda_ouro(self, client_id: int, limit: int = 15, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
-        """Classificação por Doença - Roda de Ouro (agrupa por tipo de doença baseado no diagnóstico)"""
-        # Busca todos os registros com diagnóstico
+        """Classificação por Doença - Roda de Ouro (soma dias perdidos por nome real da doença) - USA COLUNA 'Doença' DOS DADOS ORIGINAIS"""
+        import json
+        
+        # Busca todos os registros com dados originais
         query = self.db.query(
-            Atestado.diagnostico,
-            Atestado.cid,
-            Atestado.descricao_cid,
-            func.count(Atestado.id).label('quantidade')
+            Atestado.dados_originais,
+            Atestado.dias_atestados
         ).join(Upload).filter(
             Upload.client_id == client_id,
-            or_(
-                Atestado.diagnostico != '',
-                Atestado.descricao_cid != ''
-            ),
-            or_(
-                Atestado.diagnostico.isnot(None),
-                Atestado.descricao_cid.isnot(None)
-            )
+            Atestado.dias_atestados > 0  # Só inclui registros com dias
         )
         
         if mes_inicio:
@@ -842,30 +853,75 @@ class Analytics:
         query = aplicar_filtro_funcionario(query, funcionario)
         query = aplicar_filtro_setor(query, setor)
         
-        query = query.group_by(Atestado.diagnostico, Atestado.cid, Atestado.descricao_cid).order_by(func.count(Atestado.id).desc()).limit(limit * 2)
+        registros = query.all()
+        print(f"🔍 DEBUG classificacao_doencas_roda_ouro - client_id={client_id}, registros encontrados: {len(registros)}")
         
-        results = query.all()
+        # Agrupa por nome da doença usando coluna "Doença" dos dados originais
+        doencas_dict = {}
+        registros_sem_nome = 0
         
-        # Agrupa por tipo de doença (categoriza diagnósticos)
-        tipos_doenca = {}
-        for r in results:
-            diagnostico = (r.diagnostico or r.descricao_cid or '').upper()
-            tipo = self._categorizar_doenca(diagnostico)
+        for r in registros:
+            # Busca coluna "Doença" nos dados originais
+            nome_doenca = None
+            if r.dados_originais:
+                try:
+                    dados_orig = json.loads(r.dados_originais)
+                    # Prioriza coluna "Doença" (nome exato da coluna na planilha RODA DE OURO)
+                    nome_doenca = dados_orig.get('Doença') or dados_orig.get('doença') or dados_orig.get('DOENÇA')
+                    if nome_doenca:
+                        nome_doenca = str(nome_doenca).strip()
+                except:
+                    pass
             
-            if tipo not in tipos_doenca:
-                tipos_doenca[tipo] = 0
-            tipos_doenca[tipo] += r.quantidade or 0
+            # Fallback: se não encontrou em dados_originais, tenta campos do banco
+            if not nome_doenca:
+                # Tenta campos do banco como fallback
+                atestado_completo = self.db.query(Atestado).filter(Atestado.dados_originais == r.dados_originais).first()
+                if atestado_completo:
+                    if atestado_completo.descricao_cid and str(atestado_completo.descricao_cid).strip():
+                        nome_doenca = str(atestado_completo.descricao_cid).strip()
+                    elif atestado_completo.diagnostico and str(atestado_completo.diagnostico).strip():
+                        nome_doenca = str(atestado_completo.diagnostico).strip()
+                    elif atestado_completo.cid and str(atestado_completo.cid).strip():
+                        nome_doenca = str(atestado_completo.cid).strip()
+            
+            if not nome_doenca:
+                registros_sem_nome += 1
+                continue
+            
+            # Normaliza o nome (remove espaços extras, converte para maiúsculas para agrupar)
+            nome_doenca_normalizado = ' '.join(nome_doenca.upper().split())
+            
+            # Agrupa por nome normalizado e soma os dias
+            if nome_doenca_normalizado not in doencas_dict:
+                doencas_dict[nome_doenca_normalizado] = {
+                    'nome_original': nome_doenca,  # Mantém o nome original para exibição
+                    'dias': 0
+                }
+            doencas_dict[nome_doenca_normalizado]['dias'] += float(r.dias_atestados or 0)
         
-        # Ordena e limita
-        tipos_ordenados = sorted(tipos_doenca.items(), key=lambda x: x[1], reverse=True)[:limit]
+        print(f"📊 Doenças agrupadas: {len(doencas_dict)}, Registros sem nome: {registros_sem_nome}")
         
-        return [
+        # Ordena por dias perdidos (decrescente) e limita
+        doencas_ordenadas = sorted(
+            doencas_dict.items(), 
+            key=lambda x: x[1]['dias'], 
+            reverse=True
+        )[:limit]
+        
+        resultado = [
             {
-                'tipo_doenca': tipo,
-                'quantidade': quantidade
+                'tipo_doenca': item[1]['nome_original'],  # Usa nome original (não normalizado)
+                'quantidade': round(item[1]['dias'], 2)  # Dias de afastamento
             }
-            for tipo, quantidade in tipos_ordenados
+            for item in doencas_ordenadas
         ]
+        
+        print(f"✅ Retornando {len(resultado)} doenças ordenadas por dias")
+        for item in resultado[:5]:  # Mostra as 5 primeiras
+            print(f"  - {item['tipo_doenca']}: {item['quantidade']} dias")
+        
+        return resultado
     
     def _categorizar_doenca(self, diagnostico: str) -> str:
         """Categoriza diagnóstico em tipo de doença"""
@@ -897,8 +953,9 @@ class Analytics:
             return 'OUTRAS'
     
     def dias_atestados_por_ano_coerencia(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> Dict[str, Any]:
-        """Dias atestados por ano com coerência (COERENTE vs SEM COERÊNCIA)"""
+        """Dias atestados por ano com coerência (COERENTE vs SEM COERÊNCIA) - agrupa por ano e mês - USA COLUNAS 'ano', 'mês' E 'coerente' DOS DADOS ORIGINAIS"""
         import json
+        from datetime import datetime
         
         # Busca todos os registros
         query = self.db.query(
@@ -921,73 +978,158 @@ class Analytics:
         
         registros = query.all()
         
-        # Agrupa por ano
+        # Agrupa por ano (e depois por mês dentro do ano)
         dados_por_ano = {}
+        dados_por_mes_ano = {}  # Para detalhamento mensal
         
         for r in registros:
-            # Tenta obter ano da data de afastamento ou do mês de referência
+            # Tenta obter ano e mês dos dados originais (colunas "ano" e "mês")
             ano = None
-            if r.data_afastamento:
+            mes = None
+            mes_ano_key = None
+            coerente_valor = None
+            
+            # Prioridade 1: Busca nos dados originais (colunas "ano" e "mês" da planilha RODA DE OURO)
+            if r.dados_originais:
+                try:
+                    dados_orig = json.loads(r.dados_originais)
+                    # Busca colunas "ano" e "mês" (nomes exatos da planilha)
+                    ano_str = dados_orig.get('ano') or dados_orig.get('Ano') or dados_orig.get('ANO')
+                    mes_str = dados_orig.get('mês') or dados_orig.get('Mês') or dados_orig.get('MÊS') or dados_orig.get('mes')
+                    
+                    if ano_str:
+                        ano = str(ano_str).strip()
+                    if mes_str:
+                        mes = str(mes_str).strip().zfill(2)
+                    
+                    # Busca coluna "coerente" dos dados originais
+                    coerente_valor = dados_orig.get('coerente') or dados_orig.get('Coerente') or dados_orig.get('COERENTE')
+                except:
+                    pass
+            
+            # Prioridade 2: Se não encontrou nos dados originais, usa data_afastamento
+            if not ano and r.data_afastamento:
                 ano = str(r.data_afastamento.year)
-            elif r.mes_referencia:
-                ano = r.mes_referencia.split('-')[0]
+                mes = str(r.data_afastamento.month).zfill(2)
+            
+            # Prioridade 3: Se ainda não encontrou, usa mes_referencia
+            if not ano and r.mes_referencia:
+                partes = r.mes_referencia.split('-')
+                if len(partes) >= 2:
+                    ano = partes[0]
+                    mes = partes[1]
+                elif len(partes) == 1 and len(partes[0]) == 4:
+                    ano = partes[0]
+                    mes = '01'
             
             if not ano:
                 continue
             
+            # Monta chave mês-ano
+            if mes:
+                mes_ano_key = f"{ano}-{mes}"
+            
+            # Agrupa por ano
             if ano not in dados_por_ano:
                 dados_por_ano[ano] = {'coerente': 0, 'sem_coerencia': 0}
             
-            # Verifica coerência nos dados originais
-            coerente = self._verificar_coerencia(r.dados_originais, r.dias_atestados)
+            # Agrupa por mês-ano (para detalhamento)
+            if mes_ano_key:
+                if mes_ano_key not in dados_por_mes_ano:
+                    dados_por_mes_ano[mes_ano_key] = {'coerente': 0, 'sem_coerencia': 0}
             
-            if coerente:
-                dados_por_ano[ano]['coerente'] += r.dias_atestados or 0
+            # Verifica coerência: usa coluna "coerente" dos dados originais se disponível
+            if coerente_valor:
+                # Usa valor direto da coluna "coerente"
+                is_coerente = str(coerente_valor).upper().strip() == 'COERENTE'
             else:
-                dados_por_ano[ano]['sem_coerencia'] += r.dias_atestados or 0
+                # Fallback: usa função de verificação
+                is_coerente = self._verificar_coerencia(r.dados_originais, r.dias_atestados)
+            
+            dias = r.dias_atestados or 0
+            
+            if is_coerente:
+                dados_por_ano[ano]['coerente'] += dias
+                if mes_ano_key:
+                    dados_por_mes_ano[mes_ano_key]['coerente'] += dias
+            else:
+                dados_por_ano[ano]['sem_coerencia'] += dias
+                if mes_ano_key:
+                    dados_por_mes_ano[mes_ano_key]['sem_coerencia'] += dias
         
-        # Converte para lista ordenada
+        # Converte para lista ordenada (por ano)
         anos_ordenados = sorted(dados_por_ano.keys())
+        
+        # Ordena meses dentro de cada ano
+        meses_ordenados = sorted(dados_por_mes_ano.keys())
         
         return {
             'anos': anos_ordenados,
             'coerente': [dados_por_ano[ano]['coerente'] for ano in anos_ordenados],
-            'sem_coerencia': [dados_por_ano[ano]['sem_coerencia'] for ano in anos_ordenados]
+            'sem_coerencia': [dados_por_ano[ano]['sem_coerencia'] for ano in anos_ordenados],
+            # Dados mensais para gráfico detalhado
+            'meses': meses_ordenados,
+            'coerente_mensal': [dados_por_mes_ano[mes]['coerente'] for mes in meses_ordenados],
+            'sem_coerencia_mensal': [dados_por_mes_ano[mes]['sem_coerencia'] for mes in meses_ordenados]
         }
     
     def _verificar_coerencia(self, dados_originais_json: str, dias_atestados: float) -> bool:
-        """Verifica se o atestado é coerente baseado nos dados originais"""
+        """Verifica se o atestado é coerente baseado nos dados originais - USA COLUNA 'coerente' DOS DADOS ORIGINAIS"""
         import json
         
         if not dados_originais_json:
-            # Se não tem dados originais, assume coerente
-            return True
+            # Se não tem dados originais, assume SEM coerência (mais conservador)
+            return False
         
         try:
             dados_originais = json.loads(dados_originais_json)
             
-            # Procura campos relacionados a coerência
+            # PRIORIDADE 1: Busca coluna "coerente" (nome exato da coluna na planilha RODA DE OURO)
+            coerente_valor = dados_originais.get('coerente') or dados_originais.get('Coerente') or dados_originais.get('COERENTE')
+            if coerente_valor:
+                valor_str = str(coerente_valor).upper().strip()
+                if valor_str == 'COERENTE':
+                    return True
+                elif 'SEM COER' in valor_str or 'SEM_COER' in valor_str or 'SEMCOER' in valor_str:
+                    return False
+                elif 'NÃO' in valor_str or 'NAO' in valor_str or 'N' in valor_str or 'FALSE' in valor_str or '0' in valor_str:
+                    return False
+                else:
+                    return True  # Se tem valor mas não é claramente negativo, assume coerente
+            
+            # PRIORIDADE 2: Busca em "Parecer Médico" (pode conter "COERENTE" ou "SEM COERÊNCIA")
+            parecer = dados_originais.get('Parecer Médico') or dados_originais.get('Parecer Medico') or dados_originais.get('PAREcer Médico')
+            if parecer:
+                parecer_str = str(parecer).upper()
+                if 'COERENTE' in parecer_str and 'SEM COER' not in parecer_str:
+                    return True
+                elif 'SEM COER' in parecer_str:
+                    return False
+            
+            # PRIORIDADE 3: Procura campos relacionados a coerência (fallback)
             for key, value in dados_originais.items():
                 key_upper = str(key).upper()
                 value_str = str(value).upper() if value else ''
                 
+                # Verifica se tem campo "SEM COERÊNCIA" primeiro (tem prioridade)
+                if 'SEM COER' in key_upper or 'SEM_COER' in key_upper or 'SEMCOER' in key_upper:
+                    if 'SIM' in value_str or 'S' in value_str or 'TRUE' in value_str or '1' in value_str:
+                        return False  # SEM coerência
+                    elif 'NÃO' in value_str or 'NAO' in value_str or 'N' in value_str or 'FALSE' in value_str or '0' in value_str:
+                        return True  # NÃO tem sem coerência = coerente
+                
                 # Verifica se tem campo de coerência
                 if 'COERENTE' in key_upper or 'COERENCIA' in key_upper:
                     if 'SIM' in value_str or 'S' in value_str or 'TRUE' in value_str or '1' in value_str:
-                        return True
+                        return True  # COERENTE
                     elif 'NÃO' in value_str or 'NAO' in value_str or 'N' in value_str or 'FALSE' in value_str or '0' in value_str:
-                        return False
-                
-                # Verifica se tem campo "SEM COERÊNCIA"
-                if 'SEM COER' in key_upper or 'SEM_COER' in key_upper:
-                    if 'SIM' in value_str or 'S' in value_str or 'TRUE' in value_str or '1' in value_str:
-                        return False
+                        return False  # NÃO coerente = sem coerência
             
-            # Se não encontrou campo de coerência, assume coerente por padrão
-            return True
+            # Se não encontrou campo de coerência, assume SEM coerência por padrão (mais conservador)
+            return False
         except:
-            # Se der erro ao parsear, assume coerente
-            return True
+            # Se der erro ao parsear, assume SEM coerência (mais conservador)
+            return False
     
     def analise_atestados_coerencia(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> Dict[str, Any]:
         """Análise de atestados por coerência (para gráfico de rosca)"""
@@ -1035,11 +1177,14 @@ class Analytics:
         }
     
     def tempo_servico_atestados(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
-        """Tempo de Serviço x Atestados - agrupa por ano (baseado em data_afastamento ou mes_referencia)"""
+        """Tempo de Serviço x Atestados - USA COLUNA 'Admissão' DOS DADOS ORIGINAIS - Analisa se funcionários mais antigos ou mais novos dão mais atestados"""
+        import json
+        from datetime import datetime, date
+        
         query = self.db.query(
-            Atestado.data_afastamento,
-            Upload.mes_referencia,
-            func.count(Atestado.id).label('quantidade')
+            Atestado.dados_originais,
+            Atestado.dias_atestados,
+            Atestado.nomecompleto
         ).join(Upload).filter(
             Upload.client_id == client_id
         )
@@ -1055,32 +1200,583 @@ class Analytics:
         
         registros = query.all()
         
-        # Agrupa por ano
-        dados_por_ano = {}
+        # Função para calcular tempo de serviço em anos
+        def calcular_tempo_servico(data_admissao_str):
+            """Calcula tempo de serviço em anos a partir da data de admissão"""
+            if not data_admissao_str:
+                return None
+            
+            try:
+                # Tenta vários formatos de data
+                data_admissao = None
+                if isinstance(data_admissao_str, str):
+                    # Tenta formato DD/MM/YYYY
+                    try:
+                        data_admissao = datetime.strptime(data_admissao_str, '%d/%m/%Y').date()
+                    except:
+                        # Tenta formato YYYY-MM-DD
+                        try:
+                            data_admissao = datetime.strptime(data_admissao_str, '%Y-%m-%d').date()
+                        except:
+                            # Tenta formato DD-MM-YYYY
+                            try:
+                                data_admissao = datetime.strptime(data_admissao_str, '%d-%m-%Y').date()
+                            except:
+                                # Tenta apenas ano (YYYY)
+                                try:
+                                    ano = int(data_admissao_str[:4])
+                                    data_admissao = date(ano, 1, 1)
+                                except:
+                                    pass
+                
+                if not data_admissao:
+                    return None
+                
+                # Calcula diferença em anos
+                hoje = date.today()
+                anos = (hoje - data_admissao).days / 365.25
+                return anos
+            except:
+                return None
+        
+        # Função para categorizar tempo de serviço em faixas
+        def categorizar_tempo_servico(anos):
+            """Categoriza tempo de serviço em faixas"""
+            if anos is None:
+                return 'Não informado'
+            elif anos < 1:
+                return '0-1 ano'
+            elif anos < 3:
+                return '1-3 anos'
+            elif anos < 5:
+                return '3-5 anos'
+            elif anos < 10:
+                return '5-10 anos'
+            else:
+                return '10+ anos'
+        
+        # Agrupa por faixa de tempo de serviço
+        dados_por_faixa = {}
         
         for r in registros:
-            # Tenta obter ano da data de afastamento ou do mês de referência
+            # Busca coluna "Admissão" nos dados originais
+            data_admissao_str = None
+            if r.dados_originais:
+                try:
+                    dados_orig = json.loads(r.dados_originais)
+                    # Busca coluna "Admissão" (nome exato da planilha RODA DE OURO)
+                    data_admissao_str = dados_orig.get('Admissão') or dados_orig.get('admissão') or dados_orig.get('ADMISSÃO') or dados_orig.get('Admissao')
+                except:
+                    pass
+            
+            # Calcula tempo de serviço
+            anos_servico = calcular_tempo_servico(data_admissao_str)
+            faixa = categorizar_tempo_servico(anos_servico)
+            
+            # Agrupa por faixa e soma dias de afastamento
+            if faixa not in dados_por_faixa:
+                dados_por_faixa[faixa] = {
+                    'faixa': faixa,
+                    'dias_afastamento': 0,
+                    'quantidade_atestados': 0
+                }
+            
+            dias = r.dias_atestados or 0
+            dados_por_faixa[faixa]['dias_afastamento'] += dias
+            dados_por_faixa[faixa]['quantidade_atestados'] += 1
+        
+        # Ordena faixas por ordem lógica
+        ordem_faixas = ['0-1 ano', '1-3 anos', '3-5 anos', '5-10 anos', '10+ anos', 'Não informado']
+        resultado = []
+        for faixa_ordem in ordem_faixas:
+            if faixa_ordem in dados_por_faixa:
+                resultado.append({
+                    'faixa_tempo_servico': dados_por_faixa[faixa_ordem]['faixa'],
+                    'dias_afastamento': round(dados_por_faixa[faixa_ordem]['dias_afastamento'], 2),
+                    'quantidade_atestados': dados_por_faixa[faixa_ordem]['quantidade_atestados']
+                })
+        
+        # Adiciona outras faixas que não estão na ordem padrão (se houver)
+        for faixa, dados in dados_por_faixa.items():
+            if faixa not in ordem_faixas:
+                resultado.append({
+                    'faixa_tempo_servico': dados['faixa'],
+                    'dias_afastamento': round(dados['dias_afastamento'], 2),
+                    'quantidade_atestados': dados['quantidade_atestados']
+                })
+        
+        print(f"📊 Tempo Serviço x Atestados - {len(resultado)} faixas encontradas")
+        for item in resultado:
+            print(f"  - {item['faixa_tempo_servico']}: {item['dias_afastamento']} dias ({item['quantidade_atestados']} atestados)")
+        
+        return resultado
+    
+    def horas_perdidas_por_genero(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Horas perdidas por gênero (calcula se horas_perdi estiver zerado)"""
+        # Calcula horas: se horas_perdi > 0 usa ele, senão calcula dias_atestados * horas_dia
+        query = self.db.query(
+            Atestado.genero,
+            func.sum(Atestado.horas_perdi).label('horas_perdi_sum'),
+            func.sum(Atestado.dias_atestados).label('dias_atestados_sum'),
+            func.sum(Atestado.horas_dia).label('horas_dia_sum'),
+            func.count(Atestado.id).label('quantidade'),
+            func.sum(Atestado.dias_atestados * Atestado.horas_dia).label('horas_calculadas')
+        ).join(Upload).filter(
+            Upload.client_id == client_id,
+            Atestado.genero != '',
+            Atestado.genero.isnot(None)
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        query = query.group_by(Atestado.genero)
+        
+        results = query.all()
+        
+        # Considerando semana = 44 horas
+        SEMANA_HORAS = 44
+        
+        resultado = []
+        for r in results:
+            # Se horas_perdi tem valor, usa ele, senão calcula
+            horas_perdidas = float(r.horas_perdi_sum or 0)
+            if horas_perdidas == 0:
+                # Calcula: dias * horas_dia (média)
+                dias_total = float(r.dias_atestados_sum or 0)
+                horas_dia_media = float(r.horas_dia_sum or 0) / float(r.quantidade or 1) if r.quantidade > 0 else 0
+                if horas_dia_media == 0:
+                    # Tenta usar horas_calculadas se disponível
+                    horas_perdidas = float(r.horas_calculadas or 0)
+                else:
+                    horas_perdidas = dias_total * horas_dia_media
+            
+            semanas_perdidas = horas_perdidas / SEMANA_HORAS if SEMANA_HORAS > 0 else 0
+            
+            genero_nome = 'Masculino' if r.genero == 'M' else 'Feminino' if r.genero == 'F' else r.genero
+            
+            resultado.append({
+                'genero': r.genero or '-',
+                'genero_label': genero_nome,
+                'horas_perdidas': round(horas_perdidas, 2),
+                'semanas_perdidas': round(semanas_perdidas, 2),
+                'dias_perdidos': round(float(r.dias_atestados_sum or 0), 2),
+                'quantidade': r.quantidade or 0
+            })
+        
+        return resultado
+    
+    def horas_perdidas_por_setor(self, client_id: int, limit: int = 10, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Horas perdidas por setor (calcula se horas_perdi estiver zerado)"""
+        query = self.db.query(
+            Atestado.setor,
+            func.sum(Atestado.horas_perdi).label('horas_perdi_sum'),
+            func.sum(Atestado.dias_atestados).label('dias_atestados_sum'),
+            func.avg(Atestado.horas_dia).label('horas_dia_media'),
+            func.count(Atestado.id).label('quantidade'),
+            func.sum(Atestado.dias_atestados * Atestado.horas_dia).label('horas_calculadas')
+        ).join(Upload).filter(
+            Upload.client_id == client_id,
+            Atestado.setor != '',
+            Atestado.setor.isnot(None)
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        # Não aplica filtro de setor aqui, pois queremos ver todos os setores
+        
+        query = query.group_by(Atestado.setor).order_by(func.sum(Atestado.horas_perdi).desc()).limit(limit)
+        
+        results = query.all()
+        
+        # Considerando semana = 44 horas
+        SEMANA_HORAS = 44
+        
+        resultado = []
+        for r in results:
+            # Se horas_perdi tem valor, usa ele, senão calcula
+            horas_perdidas = float(r.horas_perdi_sum or 0)
+            if horas_perdidas == 0:
+                # Calcula: dias * horas_dia (média)
+                dias_total = float(r.dias_atestados_sum or 0)
+                horas_dia_media = float(r.horas_dia_media or 0)
+                if horas_dia_media == 0:
+                    # Tenta usar horas_calculadas se disponível
+                    horas_perdidas = float(r.horas_calculadas or 0)
+                else:
+                    horas_perdidas = dias_total * horas_dia_media
+            
+            semanas_perdidas = horas_perdidas / SEMANA_HORAS if SEMANA_HORAS > 0 else 0
+            
+            resultado.append({
+                'setor': r.setor or 'Não informado',
+                'horas_perdidas': round(horas_perdidas, 2),
+                'semanas_perdidas': round(semanas_perdidas, 2),
+                'dias_perdidos': round(float(r.dias_atestados_sum or 0), 2),
+                'quantidade': r.quantidade or 0
+            })
+        
+        return resultado
+    
+    def evolucao_mensal_horas(self, client_id: int, meses: int = 12, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Evolução mensal de horas perdidas - MESMO RACIOCÍNIO DE dias_atestados_por_ano_coerencia: agrupa mês a mês"""
+        import json
+        from datetime import datetime
+        
+        # Busca todos os registros (mesmo padrão de dias_atestados_por_ano_coerencia)
+        query = self.db.query(
+            Atestado.horas_perdi,
+            Atestado.dias_atestados,
+            Atestado.horas_dia,
+            Atestado.data_afastamento,
+            Atestado.dados_originais,
+            Upload.mes_referencia
+        ).join(Upload).filter(
+            Upload.client_id == client_id
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        registros = query.all()
+        
+        # Agrupa por mês-ano (mesmo padrão de dias_atestados_por_ano_coerencia)
+        dados_por_mes_ano = {}  # Chave: "YYYY-MM", Valor: {horas_perdidas, semanas_perdidas, dias_perdidos, quantidade}
+        
+        # Considerando semana = 44 horas
+        SEMANA_HORAS = 44
+        
+        for r in registros:
+            # Tenta obter ano e mês dos dados originais (colunas "ano" e "mês") - MESMO PADRÃO
             ano = None
-            if r.data_afastamento:
+            mes = None
+            mes_ano_key = None
+            
+            # Prioridade 1: Busca nos dados originais (colunas "ano" e "mês" da planilha)
+            if r.dados_originais:
+                try:
+                    dados_orig = json.loads(r.dados_originais)
+                    # Busca colunas "ano" e "mês" (nomes exatos da planilha)
+                    ano_str = dados_orig.get('ano') or dados_orig.get('Ano') or dados_orig.get('ANO')
+                    mes_str = dados_orig.get('mês') or dados_orig.get('Mês') or dados_orig.get('MÊS') or dados_orig.get('mes')
+                    
+                    if ano_str:
+                        ano = str(ano_str).strip()
+                    if mes_str:
+                        mes = str(mes_str).strip().zfill(2)
+                except:
+                    pass
+            
+            # Prioridade 2: Se não encontrou nos dados originais, usa data_afastamento
+            if not ano and r.data_afastamento:
                 ano = str(r.data_afastamento.year)
-            elif r.mes_referencia:
-                ano = r.mes_referencia.split('-')[0]
+                mes = str(r.data_afastamento.month).zfill(2)
+            
+            # Prioridade 3: Se ainda não encontrou, usa mes_referencia
+            if not ano and r.mes_referencia:
+                partes = r.mes_referencia.split('-')
+                if len(partes) >= 2:
+                    ano = partes[0]
+                    mes = partes[1]
+                elif len(partes) == 1 and len(partes[0]) == 4:
+                    ano = partes[0]
+                    mes = '01'
             
             if not ano:
                 continue
             
-            if ano not in dados_por_ano:
-                dados_por_ano[ano] = 0
+            # Monta chave mês-ano (formato "YYYY-MM")
+            if mes:
+                mes_ano_key = f"{ano}-{mes}"
+            else:
+                mes_ano_key = f"{ano}-01"  # Fallback para janeiro se não tiver mês
             
-            dados_por_ano[ano] += r.quantidade or 0
+            # Inicializa estrutura para este mês-ano se não existir
+            if mes_ano_key not in dados_por_mes_ano:
+                dados_por_mes_ano[mes_ano_key] = {
+                    'horas_perdidas': 0.0,
+                    'semanas_perdidas': 0.0,
+                    'dias_perdidos': 0.0,
+                    'quantidade': 0
+                }
+            
+            # Calcula horas perdidas: se horas_perdi tem valor, usa ele, senão calcula
+            horas_perdidas = float(r.horas_perdi or 0)
+            if horas_perdidas == 0:
+                # Calcula: dias * horas_dia
+                dias_total = float(r.dias_atestados or 0)
+                horas_dia_valor = float(r.horas_dia or 0)
+                if horas_dia_valor > 0:
+                    horas_perdidas = dias_total * horas_dia_valor
+            
+            semanas_perdidas = horas_perdidas / SEMANA_HORAS if SEMANA_HORAS > 0 else 0
+            dias_perdidos = float(r.dias_atestados or 0)
+            
+            # Acumula valores para este mês-ano
+            dados_por_mes_ano[mes_ano_key]['horas_perdidas'] += horas_perdidas
+            dados_por_mes_ano[mes_ano_key]['semanas_perdidas'] += semanas_perdidas
+            dados_por_mes_ano[mes_ano_key]['dias_perdidos'] += dias_perdidos
+            dados_por_mes_ano[mes_ano_key]['quantidade'] += 1
         
-        # Converte para lista ordenada
-        anos_ordenados = sorted(dados_por_ano.keys())
+        # Ordena meses (mesmo padrão de dias_atestados_por_ano_coerencia)
+        meses_ordenados = sorted(dados_por_mes_ano.keys())
         
-        return [
-            {
-                'ano': ano,
-                'quantidade': dados_por_ano[ano]
+        # Converte para lista de dicionários (mesmo formato esperado pelo frontend)
+        dados = []
+        for mes_ano in meses_ordenados:
+            dados_mes = dados_por_mes_ano[mes_ano]
+            dados.append({
+                'mes': mes_ano,
+                'horas_perdidas': round(dados_mes['horas_perdidas'], 2),
+                'semanas_perdidas': round(dados_mes['semanas_perdidas'], 2),
+                'dias_perdidos': round(dados_mes['dias_perdidos'], 2),
+                'quantidade': dados_mes['quantidade']
+            })
+        
+        # Já está ordenado crescente (do mais antigo para o mais recente) - MESMO PADRÃO
+        return dados
+    
+    def comparativo_periodos(self, client_id: int, tipo_comparacao: str = 'mes', funcionario: str = None, setor: str = None) -> Dict[str, Any]:
+        """
+        Comparativo entre períodos (mês atual vs anterior, trimestre atual vs anterior)
+        tipo_comparacao: 'mes' ou 'trimestre'
+        """
+        hoje = datetime.now()
+        
+        if tipo_comparacao == 'mes':
+            # Mês atual
+            mes_atual = hoje.strftime('%Y-%m')
+            # Mês anterior
+            mes_anterior_date = hoje - relativedelta(months=1)
+            mes_anterior = mes_anterior_date.strftime('%Y-%m')
+            
+            # Calcula métricas do mês atual
+            metricas_atual = self.metricas_gerais(client_id, mes_inicio=mes_atual, mes_fim=mes_atual, funcionario=funcionario, setor=setor)
+            
+            # Calcula métricas do mês anterior
+            metricas_anterior = self.metricas_gerais(client_id, mes_inicio=mes_anterior, mes_fim=mes_anterior, funcionario=funcionario, setor=setor)
+            
+            # Calcula variação percentual
+            def calcular_variacao(atual, anterior):
+                if anterior == 0:
+                    return 100.0 if atual > 0 else 0.0
+                return ((atual - anterior) / anterior) * 100
+            
+            variacao_dias = calcular_variacao(metricas_atual.get('total_dias', 0), metricas_anterior.get('total_dias', 0))
+            variacao_horas = calcular_variacao(metricas_atual.get('total_horas', 0), metricas_anterior.get('total_horas', 0))
+            variacao_registros = calcular_variacao(metricas_atual.get('total_registros', 0), metricas_anterior.get('total_registros', 0))
+            
+            return {
+                'tipo': 'mes',
+                'periodo_atual': {
+                    'mes': mes_atual,
+                    'label': hoje.strftime('%B/%Y'),
+                    'dias_perdidos': round(metricas_atual.get('total_dias', 0), 2),
+                    'horas_perdidas': round(metricas_atual.get('total_horas', 0), 2),
+                    'total_registros': metricas_atual.get('total_registros', 0)
+                },
+                'periodo_anterior': {
+                    'mes': mes_anterior,
+                    'label': mes_anterior_date.strftime('%B/%Y'),
+                    'dias_perdidos': round(metricas_anterior.get('total_dias', 0), 2),
+                    'horas_perdidas': round(metricas_anterior.get('total_horas', 0), 2),
+                    'total_registros': metricas_anterior.get('total_registros', 0)
+                },
+                'variacao': {
+                    'dias_perdidos': round(variacao_dias, 2),
+                    'horas_perdidas': round(variacao_horas, 2),
+                    'total_registros': round(variacao_registros, 2)
+                }
             }
-            for ano in anos_ordenados
-        ]
+        
+        elif tipo_comparacao == 'trimestre':
+            # Trimestre atual (últimos 3 meses)
+            mes_fim_trimestre = hoje.strftime('%Y-%m')
+            mes_inicio_trimestre_date = hoje - relativedelta(months=2)
+            mes_inicio_trimestre = mes_inicio_trimestre_date.strftime('%Y-%m')
+            
+            # Trimestre anterior (3 meses antes)
+            mes_fim_anterior_date = hoje - relativedelta(months=3)
+            mes_fim_anterior = mes_fim_anterior_date.strftime('%Y-%m')
+            mes_inicio_anterior_date = hoje - relativedelta(months=5)
+            mes_inicio_anterior = mes_inicio_anterior_date.strftime('%Y-%m')
+            
+            # Calcula métricas do trimestre atual
+            metricas_atual = self.metricas_gerais(client_id, mes_inicio=mes_inicio_trimestre, mes_fim=mes_fim_trimestre, funcionario=funcionario, setor=setor)
+            
+            # Calcula métricas do trimestre anterior
+            metricas_anterior = self.metricas_gerais(client_id, mes_inicio=mes_inicio_anterior, mes_fim=mes_fim_anterior, funcionario=funcionario, setor=setor)
+            
+            # Calcula variação percentual
+            def calcular_variacao(atual, anterior):
+                if anterior == 0:
+                    return 100.0 if atual > 0 else 0.0
+                return ((atual - anterior) / anterior) * 100
+            
+            variacao_dias = calcular_variacao(metricas_atual.get('total_dias', 0), metricas_anterior.get('total_dias', 0))
+            variacao_horas = calcular_variacao(metricas_atual.get('total_horas', 0), metricas_anterior.get('total_horas', 0))
+            variacao_registros = calcular_variacao(metricas_atual.get('total_registros', 0), metricas_anterior.get('total_registros', 0))
+            
+            return {
+                'tipo': 'trimestre',
+                'periodo_atual': {
+                    'mes_inicio': mes_inicio_trimestre,
+                    'mes_fim': mes_fim_trimestre,
+                    'label': f"{mes_inicio_trimestre_date.strftime('%b/%Y')} a {hoje.strftime('%b/%Y')}",
+                    'dias_perdidos': round(metricas_atual.get('total_dias', 0), 2),
+                    'horas_perdidas': round(metricas_atual.get('total_horas', 0), 2),
+                    'total_registros': metricas_atual.get('total_registros', 0)
+                },
+                'periodo_anterior': {
+                    'mes_inicio': mes_inicio_anterior,
+                    'mes_fim': mes_fim_anterior,
+                    'label': f"{mes_inicio_anterior_date.strftime('%b/%Y')} a {mes_fim_anterior_date.strftime('%b/%Y')}",
+                    'dias_perdidos': round(metricas_anterior.get('total_dias', 0), 2),
+                    'horas_perdidas': round(metricas_anterior.get('total_horas', 0), 2),
+                    'total_registros': metricas_anterior.get('total_registros', 0)
+                },
+                'variacao': {
+                    'dias_perdidos': round(variacao_dias, 2),
+                    'horas_perdidas': round(variacao_horas, 2),
+                    'total_registros': round(variacao_registros, 2)
+                }
+            }
+        
+        else:
+            raise ValueError(f"Tipo de comparação inválido: {tipo_comparacao}. Use 'mes' ou 'trimestre'")
+    
+    def analise_detalhada_genero(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> Dict[str, Any]:
+        """Análise detalhada por gênero (dias, horas, percentuais, comparações)"""
+        # Busca dados por gênero
+        generos_data = self.horas_perdidas_por_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        
+        # Busca totais gerais
+        metricas = self.metricas_gerais(client_id, mes_inicio, mes_fim, funcionario, setor)
+        
+        total_dias = metricas.get('total_dias_perdidos', 0)
+        total_registros = metricas.get('total_atestados', 0)
+        
+        # Calcula totais de horas
+        total_horas = 0
+        for g in generos_data:
+            total_horas += g.get('horas_perdidas', 0)
+        
+        # Calcula percentuais
+        resultado = {
+            'total_dias': total_dias,
+            'total_horas': round(total_horas, 2),
+            'total_registros': total_registros,
+            'generos': []
+        }
+        
+        for g in generos_data:
+            pct_dias = (g.get('dias_perdidos', 0) / total_dias * 100) if total_dias > 0 else 0
+            pct_horas = (g.get('horas_perdidas', 0) / total_horas * 100) if total_horas > 0 else 0
+            pct_registros = (g.get('quantidade', 0) / total_registros * 100) if total_registros > 0 else 0
+            
+            resultado['generos'].append({
+                **g,
+                'percentual_dias': round(pct_dias, 2),
+                'percentual_horas': round(pct_horas, 2),
+                'percentual_registros': round(pct_registros, 2)
+            })
+        
+        return resultado
+    
+    def comparativo_dias_horas_genero(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Comparativo de dias vs horas perdidas por gênero"""
+        generos_data = self.horas_perdidas_por_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+        
+        resultado = []
+        for g in generos_data:
+            resultado.append({
+                'genero': g.get('genero'),
+                'genero_label': g.get('genero_label'),
+                'dias_perdidos': g.get('dias_perdidos', 0),
+                'horas_perdidas': g.get('horas_perdidas', 0),
+                'semanas_perdidas': g.get('semanas_perdidas', 0),
+                'quantidade': g.get('quantidade', 0)
+            })
+        
+        return resultado
+    
+    def horas_perdidas_setor_genero(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Horas perdidas por setor e gênero (cruzamento)"""
+        query = self.db.query(
+            Atestado.setor,
+            Atestado.genero,
+            func.sum(Atestado.horas_perdi).label('horas_perdi_sum'),
+            func.sum(Atestado.dias_atestados).label('dias_atestados_sum'),
+            func.avg(Atestado.horas_dia).label('horas_dia_media'),
+            func.count(Atestado.id).label('quantidade'),
+            func.sum(Atestado.dias_atestados * Atestado.horas_dia).label('horas_calculadas')
+        ).join(Upload).filter(
+            Upload.client_id == client_id,
+            Atestado.setor != '',
+            Atestado.setor.isnot(None),
+            Atestado.genero != '',
+            Atestado.genero.isnot(None)
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        query = query.group_by(Atestado.setor, Atestado.genero).order_by(Atestado.setor, Atestado.genero)
+        
+        results = query.all()
+        
+        # Considerando semana = 44 horas
+        SEMANA_HORAS = 44
+        
+        resultado = []
+        for r in results:
+            # Se horas_perdi tem valor, usa ele, senão calcula
+            horas_perdidas = float(r.horas_perdi_sum or 0)
+            if horas_perdidas == 0:
+                # Calcula: dias * horas_dia (média)
+                dias_total = float(r.dias_atestados_sum or 0)
+                horas_dia_media = float(r.horas_dia_media or 0)
+                if horas_dia_media == 0:
+                    # Tenta usar horas_calculadas se disponível
+                    horas_perdidas = float(r.horas_calculadas or 0)
+                else:
+                    horas_perdidas = dias_total * horas_dia_media
+            
+            semanas_perdidas = horas_perdidas / SEMANA_HORAS if SEMANA_HORAS > 0 else 0
+            
+            genero_nome = 'Masculino' if r.genero == 'M' else 'Feminino' if r.genero == 'F' else r.genero
+            
+            resultado.append({
+                'setor': r.setor or 'Não informado',
+                'genero': r.genero or '-',
+                'genero_label': genero_nome,
+                'horas_perdidas': round(horas_perdidas, 2),
+                'semanas_perdidas': round(semanas_perdidas, 2),
+                'dias_perdidos': round(float(r.dias_atestados_sum or 0), 2),
+                'quantidade': r.quantidade or 0
+            })
+        
+        return resultado

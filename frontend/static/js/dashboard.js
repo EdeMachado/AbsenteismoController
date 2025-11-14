@@ -31,6 +31,24 @@ function getPaleta() {
     return ['#1a237e', '#556B2F', '#0d47a1', '#6B8E23', '#3949ab', '#808000', '#5c6bc0', '#4a5d23', '#9E9E9E', '#757575'];
 }
 
+// Função auxiliar para obter cores da RODA DE OURO (preto e cinza)
+function getCoresRodaOuro() {
+    return {
+        preto: '#000000',
+        cinza: '#808080',
+        cinzaEscuro: '#404040',
+        cinzaClaro: '#A0A0A0'
+    };
+}
+
+// Função para criar gradiente preto-cinza
+function criarGradientePretoCinza(ctx, area) {
+    const gradient = ctx.createLinearGradient(0, area.top, 0, area.bottom);
+    gradient.addColorStop(0, '#000000'); // Preto no topo
+    gradient.addColorStop(1, '#808080'); // Cinza na base
+    return gradient;
+}
+
 // Mantém compatibilidade com código existente
 const CORES_EMPRESA = new Proxy({}, {
     get: (target, prop) => {
@@ -87,8 +105,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     await carregarFiltros();
+    
+    // Aplica cor dourada ao Dashboard se for Roda de Ouro
+    aplicarCorDashboardRodaOuro();
+    
     carregarDashboard();
 });
+
+// Função para aplicar cor dourada ao Dashboard quando for Roda de Ouro
+function aplicarCorDashboardRodaOuro() {
+    const clientId = getClientId();
+    const currentPath = window.location.pathname;
+    const isDashboardPage = currentPath === '/' || currentPath === '/index.html';
+    
+    if (clientId === 4 && isDashboardPage) {
+        // Encontra o item Dashboard no menu
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            const span = item.querySelector('.nav-item-title') || item.querySelector('span');
+            const href = item.getAttribute('href');
+            if ((span && span.textContent.trim() === 'Dashboard') || (href === '/' || href === '/index.html')) {
+                item.classList.add('active', 'roda-ouro-dashboard');
+            }
+        });
+        
+        // Também verifica pelo ID
+        const navDashboard = document.getElementById('navDashboard');
+        if (navDashboard) {
+            navDashboard.classList.add('active', 'roda-ouro-dashboard');
+        }
+    } else {
+        // Remove a classe se não for Roda de Ouro ou não estiver no dashboard
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => {
+            if (item.classList.contains('roda-ouro-dashboard')) {
+                item.classList.remove('roda-ouro-dashboard');
+            }
+        });
+    }
+}
+
+// Observa mudanças no cliente selecionado
+if (typeof window.addEventListener !== 'undefined') {
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'cliente_selecionado') {
+            setTimeout(aplicarCorDashboardRodaOuro, 100);
+        }
+    });
+    
+    // Observa mudanças quando o cliente é alterado
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        originalSetItem.apply(this, arguments);
+        if (key === 'cliente_selecionado') {
+            setTimeout(aplicarCorDashboardRodaOuro, 100);
+        }
+    };
+}
 
 // ==================== HELPER FUNCTIONS ====================
 
@@ -109,6 +182,90 @@ function garantirClientId(clientId, endpoint = '') {
 // ==================== CARREGAR DASHBOARD ====================
 let camposDisponiveis = {}; // Armazena campos disponíveis do cliente atual
 
+// Função para limpar TODOS os dados do dashboard ao trocar de cliente
+function limparTodosDadosDashboard() {
+    console.log('[ISOLAMENTO] Limpando TODOS os dados do dashboard...');
+    
+    // Limpa campos disponíveis
+    camposDisponiveis = { mapeados: {}, com_dados: [], custom_fields: [] };
+    
+    // Limpa alertas
+    if (window.alertasData) {
+        window.alertasData = [];
+    }
+    
+    // LIMPA INSIGHTS (ISOLAMENTO)
+    const insightsContainer = document.getElementById('insightsContainer');
+    const insightsSection = document.getElementById('insightsSection');
+    if (insightsContainer) {
+        insightsContainer.innerHTML = '';
+        console.log('[ISOLAMENTO] Insights container limpo');
+    }
+    if (insightsSection) {
+        insightsSection.style.display = 'none';
+    }
+    
+    // Destrói TODOS os gráficos Chart.js (busca por padrão)
+    Object.keys(window).forEach(key => {
+        if (key.startsWith('chart') && window[key] && typeof window[key].destroy === 'function') {
+            try {
+                window[key].destroy();
+                window[key] = null;
+            } catch (e) {
+                console.warn(`[ISOLAMENTO] Erro ao destruir gráfico ${key}:`, e);
+            }
+        }
+    });
+    
+    // Limpa variáveis globais de gráficos
+    chartCids = null;
+    chartSetores = null;
+    chartEvolucao = null;
+    chartGenero = null;
+    chartMediaCid = null;
+    chartFuncionariosDias = null;
+    chartEscalas = null;
+    chartMotivos = null;
+    chartCentroCusto = null;
+    chartDistribuicaoDias = null;
+    chartMediaCidDias = null;
+    chartEvolucaoSetor = null;
+    chartComparativoDiasHoras = null;
+    chartFrequenciaAtestados = null;
+    chartSetorGenero = null;
+    chartProdutividade = null;
+    chartProdutividadeEvolucao = null;
+    chartProdutividadeMensalCategoria = null;
+    
+    // Gráficos de horas perdidas (Roda de Ouro)
+    if (window.chartHorasPerdidasGenero) {
+        try { window.chartHorasPerdidasGenero.destroy(); } catch(e) {}
+        window.chartHorasPerdidasGenero = null;
+    }
+    if (window.chartHorasPerdidasSetor) {
+        try { window.chartHorasPerdidasSetor.destroy(); } catch(e) {}
+        window.chartHorasPerdidasSetor = null;
+    }
+    if (window.chartEvolucaoMensalHoras) {
+        try { window.chartEvolucaoMensalHoras.destroy(); } catch(e) {}
+        window.chartEvolucaoMensalHoras = null;
+    }
+    if (window.chartComparativoDiasHorasGenero) {
+        try { window.chartComparativoDiasHorasGenero.destroy(); } catch(e) {}
+        window.chartComparativoDiasHorasGenero = null;
+    }
+    if (window.chartHorasPerdidasSetorGenero) {
+        try { window.chartHorasPerdidasSetorGenero.destroy(); } catch(e) {}
+        window.chartHorasPerdidasSetorGenero = null;
+    }
+    if (window.chartAnaliseDetalhadaGenero) {
+        try { window.chartAnaliseDetalhadaGenero.destroy(); } catch(e) {}
+        window.chartAnaliseDetalhadaGenero = null;
+    }
+    
+    console.log('[ISOLAMENTO] Todos os dados limpos');
+}
+
 async function carregarCamposDisponiveis(clientId) {
     try {
         const response = await fetch(`/api/clientes/${clientId}/campos-disponiveis`);
@@ -128,7 +285,9 @@ async function carregarCamposDisponiveis(clientId) {
 }
 
 function temCampo(campo) {
-    return camposDisponiveis.com_dados && camposDisponiveis.com_dados.includes(campo);
+    const resultado = camposDisponiveis.com_dados && camposDisponiveis.com_dados.includes(campo);
+    console.log(`[DEBUG] temCampo('${campo}') = ${resultado}`, camposDisponiveis);
+    return resultado;
 }
 
 async function carregarDashboard() {
@@ -141,6 +300,19 @@ async function carregarDashboard() {
         } catch (error) {
             alert(error.message);
             return;
+        }
+        
+        // LIMPA TODOS OS DADOS ANTES DE CARREGAR NOVOS (ISOLAMENTO TOTAL)
+        limparTodosDadosDashboard();
+        
+        // LIMPA INSIGHTS ANTES DE CARREGAR NOVOS (ISOLAMENTO)
+        const insightsContainer = document.getElementById('insightsContainer');
+        const insightsSection = document.getElementById('insightsSection');
+        if (insightsContainer) {
+            insightsContainer.innerHTML = '';
+        }
+        if (insightsSection) {
+            insightsSection.style.display = 'none';
         }
 
         // Carrega campos disponíveis primeiro
@@ -184,8 +356,40 @@ async function carregarDashboard() {
         
         const data = await response.json();
         
-        // Renderiza cards
+        console.log('[DEBUG] Dados recebidos do dashboard:', {
+            top_cids: data.top_cids?.length || 0,
+            top_setores: data.top_setores?.length || 0,
+            top_funcionarios: data.top_funcionarios?.length || 0,
+            evolucao_mensal: data.evolucao_mensal?.length || 0,
+            produtividade: data.produtividade?.length || 0,
+            camposDisponiveis: camposDisponiveis
+        });
+        
+        // Renderiza cards (a função renderizarCards já verifica se há dados)
         renderizarCards(data.metricas || {});
+        
+        // ISOLAMENTO: Mostra/oculta gráficos da Converplast baseado em client_id
+        const converplastClientId = clientId ? parseInt(clientId) : null;
+        console.log('[DEBUG] clientId recebido:', clientId, '| converplastClientId:', converplastClientId);
+        
+        // Aguarda um pouco para garantir que o DOM está pronto
+        setTimeout(() => {
+            const secaoConverplast = document.getElementById('graficosConverplast');
+            console.log('[DEBUG] Elemento graficosConverplast encontrado:', !!secaoConverplast);
+            
+            if (secaoConverplast) {
+                // Só mostra se for Converplast (ID 2)
+                if (converplastClientId === 2) {
+                    secaoConverplast.style.display = 'block';
+                    console.log('[ISOLAMENTO] ✅ Mostrando gráficos Converplast - clientId:', converplastClientId);
+                } else {
+                    secaoConverplast.style.display = 'none';
+                    console.log('[ISOLAMENTO] ❌ Ocultando gráficos Converplast - clientId:', converplastClientId, '(não é Converplast)');
+                }
+            } else {
+                console.error('[ISOLAMENTO] ⚠️ ERRO: Elemento graficosConverplast não encontrado no DOM!');
+            }
+        }, 100);
         
         // Armazena alertas para o menu (não renderiza aqui)
         window.alertasData = data.alertas || [];
@@ -196,93 +400,133 @@ async function carregarDashboard() {
         // Renderiza insights
         renderizarInsights(data.insights || []);
         
-        // Renderiza gráficos apenas se os campos necessários estiverem disponíveis
+        // Renderiza gráficos SEMPRE que houver dados (ignora temCampo para garantir que funcione)
         // Gráficos de CID
-        if (temCampo('cid') || temCampo('diagnostico')) {
-            renderizarChartCids(data.top_cids || []);
-            renderizarChartMediaCid(data.top_cids || []);
-            renderizarChartMediaCidDias(data.media_cid || []);
-        } else {
-            ocultarGrafico('chartCids');
-            ocultarGrafico('chartMediaCid');
-            ocultarGrafico('chartMediaCidDias');
+        if (data.top_cids && data.top_cids.length > 0) {
+            console.log('[DEBUG] Renderizando gráficos de CID com', data.top_cids.length, 'itens');
+            renderizarChartCids(data.top_cids);
+            renderizarChartMediaCid(data.top_cids);
+        }
+        if (data.media_cid && data.media_cid.length > 0) {
+            renderizarChartMediaCidDias(data.media_cid);
         }
         
         // Gráficos de Setor
-        if (temCampo('setor')) {
-            renderizarChartSetores(data.top_setores || []);
-            renderizarChartEvolucaoSetor(data.evolucao_setor || {});
-            renderizarChartSetorGenero(data.dias_setor_genero || []);
-        } else {
-            ocultarGrafico('chartSetores');
-            ocultarGrafico('chartEvolucaoSetor');
-            ocultarGrafico('chartSetorGenero');
+        if (data.top_setores && data.top_setores.length > 0) {
+            console.log('[DEBUG] Renderizando gráficos de Setor com', data.top_setores.length, 'itens');
+            renderizarChartSetores(data.top_setores);
+        }
+        if (data.evolucao_setor && Object.keys(data.evolucao_setor).length > 0) {
+            renderizarChartEvolucaoSetor(data.evolucao_setor);
+        }
+        if (data.dias_setor_genero && data.dias_setor_genero.length > 0) {
+            renderizarChartSetorGenero(data.dias_setor_genero);
         }
         
-        // Gráfico de Evolução (sempre disponível se tiver dados)
+        // Gráfico de Evolução
         if (data.evolucao_mensal && data.evolucao_mensal.length > 0) {
-            renderizarChartEvolucao(data.evolucao_mensal || []);
-        } else {
-            ocultarGrafico('chartEvolucao');
+            console.log('[DEBUG] Renderizando gráfico de Evolução com', data.evolucao_mensal.length, 'itens');
+            renderizarChartEvolucao(data.evolucao_mensal);
         }
         
         // Gráfico de Gênero
-        if (temCampo('genero')) {
-            renderizarChartGenero(data.distribuicao_genero || []);
-        } else {
-            ocultarGrafico('chartGenero');
+        if (data.distribuicao_genero && data.distribuicao_genero.length > 0) {
+            renderizarChartGenero(data.distribuicao_genero);
         }
         
         // Gráfico de Funcionários
-        if (temCampo('nomecompleto')) {
-            renderizarChartFuncionariosDias(data.top_funcionarios || []);
-            renderizarChartFrequenciaAtestados(data.frequencia_atestados || []);
-        } else {
-            ocultarGrafico('chartFuncionariosDias');
-            ocultarGrafico('chartFrequenciaAtestados');
+        if (data.top_funcionarios && data.top_funcionarios.length > 0) {
+            console.log('[DEBUG] Renderizando gráficos de Funcionários com', data.top_funcionarios.length, 'itens');
+            renderizarChartFuncionariosDias(data.top_funcionarios);
+        }
+        if (data.frequencia_atestados && data.frequencia_atestados.length > 0) {
+            renderizarChartFrequenciaAtestados(data.frequencia_atestados);
         }
         
         // Gráfico de Escalas
-        if (temCampo('escala')) {
-            renderizarChartEscalas(data.top_escalas || []);
-        } else {
-            ocultarGrafico('chartEscalas');
+        if (data.top_escalas && data.top_escalas.length > 0) {
+            renderizarChartEscalas(data.top_escalas);
         }
         
         // Gráfico de Motivos
-        if (temCampo('motivo_atestado')) {
-            renderizarChartMotivos(data.top_motivos || []);
-        } else {
-            ocultarGrafico('chartMotivos');
+        if (data.top_motivos && data.top_motivos.length > 0) {
+            renderizarChartMotivos(data.top_motivos);
         }
         
-        // Gráfico de Centro de Custo (centro_custo = setor)
-        if (temCampo('setor')) {
-            renderizarChartCentroCusto(data.dias_centro_custo || []);
-        } else {
-            ocultarGrafico('chartCentroCusto');
+        // Gráfico de Centro de Custo
+        if (data.dias_centro_custo && data.dias_centro_custo.length > 0) {
+            renderizarChartCentroCusto(data.dias_centro_custo);
         }
         
-        // Gráficos de Dias/Horas (sempre disponíveis se tiver dados)
-        if (temCampo('dias_atestados') || temCampo('horas_perdi')) {
-            renderizarChartDistribuicaoDias(data.distribuicao_dias || []);
-            renderizarChartComparativoDiasHoras(data.comparativo_dias_horas || []);
-        } else {
-            ocultarGrafico('chartDistribuicaoDias');
-            ocultarGrafico('chartComparativoDiasHoras');
+        // Gráficos de Dias/Horas
+        if (data.distribuicao_dias && data.distribuicao_dias.length > 0) {
+            renderizarChartDistribuicaoDias(data.distribuicao_dias);
+        }
+        if (data.comparativo_dias_horas && data.comparativo_dias_horas.length > 0) {
+            renderizarChartComparativoDiasHoras(data.comparativo_dias_horas);
         }
         
-        // Gráficos de Produtividade (sempre disponíveis se tiver dados)
+        // Gráficos de Produtividade
         if (data.produtividade && data.produtividade.length > 0) {
-            renderizarChartProdutividade(data.produtividade || []);
-            renderizarChartProdutividadeMensalCategoria(data.produtividade || []);
-        } else {
-            ocultarGrafico('chartProdutividade');
-            ocultarGrafico('chartProdutividadeMensalCategoria');
+            console.log('[DEBUG] Renderizando gráficos de Produtividade com', data.produtividade.length, 'itens');
+            renderizarChartProdutividade(data.produtividade);
+            renderizarChartProdutividadeMensalCategoria(data.produtividade);
         }
         
         // Carrega evolução de produtividade separadamente
         await carregarEvolucaoProdutividade();
+        
+        // Renderiza gráficos específicos da Roda de Ouro (APENAS para client_id = 4)
+        const rodaOuroClientId = clientId ? parseInt(clientId) : null;
+        if (rodaOuroClientId === 4 && (data.classificacao_funcionarios_ro || data.classificacao_setores_ro)) {
+            // Mostra seção de gráficos da Roda de Ouro
+            const secaoRodaOuro = document.getElementById('graficosRodaOuro');
+            if (secaoRodaOuro) {
+                secaoRodaOuro.style.display = 'block';
+            }
+            
+            // Renderiza os 6 gráficos
+            renderizarChartClassificacaoFuncionariosRO(data.classificacao_funcionarios_ro || []);
+            renderizarChartClassificacaoSetoresRO(data.classificacao_setores_ro || []);
+            renderizarChartDiasAnoCoerencia(data.dias_ano_coerencia || {});
+            renderizarChartClassificacaoDoencasRO(data.classificacao_doencas_ro || []);
+            renderizarChartAnaliseCoerencia(data.analise_coerencia || {});
+            renderizarChartTempoServicoAtestados(data.tempo_servico_atestados || []);
+            
+            // Novos gráficos de horas perdidas
+            if (data.horas_perdidas_genero && data.horas_perdidas_genero.length > 0) {
+                renderizarChartHorasPerdidasGenero(data.horas_perdidas_genero);
+            }
+            if (data.horas_perdidas_setor && data.horas_perdidas_setor.length > 0) {
+                renderizarChartHorasPerdidasSetor(data.horas_perdidas_setor);
+            }
+            if (data.evolucao_mensal_horas && data.evolucao_mensal_horas.length > 0) {
+                renderizarChartEvolucaoMensalHoras(data.evolucao_mensal_horas);
+            }
+            if (data.comparativo_dias_horas_genero && data.comparativo_dias_horas_genero.length > 0) {
+                renderizarChartComparativoDiasHorasGenero(data.comparativo_dias_horas_genero);
+            }
+            if (data.horas_perdidas_setor_genero && data.horas_perdidas_setor_genero.length > 0) {
+                renderizarChartHorasPerdidasSetorGenero(data.horas_perdidas_setor_genero);
+            }
+            if (data.analise_detalhada_genero && data.analise_detalhada_genero.generos && data.analise_detalhada_genero.generos.length > 0) {
+                renderizarChartAnaliseDetalhadaGenero(data.analise_detalhada_genero);
+            }
+        } else {
+            // Oculta seção se não for Roda de Ouro (client_id != 4)
+            const secaoRodaOuro = document.getElementById('graficosRodaOuro');
+            if (secaoRodaOuro) {
+                secaoRodaOuro.style.display = 'none';
+            }
+        }
+        
+        // Comparativo entre períodos (todos os clientes)
+        if (data.comparativo_periodos_mes && Object.keys(data.comparativo_periodos_mes).length > 0) {
+            renderizarChartComparativoMensal(data.comparativo_periodos_mes);
+        }
+        if (data.comparativo_periodos_trimestre && Object.keys(data.comparativo_periodos_trimestre).length > 0) {
+            renderizarChartComparativoTrimestral(data.comparativo_periodos_trimestre);
+        }
         
         // Carrega e renderiza gráficos personalizados configurados pelo usuário
         await carregarERenderizarGraficosPersonalizados(clientId);
@@ -507,15 +751,33 @@ function ocultarGrafico(chartId) {
 }
 
 function renderizarCards(metricas) {
-    // Dias Perdidos = Soma da coluna DIAS ATESTADOS
     const diasPerdidos = metricas.total_dias_perdidos || 0;
+    const horasPerdidas = metricas.total_horas_perdidas || 0;
+    const totalRegistros = metricas.total_registros || 0;
+    
+    // Encontra o container dos cards
+    const cardsContainer = document.querySelector('.cards-grid');
+    
+    // Se não houver dados REAIS, oculta os cards
+    if (diasPerdidos === 0 && horasPerdidas === 0 && totalRegistros === 0) {
+        if (cardsContainer) {
+            cardsContainer.style.display = 'none';
+        }
+        return;
+    }
+    
+    // TEM DADOS - Mostra e preenche os cards
+    if (cardsContainer) {
+        cardsContainer.style.display = 'grid';
+    }
+    
+    // Dias Perdidos = Soma da coluna DIAS ATESTADOS
     const elDiasPerdidos = document.getElementById('cardDiasPerdidos');
     if (elDiasPerdidos) {
         elDiasPerdidos.textContent = Math.round(diasPerdidos).toLocaleString('pt-BR');
     }
     
     // Horas Perdidas = Soma da coluna HORAS PERDI
-    const horasPerdidas = metricas.total_horas_perdidas || 0;
     const elHorasPerdidas = document.getElementById('cardHorasPerdidas');
     if (elHorasPerdidas) {
         elHorasPerdidas.textContent = Math.round(horasPerdidas).toLocaleString('pt-BR');
@@ -527,14 +789,28 @@ function renderizarInsights(insights) {
     const container = document.getElementById('insightsContainer');
     const section = document.getElementById('insightsSection');
     
+    // LIMPA SEMPRE ANTES DE RENDERIZAR (ISOLAMENTO)
+    if (container) {
+        container.innerHTML = '';
+    }
+    
+    const clientId = getClientId();
+    console.log(`[INSIGHTS] Renderizando insights para client_id=${clientId}, quantidade: ${insights?.length || 0}`);
+    
     if (!insights || insights.length === 0) {
         if (section) section.style.display = 'none';
+        console.log(`[INSIGHTS] Nenhum insight para client_id=${clientId}, ocultando seção`);
         return;
     }
     
     if (section) section.style.display = 'block';
     
     if (container) {
+        // Log dos insights que estão sendo renderizados
+        insights.forEach((insight, index) => {
+            console.log(`[INSIGHTS] Insight ${index + 1} para client_id=${clientId}: ${insight.titulo}`);
+        });
+        
         container.innerHTML = insights.map(insight => `
             <div class="insight-card ${insight.tipo}">
                 <div class="insight-header">
@@ -554,11 +830,41 @@ function renderizarInsights(insights) {
 }
 
 // ==================== GRÁFICOS ====================
+
+// Função helper para destruir gráfico de forma segura
+function destruirGraficoSeguro(canvasId, variavelGlobal) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    // Destrói variável global se existir e for um Chart válido
+    if (variavelGlobal) {
+        try {
+            // Verifica se é um objeto Chart válido
+            if (variavelGlobal && typeof variavelGlobal.destroy === 'function') {
+                variavelGlobal.destroy();
+            }
+        } catch (e) {
+            console.warn(`Erro ao destruir ${canvasId} (variável):`, e);
+        }
+    }
+    
+    // Verifica se há gráfico no canvas (Chart.js pode ter criado um)
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) {
+        try {
+            existingChart.destroy();
+        } catch (e) {
+            console.warn(`Erro ao destruir ${canvasId} (canvas):`, e);
+        }
+    }
+}
+
 function renderizarChartCids(dados) {
     const ctx = document.getElementById('chartCids');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartCids) chartCids.destroy();
+    destruirGraficoSeguro('chartCids', chartCids);
+    chartCids = null;
     
     chartCids = new Chart(ctx, {
         type: 'bar',
@@ -616,7 +922,8 @@ function renderizarChartSetores(dados) {
     const ctx = document.getElementById('chartSetores');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartSetores) chartSetores.destroy();
+    destruirGraficoSeguro('chartSetores', chartSetores);
+    chartSetores = null;
     
     // Pega TOP 5 setores
     const top5 = dados.slice(0, 5);
@@ -684,7 +991,8 @@ function renderizarChartEvolucao(dados) {
     const ctx = document.getElementById('chartEvolucao');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartEvolucao) chartEvolucao.destroy();
+    destruirGraficoSeguro('chartEvolucao', chartEvolucao);
+    chartEvolucao = null;
     
     chartEvolucao = new Chart(ctx, {
         type: 'line',
@@ -716,7 +1024,8 @@ function renderizarChartGenero(dados) {
     const ctx = document.getElementById('chartGenero');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartGenero) chartGenero.destroy();
+    destruirGraficoSeguro('chartGenero', chartGenero);
+    chartGenero = null;
     
     chartGenero = new Chart(ctx, {
         type: 'pie',
@@ -741,7 +1050,8 @@ function renderizarChartMediaCid(dados) {
     const ctx = document.getElementById('chartMediaCid');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartMediaCid) chartMediaCid.destroy();
+    destruirGraficoSeguro('chartMediaCid', chartMediaCid);
+    chartMediaCid = null;
     
     const top5 = dados.slice(0, 5);
     
@@ -774,7 +1084,8 @@ function renderizarChartFuncionariosDias(dados) {
     const ctx = document.getElementById('chartFuncionariosDias');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartFuncionariosDias) chartFuncionariosDias.destroy();
+    destruirGraficoSeguro('chartFuncionariosDias', chartFuncionariosDias);
+    chartFuncionariosDias = null;
     
     // TOP 10 funcionários ordenados por dias perdidos
     const top10 = dados.slice(0, 10).sort((a, b) => (b.dias_perdidos || 0) - (a.dias_perdidos || 0));
@@ -822,7 +1133,8 @@ function renderizarChartEscalas(dados) {
     const ctx = document.getElementById('chartEscalas');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartEscalas) chartEscalas.destroy();
+    destruirGraficoSeguro('chartEscalas', chartEscalas);
+    chartEscalas = null;
     
     // TOP 10 escalas
     const top10 = dados.slice(0, 10);
@@ -879,7 +1191,8 @@ function renderizarChartMotivos(dados) {
     const ctx = document.getElementById('chartMotivos');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartMotivos) chartMotivos.destroy();
+    destruirGraficoSeguro('chartMotivos', chartMotivos);
+    chartMotivos = null;
     
     // TOP 10 motivos
     const top10 = dados.slice(0, 10);
@@ -949,7 +1262,8 @@ function renderizarChartCentroCusto(dados) {
     const ctx = document.getElementById('chartCentroCusto');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartCentroCusto) chartCentroCusto.destroy();
+    destruirGraficoSeguro('chartCentroCusto', chartCentroCusto);
+    chartCentroCusto = null;
     
     chartCentroCusto = new Chart(ctx, {
         type: 'bar',
@@ -994,7 +1308,8 @@ function renderizarChartDistribuicaoDias(dados) {
     const ctx = document.getElementById('chartDistribuicaoDias');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartDistribuicaoDias) chartDistribuicaoDias.destroy();
+    destruirGraficoSeguro('chartDistribuicaoDias', chartDistribuicaoDias);
+    chartDistribuicaoDias = null;
     
     chartDistribuicaoDias = new Chart(ctx, {
         type: 'bar',
@@ -1028,7 +1343,8 @@ function renderizarChartMediaCidDias(dados) {
     const ctx = document.getElementById('chartMediaCidDias');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartMediaCidDias) chartMediaCidDias.destroy();
+    destruirGraficoSeguro('chartMediaCidDias', chartMediaCidDias);
+    chartMediaCidDias = null;
     
     chartMediaCidDias = new Chart(ctx, {
         type: 'bar',
@@ -1073,7 +1389,8 @@ function renderizarChartEvolucaoSetor(dados) {
     const ctx = document.getElementById('chartEvolucaoSetor');
     if (!ctx || !dados || Object.keys(dados).length === 0) return;
     
-    if (chartEvolucaoSetor) chartEvolucaoSetor.destroy();
+    destruirGraficoSeguro('chartEvolucaoSetor', chartEvolucaoSetor);
+    chartEvolucaoSetor = null;
     
     // Pega os setores e calcula total de dias perdidos por setor
     const setoresData = [];
@@ -1170,7 +1487,8 @@ function renderizarChartComparativoDiasHoras(dados) {
     const ctx = document.getElementById('chartComparativoDiasHoras');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartComparativoDiasHoras) chartComparativoDiasHoras.destroy();
+    destruirGraficoSeguro('chartComparativoDiasHoras', chartComparativoDiasHoras);
+    chartComparativoDiasHoras = null;
     
     // Pega TOP 8 setores
     const top8 = dados.slice(0, 8);
@@ -1224,7 +1542,8 @@ function renderizarChartFrequenciaAtestados(dados) {
     const ctx = document.getElementById('chartFrequenciaAtestados');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartFrequenciaAtestados) chartFrequenciaAtestados.destroy();
+    destruirGraficoSeguro('chartFrequenciaAtestados', chartFrequenciaAtestados);
+    chartFrequenciaAtestados = null;
     
     chartFrequenciaAtestados = new Chart(ctx, {
         type: 'doughnut',
@@ -1250,7 +1569,8 @@ function renderizarChartProdutividade(dados) {
     const ctx = document.getElementById('chartProdutividade');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartProdutividade) chartProdutividade.destroy();
+    destruirGraficoSeguro('chartProdutividade', chartProdutividade);
+    chartProdutividade = null;
     
     // Agrupa por mês
     const dadosPorMes = {};
@@ -1453,7 +1773,8 @@ function renderizarChartProdutividadeMensalCategoria(dados) {
     const ctx = document.getElementById('chartProdutividadeMensalCategoria');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartProdutividadeMensalCategoria) chartProdutividadeMensalCategoria.destroy();
+    destruirGraficoSeguro('chartProdutividadeMensalCategoria', chartProdutividadeMensalCategoria);
+    chartProdutividadeMensalCategoria = null;
     
     // Agrupa por mês (dados anuais mês a mês)
     const dadosPorMes = {};
@@ -1629,7 +1950,8 @@ function renderizarChartProdutividadeEvolucao(dados) {
     const ctx = document.getElementById('chartProdutividadeEvolucao');
     if (!ctx) return;
     
-    if (chartProdutividadeEvolucao) chartProdutividadeEvolucao.destroy();
+    destruirGraficoSeguro('chartProdutividadeEvolucao', chartProdutividadeEvolucao);
+    chartProdutividadeEvolucao = null;
     
     if (!dados || dados.length === 0) {
         // Mostra mensagem de sem dados
@@ -1819,7 +2141,8 @@ function renderizarChartSetorGenero(dados) {
     const ctx = document.getElementById('chartSetorGenero');
     if (!ctx || !dados || dados.length === 0) return;
     
-    if (chartSetorGenero) chartSetorGenero.destroy();
+    destruirGraficoSeguro('chartSetorGenero', chartSetorGenero);
+    chartSetorGenero = null;
     
     // Calcula total geral para calcular percentuais
     const totalGeral = dados.reduce((sum, d) => sum + (d.dias_perdidos || 0), 0);
@@ -2209,9 +2532,1427 @@ function desselecionarTodos(tipo) {
     atualizarTextoSelecionados(tipo);
 }
 
+// ==================== GRÁFICOS RODA DE OURO ====================
+
+function renderizarChartClassificacaoFuncionariosRO(dados) {
+    if (!dados || dados.length === 0) {
+        const canvas = document.getElementById('chartClassificacaoFuncionariosRO');
+        if (canvas && canvas.parentElement) {
+            canvas.parentElement.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Nenhum dado disponível</div>';
+        }
+        return;
+    }
+    
+    const ctx = document.getElementById('chartClassificacaoFuncionariosRO');
+    if (!ctx) return;
+    
+    // Destrói gráfico anterior se existir
+    if (window.chartClassificacaoFuncionariosRO && typeof window.chartClassificacaoFuncionariosRO.destroy === 'function') {
+        window.chartClassificacaoFuncionariosRO.destroy();
+    }
+    
+    const cores = getCores();
+    const paleta = getPaleta();
+    const coresRO = getCoresRodaOuro();
+    
+    // Ordena por quantidade (decrescente) e pega top 15
+    const dadosOrdenados = [...dados].sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0)).slice(0, 15);
+    
+    window.chartClassificacaoFuncionariosRO = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dadosOrdenados.map(d => {
+                // Trunca nome se muito longo
+                const nome = d.nome || 'Não informado';
+                return nome.length > 20 ? nome.substring(0, 17) + '...' : nome;
+            }),
+            datasets: [{
+                label: 'Dias de Atestados',
+                data: dadosOrdenados.map(d => d.quantidade || 0),
+                backgroundColor: function(context) {
+                    // Gradiente preto-cinza para este gráfico (horizontal)
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return coresRO.preto;
+                    return criarGradientePretoCinza(ctx, chartArea);
+                },
+                borderColor: coresRO.preto,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Dias de Atestados: ${context.parsed.x}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#f0f0f0'
+                    }
+                },
+                y: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartClassificacaoSetoresRO(dados) {
+    if (!dados || dados.length === 0) {
+        const canvas = document.getElementById('chartClassificacaoSetoresRO');
+        if (canvas && canvas.parentElement) {
+            canvas.parentElement.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Nenhum dado disponível</div>';
+        }
+        return;
+    }
+    
+    const ctx = document.getElementById('chartClassificacaoSetoresRO');
+    if (!ctx) return;
+    
+    // Destrói gráfico anterior se existir
+    if (window.chartClassificacaoSetoresRO && typeof window.chartClassificacaoSetoresRO.destroy === 'function') {
+        window.chartClassificacaoSetoresRO.destroy();
+    }
+    
+    const cores = getCores();
+    const paleta = getPaleta();
+    const coresRO = getCoresRodaOuro();
+    
+    // Ordena por dias_afastamento (decrescente) e pega top 15
+    const dadosOrdenados = [...dados].sort((a, b) => (b.dias_afastamento || 0) - (a.dias_afastamento || 0)).slice(0, 15);
+    
+    window.chartClassificacaoSetoresRO = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dadosOrdenados.map(d => d.setor || 'Não informado'),
+            datasets: [{
+                label: 'Dias de Afastamento',
+                data: dadosOrdenados.map(d => Math.round(d.dias_afastamento || 0)),
+                backgroundColor: coresRO.cinza, // Cinza sólido para diferenciar do gráfico anterior
+                borderColor: coresRO.cinzaEscuro,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Dias de Afastamento: ${context.parsed.x}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#f0f0f0'
+                    }
+                },
+                y: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartDiasAnoCoerencia(dados) {
+    // Usa dados mensais se disponíveis, senão usa dados anuais
+    const usarDadosMensais = dados.meses && dados.meses.length > 0;
+    const labels = usarDadosMensais ? dados.meses : (dados.anos || []);
+    const dadosCoerente = usarDadosMensais ? dados.coerente_mensal : (dados.coerente || []);
+    const dadosSemCoerencia = usarDadosMensais ? dados.sem_coerencia_mensal : (dados.sem_coerencia || []);
+    
+    if (!labels || labels.length === 0) {
+        const canvas = document.getElementById('chartDiasAnoCoerencia');
+        if (canvas && canvas.parentElement) {
+            canvas.parentElement.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Nenhum dado disponível</div>';
+        }
+        return;
+    }
+    
+    const ctx = document.getElementById('chartDiasAnoCoerencia');
+    if (!ctx) return;
+    
+    destruirGraficoSeguro('chartDiasAnoCoerencia', window.chartDiasAnoCoerencia);
+    window.chartDiasAnoCoerencia = null;
+    
+    const cores = getCores();
+    const paleta = getPaleta();
+    const coresRO = getCoresRodaOuro();
+    
+    // Formata labels (se for mês-ano, formata melhor)
+    const labelsFormatados = labels.map(label => {
+        if (label.includes('-') && label.length === 7) {
+            // Formato YYYY-MM
+            const [ano, mes] = label.split('-');
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const mesNum = parseInt(mes) - 1;
+            return `${meses[mesNum]}/${ano}`;
+        }
+        return label;
+    });
+    
+    window.chartDiasAnoCoerencia = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labelsFormatados,
+            datasets: [
+                {
+                    label: 'Coerente',
+                    data: dadosCoerente,
+                    backgroundColor: coresRO.preto, // Preto
+                    borderColor: coresRO.preto,
+                    borderWidth: 1
+                },
+                {
+                    label: 'Sem Coerência',
+                    data: dadosSemCoerencia,
+                    backgroundColor: coresRO.cinza, // Cinza
+                    borderColor: coresRO.cinzaEscuro,
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y} dias`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: {
+                        color: '#f0f0f0'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartClassificacaoDoencasRO(dados) {
+    console.log('📊 renderizarChartClassificacaoDoencasRO - Dados recebidos:', dados);
+    
+    if (!dados || dados.length === 0) {
+        const canvas = document.getElementById('chartClassificacaoDoencasRO');
+        if (canvas && canvas.parentElement) {
+            const wrapper = canvas.closest('.chart-wrapper');
+            if (wrapper) {
+                wrapper.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Nenhum dado disponível</div>';
+            }
+        }
+        return;
+    }
+    
+    const ctx = document.getElementById('chartClassificacaoDoencasRO');
+    if (!ctx) {
+        console.error('❌ Canvas chartClassificacaoDoencasRO não encontrado');
+        return;
+    }
+    
+    destruirGraficoSeguro('chartClassificacaoDoencasRO', window.chartClassificacaoDoencasRO);
+    window.chartClassificacaoDoencasRO = null;
+    
+    const cores = getCores();
+    const paleta = getPaleta();
+    const coresRO = getCoresRodaOuro();
+    
+    // Ordena por quantidade (decrescente) e pega top 15
+    const dadosOrdenados = [...dados].sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0)).slice(0, 15);
+    
+    console.log('📊 Dados ordenados (top 15):', dadosOrdenados);
+    
+    window.chartClassificacaoDoencasRO = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dadosOrdenados.map(d => {
+                // Trunca nome da doença se muito longo
+                const nome = d.tipo_doenca || 'Não informado';
+                return nome.length > 20 ? nome.substring(0, 17) + '...' : nome;
+            }),
+            datasets: [{
+                label: 'Dias de Afastamento',
+                data: dadosOrdenados.map(d => d.quantidade || 0),
+                backgroundColor: function(context) {
+                    // Gradiente preto-cinza para este gráfico (vertical)
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return coresRO.preto;
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, '#000000'); // Preto na base
+                    gradient.addColorStop(1, '#808080'); // Cinza no topo
+                    return gradient;
+                },
+                borderColor: coresRO.preto,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            // Barras verticais (colunas)
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            // Mostra o nome completo da doença no título do tooltip
+                            const index = context[0].dataIndex;
+                            return dadosOrdenados[index].tipo_doenca || 'Não informado';
+                        },
+                        label: function(context) {
+                            return `Dias de Afastamento: ${context.parsed.y}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#f0f0f0'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Dias de Afastamento'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartAnaliseCoerencia(dados) {
+    if (!dados || dados.total === 0) {
+        const canvas = document.getElementById('chartAnaliseCoerencia');
+        if (canvas && canvas.parentElement) {
+            canvas.parentElement.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Nenhum dado disponível</div>';
+        }
+        return;
+    }
+    
+    const ctx = document.getElementById('chartAnaliseCoerencia');
+    if (!ctx) return;
+    
+    // Destrói gráfico anterior se existir
+    if (window.chartAnaliseCoerencia && typeof window.chartAnaliseCoerencia.destroy === 'function') {
+        window.chartAnaliseCoerencia.destroy();
+    }
+    
+    const cores = getCores();
+    const paleta = getPaleta();
+    const coresRO = getCoresRodaOuro();
+    
+    const coerente = dados.coerente || 0;
+    const semCoerencia = dados.sem_coerencia || 0;
+    const total = dados.total || 0;
+    const percentualCoerente = dados.percentual_coerente || 0;
+    const percentualSemCoerencia = dados.percentual_sem_coerencia || 0;
+    
+    window.chartAnaliseCoerencia = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Coerente', 'Sem Coerência'],
+            datasets: [{
+                data: [coerente, semCoerencia],
+                backgroundColor: [coresRO.preto, coresRO.cinza], // Preto e cinza
+                borderColor: ['#fff', '#fff'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const percent = total > 0 ? ((value / total) * 100).toFixed(2) : 0;
+                            return `${label}: ${value} dias (${percent}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Adiciona texto no centro do donut
+    const chartContainer = ctx.parentElement;
+    if (chartContainer) {
+        const centerText = document.createElement('div');
+        centerText.id = 'centerTextAnaliseCoerencia';
+        centerText.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;';
+        centerText.innerHTML = `
+            <div style="font-size: 24px; font-weight: 600; color: #333;">${total}</div>
+            <div style="font-size: 12px; color: #666;">Total dias</div>
+        `;
+        chartContainer.style.position = 'relative';
+        if (!document.getElementById('centerTextAnaliseCoerencia')) {
+            chartContainer.appendChild(centerText);
+        }
+    }
+}
+
+function renderizarChartTempoServicoAtestados(dados) {
+    // Novo formato: array com faixas de tempo de serviço
+    if (!dados || !Array.isArray(dados) || dados.length === 0) {
+        const canvas = document.getElementById('chartTempoServicoAtestados');
+        if (canvas && canvas.parentElement) {
+            canvas.parentElement.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Nenhum dado disponível</div>';
+        }
+        return;
+    }
+    
+    const ctx = document.getElementById('chartTempoServicoAtestados');
+    if (!ctx) return;
+    
+    destruirGraficoSeguro('chartTempoServicoAtestados', window.chartTempoServicoAtestados);
+    window.chartTempoServicoAtestados = null;
+    
+    const cores = getCores();
+    const paleta = getPaleta();
+    const coresRO = getCoresRodaOuro();
+    
+    // Extrai labels (faixas de tempo) e dados (dias de afastamento)
+    const labels = dados.map(d => d.faixa_tempo_servico || 'Não informado');
+    const dadosDias = dados.map(d => d.dias_afastamento || 0);
+    
+    window.chartTempoServicoAtestados = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Dias de Afastamento',
+                data: dadosDias,
+                backgroundColor: coresRO.preto, // Preto sólido para este gráfico
+                borderColor: coresRO.preto,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const index = context.dataIndex;
+                            const item = dados[index];
+                            return [
+                                `Dias de Afastamento: ${item.dias_afastamento || 0}`,
+                                `Quantidade de Atestados: ${item.quantidade_atestados || 0}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#f0f0f0'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Dias de Afastamento'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ==================== GRÁFICOS DE HORAS PERDIDAS (RODA DE OURO) ====================
+
+function renderizarChartHorasPerdidasGenero(dados) {
+    const ctx = document.getElementById('chartHorasPerdidasGenero');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartHorasPerdidasGenero', window.chartHorasPerdidasGenero);
+    window.chartHorasPerdidasGenero = null;
+    
+    const cores = getCores();
+    // Cor dourada para feminino: #FFD700 (gold)
+    const coresGenero = dados.map(d => d.genero === 'M' ? cores.masculino : '#FFD700');
+    
+    window.chartHorasPerdidasGenero = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: dados.map(d => `${d.genero_label} (${d.semanas_perdidas.toFixed(1)} semanas)`),
+            datasets: [{
+                label: 'Horas Perdidas',
+                data: dados.map(d => d.horas_perdidas),
+                backgroundColor: coresGenero,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const dataIndex = context.dataIndex;
+                            const semanas = dados[dataIndex]?.semanas_perdidas || 0;
+                            return `${label}: ${value.toFixed(1)}h (${semanas.toFixed(1)} semanas)`;
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Horas Perdidas por Gênero',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { bottom: 20 }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartHorasPerdidasSetor(dados) {
+    const ctx = document.getElementById('chartHorasPerdidasSetor');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartHorasPerdidasSetor', window.chartHorasPerdidasSetor);
+    window.chartHorasPerdidasSetor = null;
+    
+    // Ordena por horas perdidas (decrescente) e pega top 10
+    const dadosOrdenados = [...dados].sort((a, b) => (b.horas_perdidas || 0) - (a.horas_perdidas || 0));
+    const top10 = dadosOrdenados.slice(0, 10);
+    const paleta = getPaleta();
+    
+    window.chartHorasPerdidasSetor = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: top10.map(d => truncate(d.setor, 20)),
+            datasets: [{
+                label: 'Horas Perdidas',
+                data: top10.map(d => d.horas_perdidas),
+                backgroundColor: paleta[0],
+                borderColor: paleta[0],
+                borderWidth: 1
+            }, {
+                label: 'Semanas Perdidas',
+                data: top10.map(d => d.semanas_perdidas),
+                backgroundColor: paleta[1],
+                borderColor: paleta[1],
+                borderWidth: 1,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'TOP 10 Setores - Horas Perdidas',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { bottom: 20 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            if (label === 'Semanas Perdidas') {
+                                return `${label}: ${value.toFixed(1)} semanas`;
+                            }
+                            return `${label}: ${value.toFixed(1)}h`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { maxRotation: 45, minRotation: 45 }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Horas' },
+                    grid: { color: '#f0f0f0' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    title: { display: true, text: 'Semanas (44h)' },
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartEvolucaoMensalHoras(dados) {
+    const ctx = document.getElementById('chartEvolucaoMensalHoras');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartEvolucaoMensalHoras', window.chartEvolucaoMensalHoras);
+    window.chartEvolucaoMensalHoras = null;
+    
+    const cores = getCores();
+    
+    window.chartEvolucaoMensalHoras = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dados.map(d => d.mes),
+            datasets: [{
+                label: 'Horas Perdidas',
+                data: dados.map(d => d.horas_perdidas),
+                borderColor: cores.primary,
+                backgroundColor: cores.primary + '20',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }, {
+                label: 'Semanas Perdidas (44h)',
+                data: dados.map(d => d.semanas_perdidas),
+                borderColor: cores.secondary,
+                backgroundColor: cores.secondary + '20',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Evolução Mensal de Horas Perdidas',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { bottom: 20 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            if (label.includes('Semanas')) {
+                                return `${label}: ${value.toFixed(1)} semanas`;
+                            }
+                            return `${label}: ${value.toFixed(1)}h`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Horas' },
+                    grid: { color: '#f0f0f0' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    title: { display: true, text: 'Semanas (44h)' },
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartComparativoDiasHorasGenero(dados) {
+    const ctx = document.getElementById('chartComparativoDiasHorasGenero');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartComparativoDiasHorasGenero', window.chartComparativoDiasHorasGenero);
+    window.chartComparativoDiasHorasGenero = null;
+    
+    const cores = getCores();
+    
+    // Ordena: Masculino primeiro, depois ordena por dias perdidos (decrescente)
+    const dadosOrdenados = [...dados].sort((a, b) => {
+        // Primeiro: Masculino (M) vem antes de Feminino (F)
+        if (a.genero === 'M' && b.genero !== 'M') return -1;
+        if (a.genero !== 'M' && b.genero === 'M') return 1;
+        // Se ambos são do mesmo gênero, ordena por dias perdidos (decrescente)
+        return (b.dias_perdidos || 0) - (a.dias_perdidos || 0);
+    });
+    
+    window.chartComparativoDiasHorasGenero = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dadosOrdenados.map(d => d.genero_label),
+            datasets: [{
+                label: 'Dias Perdidos',
+                data: dadosOrdenados.map(d => d.dias_perdidos),
+                backgroundColor: cores.primary,
+                borderColor: cores.primaryDark,
+                borderWidth: 1
+            }, {
+                label: 'Horas Perdidas',
+                data: dadosOrdenados.map(d => d.horas_perdidas),
+                backgroundColor: cores.secondary,
+                borderColor: cores.secondaryDark,
+                borderWidth: 1,
+                yAxisID: 'y1'
+            }, {
+                label: 'Semanas Perdidas',
+                data: dadosOrdenados.map(d => d.semanas_perdidas),
+                backgroundColor: cores.primaryLight,
+                borderColor: cores.primary,
+                borderWidth: 1,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Comparativo: Dias vs Horas vs Semanas por Gênero',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { bottom: 20 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            if (label.includes('Semanas')) {
+                                return `${label}: ${value.toFixed(1)} semanas`;
+                            } else if (label.includes('Horas')) {
+                                return `${label}: ${value.toFixed(1)}h`;
+                            }
+                            return `${label}: ${value.toFixed(1)} dias`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Dias' },
+                    grid: { color: '#f0f0f0' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    title: { display: true, text: 'Horas / Semanas' },
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartHorasPerdidasSetorGenero(dados) {
+    const ctx = document.getElementById('chartHorasPerdidasSetorGenero');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartHorasPerdidasSetorGenero', window.chartHorasPerdidasSetorGenero);
+    window.chartHorasPerdidasSetorGenero = null;
+    
+    // Agrupa por setor e calcula total de horas por setor
+    const setoresUnicos = [...new Set(dados.map(d => d.setor))];
+    const generos = ['M', 'F'];
+    
+    // Calcula total de horas por setor (soma M + F) para ordenação
+    const setoresComTotal = setoresUnicos.map(setor => {
+        const totalHoras = dados
+            .filter(d => d.setor === setor)
+            .reduce((sum, d) => sum + (d.horas_perdidas || 0), 0);
+        return { setor, totalHoras };
+    });
+    
+    // Ordena por total de horas (decrescente)
+    setoresComTotal.sort((a, b) => (b.totalHoras || 0) - (a.totalHoras || 0));
+    const setoresOrdenados = setoresComTotal.map(s => s.setor);
+    
+    // Cores: Preto para Masculino, Dourado para Feminino
+    const corMasculino = '#000000'; // Preto
+    const corFeminino = '#FFD700';  // Dourado
+    
+    const datasets = generos.map((genero, idx) => {
+        const generoLabel = genero === 'M' ? 'Masculino' : 'Feminino';
+        const cor = genero === 'M' ? corMasculino : corFeminino;
+        
+        return {
+            label: generoLabel,
+            data: setoresOrdenados.map(setor => {
+                const item = dados.find(d => d.setor === setor && d.genero === genero);
+                return item ? item.horas_perdidas : 0;
+            }),
+            backgroundColor: cor + '80', // 80 = 50% de opacidade
+            borderColor: cor,
+            borderWidth: 2
+        };
+    });
+    
+    window.chartHorasPerdidasSetorGenero = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: setoresOrdenados.map(s => truncate(s, 20)),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Horas Perdidas por Setor e Gênero',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { bottom: 20 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            const dataIndex = context.dataIndex;
+                            const setor = setoresOrdenados[dataIndex];
+                            const genero = generos[context.datasetIndex];
+                            const item = dados.find(d => d.setor === setor && d.genero === genero);
+                            const semanas = item ? item.semanas_perdidas : 0;
+                            return `${label}: ${value.toFixed(1)}h (${semanas.toFixed(1)} semanas)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { maxRotation: 45, minRotation: 45 }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Horas Perdidas' },
+                    grid: { color: '#f0f0f0' }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartAnaliseDetalhadaGenero(dados) {
+    const ctx = document.getElementById('chartAnaliseDetalhadaGenero');
+    if (!ctx || !dados || !dados.generos || dados.generos.length === 0) return;
+    
+    destruirGraficoSeguro('chartAnaliseDetalhadaGenero', window.chartAnaliseDetalhadaGenero);
+    window.chartAnaliseDetalhadaGenero = null;
+    
+    // Ordena: Masculino primeiro
+    const generos = [...dados.generos].sort((a, b) => {
+        // Masculino (M) vem antes de Feminino (F)
+        if (a.genero === 'M' && b.genero !== 'M') return -1;
+        if (a.genero !== 'M' && b.genero === 'M') return 1;
+        return 0;
+    });
+    const cores = getCores();
+    
+    window.chartAnaliseDetalhadaGenero = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: generos.map(g => g.genero_label),
+            datasets: [{
+                label: 'Percentual de Dias',
+                data: generos.map(g => g.percentual_dias),
+                backgroundColor: cores.primary,
+                borderColor: cores.primaryDark,
+                borderWidth: 1,
+                yAxisID: 'y'
+            }, {
+                label: 'Percentual de Horas',
+                data: generos.map(g => g.percentual_horas),
+                backgroundColor: cores.secondary,
+                borderColor: cores.secondaryDark,
+                borderWidth: 1,
+                yAxisID: 'y'
+            }, {
+                label: 'Percentual de Registros',
+                data: generos.map(g => g.percentual_registros),
+                backgroundColor: cores.primaryLight,
+                borderColor: cores.primary,
+                borderWidth: 1,
+                yAxisID: 'y'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Análise Detalhada por Gênero - Percentuais',
+                    font: { size: 16, weight: 'bold' },
+                    padding: { bottom: 20 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            return `${label}: ${value.toFixed(1)}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: { display: true, text: 'Percentual (%)' },
+                    grid: { color: '#f0f0f0' }
+                }
+            }
+        }
+    });
+}
+
 // ==================== UTILITÁRIOS ====================
 function truncate(str, length) {
     if (!str) return '';
     return str.length > length ? str.substring(0, length) + '...' : str;
 }
+
+// ==================== FILTROS SALVOS ====================
+
+let filtrosSalvosAbertos = false;
+
+function toggleFiltrosSalvos() {
+    const dropdown = document.getElementById('dropdownFiltrosSalvos');
+    if (!dropdown) return;
+    
+    filtrosSalvosAbertos = !filtrosSalvosAbertos;
+    dropdown.style.display = filtrosSalvosAbertos ? 'block' : 'none';
+    
+    if (filtrosSalvosAbertos) {
+        carregarFiltrosSalvos();
+    }
+}
+
+async function carregarFiltrosSalvos() {
+    const clientId = getClientId();
+    if (!clientId) {
+        const lista = document.getElementById('listaFiltrosSalvos');
+        if (lista) {
+            lista.innerHTML = '<div style="padding: 20px; text-align: center; color: #6c757d;">Selecione um cliente primeiro</div>';
+        }
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/filtros-salvos?client_id=${clientId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao carregar filtros salvos');
+        }
+        
+        const filtros = await response.json();
+        renderizarListaFiltrosSalvos(filtros);
+    } catch (error) {
+        console.error('Erro ao carregar filtros salvos:', error);
+        const lista = document.getElementById('listaFiltrosSalvos');
+        if (lista) {
+            lista.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">Erro ao carregar filtros</div>';
+        }
+    }
+}
+
+function renderizarListaFiltrosSalvos(filtros) {
+    const lista = document.getElementById('listaFiltrosSalvos');
+    if (!lista) return;
+    
+    if (!filtros || filtros.length === 0) {
+        lista.innerHTML = '<div style="padding: 20px; text-align: center; color: #6c757d; font-size: 12px;">Nenhum filtro salvo</div>';
+        return;
+    }
+    
+    lista.innerHTML = filtros.map(filtro => {
+        const descricao = [];
+        if (filtro.mes_inicio || filtro.mes_fim) {
+            descricao.push(`${filtro.mes_inicio || '...'} a ${filtro.mes_fim || '...'}`);
+        }
+        if (filtro.funcionarios && filtro.funcionarios.length > 0) {
+            descricao.push(`${filtro.funcionarios.length} funcionário(s)`);
+        }
+        if (filtro.setores && filtro.setores.length > 0) {
+            descricao.push(`${filtro.setores.length} setor(es)`);
+        }
+        
+        return `
+            <div style="padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; font-size: 13px; color: #212529; margin-bottom: 4px;">${filtro.nome}</div>
+                    <div style="font-size: 11px; color: #6c757d;">${descricao.length > 0 ? descricao.join(' • ') : 'Sem filtros específicos'}</div>
+                </div>
+                <div style="display: flex; gap: 4px;">
+                    <button onclick="aplicarFiltroSalvo(${filtro.id})" style="padding: 4px 8px; background: #1a237e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;" title="Aplicar">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button onclick="deletarFiltroSalvo(${filtro.id})" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function aplicarFiltroSalvo(filtroId) {
+    const clientId = getClientId();
+    if (!clientId) {
+        alert('Selecione um cliente primeiro');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/filtros-salvos/${filtroId}/aplicar`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao aplicar filtro');
+        }
+        
+        const filtro = await response.json();
+        
+        // Aplica os valores do filtro nos campos
+        const mesInicioInput = document.getElementById('mesInicio');
+        const mesFimInput = document.getElementById('mesFim');
+        
+        if (mesInicioInput && filtro.mes_inicio) {
+            mesInicioInput.value = filtro.mes_inicio;
+        }
+        if (mesFimInput && filtro.mes_fim) {
+            mesFimInput.value = filtro.mes_fim;
+        }
+        
+        // Aplica funcionários (checkboxes)
+        if (filtro.funcionarios && filtro.funcionarios.length > 0) {
+            const checkboxes = document.querySelectorAll('#checkboxesFuncionarios input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.checked = filtro.funcionarios.includes(cb.value);
+            });
+            atualizarTextoSelecionados('funcionarios');
+        }
+        
+        // Aplica setores (checkboxes)
+        if (filtro.setores && filtro.setores.length > 0) {
+            const checkboxes = document.querySelectorAll('#checkboxesSetores input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.checked = filtro.setores.includes(cb.value);
+            });
+            atualizarTextoSelecionados('setores');
+        }
+        
+        // Fecha o dropdown
+        toggleFiltrosSalvos();
+        
+        // Aplica os filtros automaticamente
+        await aplicarFiltros();
+        
+        // Mostra mensagem de sucesso
+        mostrarMensagemSucesso('Filtro aplicado com sucesso!');
+    } catch (error) {
+        console.error('Erro ao aplicar filtro:', error);
+        alert('Erro ao aplicar filtro salvo');
+    }
+}
+
+async function deletarFiltroSalvo(filtroId) {
+    if (!confirm('Deseja realmente excluir este filtro salvo?')) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/filtros-salvos/${filtroId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Erro ao deletar filtro');
+        }
+        
+        // Recarrega a lista
+        await carregarFiltrosSalvos();
+        mostrarMensagemSucesso('Filtro excluído com sucesso!');
+    } catch (error) {
+        console.error('Erro ao deletar filtro:', error);
+        alert('Erro ao excluir filtro salvo');
+    }
+}
+
+async function salvarFiltroAtual() {
+    const clientId = getClientId();
+    if (!clientId) {
+        alert('Selecione um cliente primeiro');
+        return;
+    }
+    
+    const nome = prompt('Digite um nome para este filtro:');
+    if (!nome || nome.trim() === '') {
+        return;
+    }
+    
+    // Coleta valores atuais dos filtros
+    const mesInicio = document.getElementById('mesInicio')?.value || '';
+    const mesFim = document.getElementById('mesFim')?.value || '';
+    
+    // Pega funcionários selecionados
+    const funcionarios = Array.from(document.querySelectorAll('#checkboxesFuncionarios input[type="checkbox"]:checked'))
+        .map(cb => cb.value)
+        .filter(v => v);
+    
+    // Pega setores selecionados
+    const setores = Array.from(document.querySelectorAll('#checkboxesSetores input[type="checkbox"]:checked'))
+        .map(cb => cb.value)
+        .filter(v => v);
+    
+    try {
+        const token = localStorage.getItem('access_token');
+        const formData = new FormData();
+        formData.append('client_id', clientId);
+        formData.append('nome', nome.trim());
+        if (mesInicio) formData.append('mes_inicio', mesInicio);
+        if (mesFim) formData.append('mes_fim', mesFim);
+        if (funcionarios.length > 0) formData.append('funcionarios', JSON.stringify(funcionarios));
+        if (setores.length > 0) formData.append('setores', JSON.stringify(setores));
+        
+        const response = await fetch('/api/filtros-salvos', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao salvar filtro');
+        }
+        
+        mostrarMensagemSucesso('Filtro salvo com sucesso!');
+        
+        // Recarrega a lista se o dropdown estiver aberto
+        if (filtrosSalvosAbertos) {
+            await carregarFiltrosSalvos();
+        }
+    } catch (error) {
+        console.error('Erro ao salvar filtro:', error);
+        alert(error.message || 'Erro ao salvar filtro');
+    }
+}
+
+function mostrarMensagemSucesso(mensagem) {
+    // Cria ou atualiza mensagem de sucesso
+    let msgDiv = document.getElementById('mensagemSucessoFiltros');
+    if (!msgDiv) {
+        msgDiv = document.createElement('div');
+        msgDiv.id = 'mensagemSucessoFiltros';
+        msgDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: #28a745; color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10000; font-size: 13px;';
+        document.body.appendChild(msgDiv);
+    }
+    
+    msgDiv.textContent = mensagem;
+    msgDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        msgDiv.style.display = 'none';
+    }, 3000);
+}
+
+// ==================== COMPARATIVO ENTRE PERÍODOS ====================
+
+let chartComparativoMensal = null;
+let chartComparativoTrimestral = null;
+
+function renderizarChartComparativoMensal(dados) {
+    const ctx = document.getElementById('chartComparativoMensal');
+    if (!ctx || !dados || !dados.periodo_atual) return;
+    
+    destruirGraficoSeguro('chartComparativoMensal', chartComparativoMensal);
+    chartComparativoMensal = null;
+    
+    const cores = getCores();
+    const periodoAtual = dados.periodo_atual;
+    const periodoAnterior = dados.periodo_anterior;
+    const variacao = dados.variacao;
+    
+    chartComparativoMensal = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Dias Perdidos', 'Horas Perdidas', 'Total de Registros'],
+            datasets: [
+                {
+                    label: periodoAtual.label || 'Período Atual',
+                    data: [
+                        periodoAtual.dias_perdidos || 0,
+                        periodoAtual.horas_perdidas || 0,
+                        periodoAtual.total_registros || 0
+                    ],
+                    backgroundColor: cores.primary,
+                    borderRadius: 6
+                },
+                {
+                    label: periodoAnterior.label || 'Período Anterior',
+                    data: [
+                        periodoAnterior.dias_perdidos || 0,
+                        periodoAnterior.horas_perdidas || 0,
+                        periodoAnterior.total_registros || 0
+                    ],
+                    backgroundColor: cores.secondary,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { font: { size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function(context) {
+                            const index = context.dataIndex;
+                            const datasetIndex = context.datasetIndex;
+                            let variacaoValor = 0;
+                            
+                            if (index === 0) variacaoValor = variacao.dias_perdidos;
+                            else if (index === 1) variacaoValor = variacao.horas_perdidas;
+                            else if (index === 2) variacaoValor = variacao.total_registros;
+                            
+                            if (datasetIndex === 0 && variacaoValor !== 0) {
+                                const sinal = variacaoValor > 0 ? '+' : '';
+                                const cor = variacaoValor > 0 ? '🔴' : '🟢';
+                                return `${cor} Variação: ${sinal}${variacaoValor.toFixed(1)}%`;
+                            }
+                            return '';
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: `Comparativo: ${periodoAtual.label} vs ${periodoAnterior.label}`,
+                    font: { size: 14, weight: 'bold' },
+                    padding: { bottom: 10 }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function renderizarChartComparativoTrimestral(dados) {
+    const ctx = document.getElementById('chartComparativoTrimestral');
+    if (!ctx || !dados || !dados.periodo_atual) return;
+    
+    destruirGraficoSeguro('chartComparativoTrimestral', chartComparativoTrimestral);
+    chartComparativoTrimestral = null;
+    
+    const cores = getCores();
+    const periodoAtual = dados.periodo_atual;
+    const periodoAnterior = dados.periodo_anterior;
+    const variacao = dados.variacao;
+    
+    chartComparativoTrimestral = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Dias Perdidos', 'Horas Perdidas', 'Total de Registros'],
+            datasets: [
+                {
+                    label: periodoAtual.label || 'Trimestre Atual',
+                    data: [
+                        periodoAtual.dias_perdidos || 0,
+                        periodoAtual.horas_perdidas || 0,
+                        periodoAtual.total_registros || 0
+                    ],
+                    backgroundColor: cores.primary,
+                    borderRadius: 6
+                },
+                {
+                    label: periodoAnterior.label || 'Trimestre Anterior',
+                    data: [
+                        periodoAnterior.dias_perdidos || 0,
+                        periodoAnterior.horas_perdidas || 0,
+                        periodoAnterior.total_registros || 0
+                    ],
+                    backgroundColor: cores.secondary,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { font: { size: 12 } }
+                },
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function(context) {
+                            const index = context.dataIndex;
+                            const datasetIndex = context.datasetIndex;
+                            let variacaoValor = 0;
+                            
+                            if (index === 0) variacaoValor = variacao.dias_perdidos;
+                            else if (index === 1) variacaoValor = variacao.horas_perdidas;
+                            else if (index === 2) variacaoValor = variacao.total_registros;
+                            
+                            if (datasetIndex === 0 && variacaoValor !== 0) {
+                                const sinal = variacaoValor > 0 ? '+' : '';
+                                const cor = variacaoValor > 0 ? '🔴' : '🟢';
+                                return `${cor} Variação: ${sinal}${variacaoValor.toFixed(1)}%`;
+                            }
+                            return '';
+                        }
+                    }
+                },
+                title: {
+                    display: true,
+                    text: `Comparativo Trimestral`,
+                    font: { size: 14, weight: 'bold' },
+                    padding: { bottom: 10 }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+// Torna funções globais
+window.toggleFiltrosSalvos = toggleFiltrosSalvos;
+window.salvarFiltroAtual = salvarFiltroAtual;
+window.aplicarFiltroSalvo = aplicarFiltroSalvo;
+window.deletarFiltroSalvo = deletarFiltroSalvo;
 

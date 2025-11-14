@@ -10,13 +10,13 @@ function getCoresApresentacao() {
     }
     // Fallback para cores padrão
     return {
-        primary: '#1a237e',
-        primaryDark: '#0d47a1',
-        primaryLight: '#3949ab',
-        secondary: '#556B2F',
-        secondaryDark: '#4a5d23',
-        secondaryLight: '#6B8E23',
-    };
+    primary: '#1a237e',
+    primaryDark: '#0d47a1',
+    primaryLight: '#3949ab',
+    secondary: '#556B2F',
+    secondaryDark: '#4a5d23',
+    secondaryLight: '#6B8E23',
+};
 }
 
 function getPaletaApresentacao() {
@@ -64,6 +64,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         carregarApresentacao();
+        
+        // Ajusta header para RODA DE OURO (preto-cinza)
+        setTimeout(() => {
+            const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+            if (clientId === 4) {
+                const header = document.querySelector('.apresentacao-header');
+                if (header) {
+                    header.style.background = 'linear-gradient(135deg, #000000, #808080)';
+                }
+            }
+        }, 100);
     }, 500);
     
     // Navegação por teclado
@@ -93,6 +104,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== CARREGAR APRESENTAÇÃO ====================
 async function carregarApresentacao(forceClientId = null) {
+    // Mostra loading
+    const container = document.getElementById('slideContent');
+    if (container) {
+        container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column;"><div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Carregando apresentação...</p></div></div>';
+    }
+    
     try {
         // Sempre obtém o client_id atual do localStorage (sem valor padrão)
         let clientId = forceClientId;
@@ -121,26 +138,66 @@ async function carregarApresentacao(forceClientId = null) {
         
         // Adiciona timestamp para evitar cache
         const timestamp = new Date().getTime();
-        const response = await fetch(`/api/apresentacao?client_id=${clientId}&_t=${timestamp}`);
+        
+        // Cria um AbortController para timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
+        
+        let response;
+        try {
+            response = await fetch(`/api/apresentacao?client_id=${clientId}&_t=${timestamp}`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('Timeout: A requisição demorou mais de 30 segundos. O servidor pode estar sobrecarregado.');
+            }
+            throw error;
+        }
         
         if (!response.ok) {
             const errorText = await response.text();
+            console.error('[APRESENTACAO] Erro na resposta:', response.status, errorText);
             throw new Error(`Erro ao carregar apresentação: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
+        console.log('[APRESENTACAO] Dados recebidos do backend:', data);
         slides = data.slides || [];
         
-        console.log('Slides carregados:', slides.length, 'para cliente:', clientId);
+        console.log('[APRESENTACAO] Resposta completa:', data);
+        console.log('[APRESENTACAO] Slides carregados:', slides.length, 'para cliente:', clientId);
+        console.log('[APRESENTACAO] Primeiros 3 slides:', slides.slice(0, 3));
         
-        document.getElementById('totalSlides').textContent = slides.length;
+        // Ajusta header para RODA DE OURO (preto-cinza)
+        if (clientId === 4) {
+            const header = document.querySelector('.apresentacao-header');
+            if (header) {
+                header.style.background = 'linear-gradient(135deg, #000000, #808080)';
+            }
+        } else {
+            // Restaura cores padrão para outras empresas
+            const header = document.querySelector('.apresentacao-header');
+            if (header) {
+                header.style.background = 'linear-gradient(135deg, #1a237e, #3949ab)';
+            }
+        }
+        
+        const totalSlidesEl = document.getElementById('totalSlides');
+        if (totalSlidesEl) {
+            totalSlidesEl.textContent = slides.length;
+        }
         
         if (slides.length > 0) {
             slideAtual = 0;
+            console.log('[APRESENTACAO] Renderizando slide 0:', slides[0]);
             renderizarSlide(slides[0]);
             atualizarBotoes();
         } else {
-            mostrarErro('Nenhum dado disponível para apresentação');
+            console.error('[APRESENTACAO] Nenhum slide retornado!');
+            mostrarErro('Nenhum dado disponível para apresentação. Verifique se há dados cadastrados para este cliente.');
         }
     } catch (error) {
         console.error('Erro ao carregar apresentação:', error);
@@ -180,11 +237,26 @@ if (typeof window !== 'undefined') {
 // ==================== RENDERIZAR SLIDE ====================
 function renderizarSlide(slide) {
     const container = document.getElementById('slideContent');
+    if (!container) {
+        console.error('[APRESENTACAO] Container slideContent não encontrado!');
+        return;
+    }
+    
+    if (!slide) {
+        console.error('[APRESENTACAO] Slide é null ou undefined!');
+        return;
+    }
+    
+    console.log('[APRESENTACAO] Renderizando slide:', slide.id, slide.tipo);
+    
     // Não mostra número para capa (id 0) e slides de ações (id >= 14)
+    const slideAtualEl = document.getElementById('slideAtual');
+    if (slideAtualEl) {
     if (slide.id === 0 || slide.id >= 14) {
-        document.getElementById('slideAtual').textContent = '-';
+            slideAtualEl.textContent = '-';
     } else {
-        document.getElementById('slideAtual').textContent = slide.id;
+            slideAtualEl.textContent = slide.id;
+        }
     }
     
     // Limpa gráficos anteriores
@@ -193,6 +265,17 @@ function renderizarSlide(slide) {
     });
     charts = {};
     
+    // Remove footer antigo se existir (antes de renderizar novo slide)
+    // Procura em todos os containers possíveis
+    const footerAntigo1 = document.querySelector('.slide-body div[style*="position: absolute"][style*="bottom: 0"]');
+    const footerAntigo2 = document.querySelector('div[style*="position: fixed"][style*="bottom: 0"]');
+    if (footerAntigo1) {
+        footerAntigo1.remove();
+    }
+    if (footerAntigo2) {
+        footerAntigo2.remove();
+    }
+    
     let html = '';
     
     // Renderiza conteúdo baseado no tipo
@@ -200,14 +283,22 @@ function renderizarSlide(slide) {
         // Capa não tem header - renderiza de forma assíncrona
         container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Carregando capa...</p></div></div>';
         renderizarCapa().then(capaHTML => {
-            container.innerHTML = capaHTML;
+            if (capaHTML) {
+                container.innerHTML = capaHTML;
+            } else {
+                container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><p>Erro ao carregar capa</p></div>';
+            }
+        }).catch(error => {
+            console.error('[APRESENTACAO] Erro ao renderizar capa:', error);
+            container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><p>Erro ao carregar capa: ' + error.message + '</p></div>';
         });
         return; // Retorna cedo para não processar o resto
     } else {
         // Outros slides têm header
+        // Título sempre em preto
         html += `
             <div class="slide-header">
-                <h2>${slide.titulo}</h2>
+                <h2 style="color: #000000;">${slide.titulo}</h2>
                 <p>${slide.subtitulo}</p>
             </div>
         `;
@@ -232,15 +323,16 @@ function renderizarSlide(slide) {
             html += `</div>`;
         } else if (slide.tipo === 'acoes_intro' || slide.tipo === 'acoes_saude_fisica' || slide.tipo === 'acoes_saude_emocional' || slide.tipo === 'acoes_saude_social') {
             // Slides de ações ocupam toda a altura (sem grid de análise)
-            html += `<div style="flex: 1; overflow: hidden; position: relative;">`;
+            html += `<div class="slide-body" style="position: relative; display: flex; flex-direction: column;">`;
+            html += `<div style="flex: 1; overflow: hidden; position: relative; height: 100%;">`;
             // Botões de edição (apenas para slides de saúde, não para introdução)
             if (slide.tipo !== 'acoes_intro') {
                 html += `
                     <div style="position: absolute; top: 10px; right: 10px; z-index: 100; display: flex; gap: 8px;">
-                        <button id="btnEditarAcoes" onclick="toggleEdicaoAcoes('${slide.tipo}')" style="padding: 8px 16px; background: #556B2F; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <button id="btnEditarAcoes" onclick="toggleEdicaoAcoes('${slide.tipo}')" style="padding: 8px 16px; background: #000000; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
                             <i class="fas fa-edit"></i> Editar
                         </button>
-                        <button id="btnSalvarAcoes" onclick="salvarAcoes('${slide.tipo}')" style="padding: 8px 16px; background: #1a237e; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: none; align-items: center; gap: 6px;">
+                        <button id="btnSalvarAcoes" onclick="salvarAcoes('${slide.tipo}')" style="padding: 8px 16px; background: #808080; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: none; align-items: center; gap: 6px;">
                             <i class="fas fa-save"></i> Salvar
                         </button>
                     </div>
@@ -255,9 +347,35 @@ function renderizarSlide(slide) {
             } else if (slide.tipo === 'acoes_saude_social') {
                 html += renderizarAcoesSaudeSocial(slide.tipo);
             }
-            // Footer com risco verde/azul e logo CONVER
-            html += renderizarFooterAcoes();
-            html += `</div>`;
+            html += `</div>`; // Fecha div position relative
+            html += `</div>`; // Fecha slide-body
+            
+            // Footer dinâmico - adiciona no container interno
+            setTimeout(async () => {
+                try {
+                    const footerHTML = await renderizarFooterAcoes();
+                    // Procura o container interno (div com position: relative) dentro do slide-body
+                    const slideBody = document.querySelector('.slide-body[style*="position: relative"]');
+                    if (slideBody) {
+                        const container = slideBody.querySelector('div[style*="position: relative"]');
+                        if (container) {
+                            // Garante que o container tenha altura completa
+                            const slideBodyHeight = slideBody.offsetHeight;
+                            container.style.height = slideBodyHeight + 'px';
+                            container.style.position = 'relative';
+                            
+                            // Remove footer antigo
+                            const footerAntigo = container.querySelector('div[style*="position: absolute"][style*="bottom: 0"]');
+                            if (footerAntigo) footerAntigo.remove();
+                            
+                            // Adiciona footer no final
+                            container.insertAdjacentHTML('beforeend', footerHTML);
+                        }
+                    }
+                } catch (error) {
+                    console.error('[FOOTER] Erro:', error);
+                }
+            }, 200);
         } else {
             html += `<div class="slide-body">`;
             html += `
@@ -268,13 +386,15 @@ function renderizarSlide(slide) {
                 </div>
             `;
             // Análise IA para gráficos
+            const analiseTexto = slide.analise || 'Análise não disponível.';
+            console.log(`[APRESENTACAO] Slide ${slide.tipo} - Análise:`, analiseTexto);
             html += `
                 <div class="analise-container">
                     <h3>
                         <i class="fas fa-lightbulb"></i>
                         Análise e Insights
                     </h3>
-                    <div class="analise-texto">${formatarAnalise(slide.analise)}</div>
+                    <div class="analise-texto">${formatarAnalise(analiseTexto)}</div>
                 </div>
             `;
             html += `</div>`;
@@ -285,9 +405,12 @@ function renderizarSlide(slide) {
     
     // Renderiza gráfico se necessário
     if (slide.tipo !== 'kpis' && slide.tipo !== 'capa' && slide.tipo !== 'acoes_intro' && slide.tipo !== 'acoes_saude_fisica' && slide.tipo !== 'acoes_saude_emocional' && slide.tipo !== 'acoes_saude_social') {
+        console.log(`[APRESENTACAO] Preparando para renderizar gráfico ${slide.tipo}...`);
         setTimeout(() => {
             renderizarGrafico(slide);
         }, 100);
+    } else {
+        console.log(`[APRESENTACAO] Slide ${slide.tipo} não requer gráfico`);
     }
 }
 
@@ -334,23 +457,54 @@ async function renderizarCapa() {
     const dataFormatada = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     
     // Renderiza logo ou nome
+    // Para RODA DE OURO (client_id = 4): retangular (64px altura x 128px largura)
+    // Para outras empresas: mantém formato original
+    const isRodaOuro = clientId === 4;
+    
     let logoHTML = '';
     if (clienteInfo.logo_url) {
-        logoHTML = `
-            <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center;">
-                <img src="${clienteInfo.logo_url}" alt="${nomeExibicao}" style="max-height: 200px; max-width: 600px; object-fit: contain;">
-            </div>
-        `;
-    } else {
-        // Usa iniciais se não tiver logo
-        const iniciais = gerarIniciaisCapa(nomeExibicao);
-        logoHTML = `
-            <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center;">
-                <div style="width: 180px; height: 180px; border-radius: 50%; background: linear-gradient(135deg, ${corPrimaria}, ${corSecundaria}); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
-                    <span style="font-size: 72px; font-weight: 700; color: white; letter-spacing: 2px;">${iniciais}</span>
+        // Adiciona timestamp para evitar cache
+        const logoUrlComCache = clienteInfo.logo_url + (clienteInfo.logo_url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        
+        if (isRodaOuro) {
+            // RODA DE OURO: formato HORIZONTAL/RETANGULAR FORÇADO (120px altura x 360px largura) - 3:1 HORIZONTAL
+            logoHTML = `
+                <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center; width: 100%;">
+                    <div style="height: 120px !important; width: 360px !important; min-width: 360px !important; max-width: 360px !important; min-height: 120px !important; max-height: 120px !important; aspect-ratio: 3 / 1 !important; overflow: hidden !important; background: transparent !important; display: flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important;">
+                        <img src="${logoUrlComCache}" alt="${nomeExibicao}" style="width: 360px !important; height: 120px !important; max-width: 360px !important; max-height: 120px !important; aspect-ratio: 3 / 1 !important; object-fit: contain !important; object-position: center !important; display: block !important;">
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            // Converplast e outras: formato original (aumentado)
+            logoHTML = `
+                <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center;">
+                    <img src="${logoUrlComCache}" alt="${nomeExibicao}" style="max-height: 200px; max-width: 600px; object-fit: contain;">
+                </div>
+            `;
+        }
+    } else {
+        if (isRodaOuro) {
+            // RODA DE OURO: nome completo em formato HORIZONTAL (100px altura x 300px largura)
+            const tamanhoFonte = nomeExibicao.length > 20 ? 16 : (nomeExibicao.length > 15 ? 18 : 20);
+            logoHTML = `
+                <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center;">
+                    <div style="height: 100px !important; width: 300px !important; min-width: 300px !important; max-width: 300px !important; background: ${corPrimaria}; border-radius: 4px; padding: 8px 12px; box-sizing: border-box; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: ${tamanhoFonte}px; font-weight: 700; color: white; letter-spacing: 0.5px; line-height: 1.2; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; max-width: 100%;">${nomeExibicao}</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Converplast e outras: iniciais no formato original
+            const iniciais = gerarIniciaisCapa(nomeExibicao);
+            logoHTML = `
+                <div style="margin-bottom: 80px; display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 180px; height: 180px; border-radius: 50%; background: linear-gradient(135deg, ${corPrimaria}, ${corSecundaria}); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
+                        <span style="font-size: 72px; font-weight: 700; color: white; letter-spacing: 2px;">${iniciais}</span>
+                    </div>
+                </div>
+            `;
+        }
     }
     
     const htmlCapa = `
@@ -408,19 +562,39 @@ function renderizarKPIs(dados) {
     const totalDias = Math.round(dados.total_dias_perdidos || 0);
     const totalHoras = Math.round(dados.total_horas_perdidas || 0);
     
+    // Obtém client_id atual para determinar cores
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    const isRodaOuro = clientId === 4;
+    
+    // Cores para Roda de Ouro (preto e cinza)
+    const coresRO = {
+        card1: '#000000',  // Preto
+        card2: '#404040',  // Cinza escuro
+        card3: '#808080'   // Cinza
+    };
+    
+    // Cores padrão (Converplast e outras)
+    const coresPadrao = {
+        card1: '#1a237e',  // Azul escuro
+        card2: '#3949ab',  // Azul médio
+        card3: '#5c6bc0'   // Azul claro
+    };
+    
+    const cores = isRodaOuro ? coresRO : coresPadrao;
+    
     return `
         <div class="kpis-grid">
-            <div class="kpi-card">
+            <div class="kpi-card" style="background: linear-gradient(135deg, ${cores.card1}, ${cores.card2}); border-left: 4px solid ${cores.card1};">
                 <h3>Total de Atestados</h3>
                 <div class="valor">${totalAtestados}</div>
                 <div class="label">Atestados</div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" style="background: linear-gradient(135deg, ${cores.card2}, ${cores.card3}); border-left: 4px solid ${cores.card2};">
                 <h3>Dias Perdidos</h3>
                 <div class="valor">${totalDias}</div>
                 <div class="label">Dias</div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" style="background: linear-gradient(135deg, ${cores.card3}, ${cores.card2}); border-left: 4px solid ${cores.card3};">
                 <h3>Horas Perdidas</h3>
                 <div class="valor">${totalHoras}</div>
                 <div class="label">Horas</div>
@@ -431,16 +605,53 @@ function renderizarKPIs(dados) {
 
 function renderizarGrafico(slide) {
     const ctx = document.getElementById('chartSlide');
-    if (!ctx) return;
+    if (!ctx) {
+        console.warn('[APRESENTACAO] Canvas chartSlide não encontrado');
+        return;
+    }
     
     const tipo = slide.tipo;
     const dados = slide.dados;
     
-    if (!dados || dados.length === 0) {
+    // Validação mais flexível: aceita arrays e objetos
+    if (!dados) {
+        console.warn(`[APRESENTACAO] Slide ${tipo} sem dados`);
         return;
     }
     
+    // Verifica se é array vazio
+    if (Array.isArray(dados) && dados.length === 0) {
+        console.warn(`[APRESENTACAO] Slide ${tipo} com array vazio`);
+        return;
+    }
+    
+    // Verifica se é objeto vazio (para gráficos como dias_ano_coerencia, analise_coerencia)
+    if (typeof dados === 'object' && !Array.isArray(dados)) {
+        const temDados = Object.keys(dados).some(key => {
+            const valor = dados[key];
+            if (Array.isArray(valor)) return valor.length > 0;
+            if (typeof valor === 'number') return valor > 0;
+            return valor != null && valor !== '';
+        });
+        if (!temDados) {
+            console.warn(`[APRESENTACAO] Slide ${tipo} com objeto sem dados válidos`);
+            return;
+        }
+    }
+    
+    console.log(`[APRESENTACAO] Renderizando gráfico ${tipo} com dados:`, dados);
+    
     let config = {};
+    
+    // Obtém client_id atual para determinar cores
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    const clientIdNum = clientId ? Number(clientId) : null;
+    
+    // Cores da RODA DE OURO (preto e cinza) - apenas se for RODA DE OURO (client_id = 4)
+    const coresRO = { preto: '#000000', cinza: '#808080', cinzaEscuro: '#404040', cinzaClaro: '#A0A0A0' };
+    
+    // Obtém cores dinâmicas do cliente
+    const coresCliente = getCoresApresentacao();
     
     switch(tipo) {
         case 'funcionarios_dias':
@@ -486,13 +697,15 @@ function renderizarGrafico(slide) {
             break;
             
         case 'top_cids':
+            // Ordena por quantidade (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const cidsOrdenados = [...dados].sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0));
             config = {
                 type: 'bar',
                 data: {
-                    labels: dados.map(d => truncate(d.descricao || d.cid, 28)),
+                    labels: cidsOrdenados.map(d => truncate(d.descricao || d.cid, 28)),
                     datasets: [{
                         label: 'Atestados',
-                        data: dados.map(d => d.quantidade),
+                        data: cidsOrdenados.map(d => d.quantidade),
                         backgroundColor: CORES_EMPRESA.primary,
                         borderRadius: 6,
                     }]
@@ -507,12 +720,12 @@ function renderizarGrafico(slide) {
                             callbacks: {
                                 title: function(context) {
                                     const index = context[0].dataIndex;
-                                    const item = dados[index];
+                                    const item = cidsOrdenados[index];
                                     return `CID ${item.cid || 'N/A'}`;
                                 },
                                 label: function(context) {
                                     const index = context.dataIndex;
-                                    const item = dados[index];
+                                    const item = cidsOrdenados[index];
                                     const diagnostico = item.descricao || item.diagnostico || 'Não especificado';
                                     return [
                                         `Diagnóstico: ${diagnostico}`,
@@ -521,7 +734,7 @@ function renderizarGrafico(slide) {
                                 },
                                 afterLabel: function(context) {
                                     const index = context.dataIndex;
-                                    const item = dados[index];
+                                    const item = cidsOrdenados[index];
                                     if (item.dias_perdidos) {
                                         return `Dias perdidos: ${item.dias_perdidos}`;
                                     }
@@ -618,7 +831,9 @@ function renderizarGrafico(slide) {
             break;
             
         case 'top_setores':
-            const top5Setores = dados.slice(0, 5);
+            // Ordena por quantidade (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const setoresTopOrdenados = [...dados].sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0));
+            const top5Setores = setoresTopOrdenados.slice(0, 5);
             config = {
                 type: 'line',
                 data: {
@@ -716,7 +931,9 @@ function renderizarGrafico(slide) {
             break;
             
         case 'dias_doenca':
-            const top5Cids = dados.slice(0, 5);
+            // Ordena por dias perdidos (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const doencasOrdenadas = [...dados].sort((a, b) => (b.dias_perdidos || 0) - (a.dias_perdidos || 0));
+            const top5Cids = doencasOrdenadas.slice(0, 5);
             config = {
                 type: 'bar',
                 data: {
@@ -741,7 +958,9 @@ function renderizarGrafico(slide) {
             break;
             
         case 'escalas':
-            const top10Escalas = dados.slice(0, 10);
+            // Ordena por quantidade (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const escalasOrdenadas = [...dados].sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0));
+            const top10Escalas = escalasOrdenadas.slice(0, 10);
             config = {
                 type: 'bar',
                 data: {
@@ -762,7 +981,7 @@ function renderizarGrafico(slide) {
                             callbacks: {
                                 label: function(context) {
                                     const index = context.dataIndex;
-                                    const escala = top10Escalas[index];
+                                    const escala = escalasOrdenadas[index];
                                     return `Atestados: ${escala.quantidade || 0}`;
                                 }
                             }
@@ -783,7 +1002,9 @@ function renderizarGrafico(slide) {
             break;
             
         case 'motivos':
-            const top10Motivos = dados.slice(0, 10);
+            // Ordena por quantidade (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const motivosOrdenados = [...dados].sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0));
+            const top10Motivos = motivosOrdenados.slice(0, 10);
             const totalMotivos = top10Motivos.reduce((sum, m) => sum + (m.quantidade || 0), 0);
             config = {
                 type: 'pie',
@@ -843,7 +1064,9 @@ function renderizarGrafico(slide) {
             break;
             
         case 'centro_custo':
-            const top10Setores = dados.slice(0, 10);
+            // Ordena por dias perdidos (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const centrosOrdenados = [...dados].sort((a, b) => (b.dias_perdidos || 0) - (a.dias_perdidos || 0));
+            const top10Setores = centrosOrdenados.slice(0, 10);
             config = {
                 type: 'bar',
                 data: {
@@ -918,7 +1141,9 @@ function renderizarGrafico(slide) {
             break;
             
         case 'media_cid':
-            const top10MediaCid = dados.slice(0, 10);
+            // Ordena por média de dias (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const mediaCidOrdenados = [...dados].sort((a, b) => (b.media_dias || 0) - (a.media_dias || 0));
+            const top10MediaCid = mediaCidOrdenados.slice(0, 10);
             config = {
                 type: 'bar',
                 data: {
@@ -1092,10 +1317,634 @@ function renderizarGrafico(slide) {
                 }
             };
             break;
+        
+        // ==================== GRÁFICOS RODA DE OURO ====================
+        case 'classificacao_funcionarios_ro':
+            const top15FuncRO = dados.slice(0, 15).sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0));
+            config = {
+                type: 'bar',
+                data: {
+                    labels: top15FuncRO.map(d => truncate(d.nome || 'N/A', 25)),
+                    datasets: [{
+                        label: 'Dias de Atestados',
+                        data: top15FuncRO.map(d => d.quantidade || 0),
+                        backgroundColor: function(context) {
+                            const chart = context.chart;
+                            const {ctx, chartArea} = chart;
+                            if (!chartArea) return coresRO.preto;
+                            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                            gradient.addColorStop(0, '#000000');
+                            gradient.addColorStop(1, '#808080');
+                            return gradient;
+                        },
+                        borderColor: coresRO.preto,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Dias de Atestados: ${context.parsed.x}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true },
+                        y: { ticks: { font: { size: 11 } } }
+                    }
+                }
+            };
+            break;
+        
+        case 'classificacao_setores_ro':
+            const top15SetoresRO = dados.slice(0, 15).sort((a, b) => (b.dias_afastamento || 0) - (a.dias_afastamento || 0));
+            config = {
+                type: 'bar',
+                data: {
+                    labels: top15SetoresRO.map(d => truncate(d.setor || 'N/A', 25)),
+                    datasets: [{
+                        label: 'Dias de Afastamento',
+                        data: top15SetoresRO.map(d => d.dias_afastamento || 0),
+                        backgroundColor: coresRO.cinza,
+                        borderColor: coresRO.cinzaEscuro,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Dias de Afastamento: ${context.parsed.x}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true },
+                        y: { ticks: { font: { size: 11 } } }
+                    }
+                }
+            };
+            break;
+        
+        case 'classificacao_doencas_ro':
+            const top15DoencasRO = dados.slice(0, 15).sort((a, b) => (b.quantidade || 0) - (a.quantidade || 0));
+            config = {
+                type: 'bar',
+                data: {
+                    labels: top15DoencasRO.map(d => truncate(d.tipo_doenca || 'N/A', 30)),
+                    datasets: [{
+                        label: 'Dias de Afastamento',
+                        data: top15DoencasRO.map(d => d.quantidade || 0),
+                        backgroundColor: function(context) {
+                            const chart = context.chart;
+                            const {ctx, chartArea} = chart;
+                            if (!chartArea) return coresRO.preto;
+                            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                            gradient.addColorStop(0, '#000000');
+                            gradient.addColorStop(1, '#808080');
+                            return gradient;
+                        },
+                        borderColor: coresRO.preto,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const index = context[0].dataIndex;
+                                    return top15DoencasRO[index].tipo_doenca || 'N/A';
+                                },
+                                label: function(context) {
+                                    return `Dias de Afastamento: ${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxRotation: 45, minRotation: 45, font: { size: 11 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Dias de Afastamento' }
+                        }
+                    }
+                }
+            };
+            break;
+        
+        case 'dias_ano_coerencia':
+            // Verifica se dados é objeto (formato correto)
+            if (dados && typeof dados === 'object' && !Array.isArray(dados)) {
+                const usarMensal = dados.meses && dados.meses.length > 0;
+                const labelsCoerencia = usarMensal ? dados.meses : (dados.anos || []);
+                const dadosCoerente = usarMensal ? dados.coerente_mensal : (dados.coerente || []);
+                const dadosSemCoerencia = usarMensal ? dados.sem_coerencia_mensal : (dados.sem_coerencia || []);
+                
+                if (labelsCoerencia.length === 0) {
+                    return; // Sem dados
+                }
+                
+                // Formata labels
+                const labelsFormatados = labelsCoerencia.map(label => {
+                    if (label.includes('-') && label.length === 7) {
+                        const [ano, mes] = label.split('-');
+                        const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                        const mesNum = parseInt(mes) - 1;
+                        return `${meses[mesNum]}/${ano}`;
+                    }
+                    return label;
+                });
+                
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: labelsFormatados,
+                        datasets: [
+                            {
+                                label: 'Coerente',
+                                data: dadosCoerente,
+                                backgroundColor: coresRO.preto,
+                                borderColor: coresRO.preto,
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Sem Coerência',
+                                data: dadosSemCoerencia,
+                                backgroundColor: coresRO.cinza,
+                                borderColor: coresRO.cinzaEscuro,
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.parsed.y} dias`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { stacked: true, grid: { display: false } },
+                            y: { stacked: true, beginAtZero: true }
+                        }
+                    }
+                };
+            }
+            break;
+        
+        case 'analise_coerencia':
+            // Verifica se dados é objeto e tem total > 0
+            if (dados && typeof dados === 'object' && !Array.isArray(dados) && dados.total > 0) {
+                config = {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Coerente', 'Sem Coerência'],
+                        datasets: [{
+                            data: [dados.coerente || 0, dados.sem_coerencia || 0],
+                            backgroundColor: [coresRO.preto, coresRO.cinza],
+                            borderColor: ['#fff', '#fff'],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'bottom' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed || 0;
+                                        const total = dados.total || 0;
+                                        const percent = total > 0 ? ((value / total) * 100).toFixed(2) : 0;
+                                        return `${label}: ${value} dias (${percent}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+            break;
+        
+        case 'tempo_servico_atestados':
+            // Ordena por dias de afastamento (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const tempoOrdenado = [...dados].sort((a, b) => (b.dias_afastamento || 0) - (a.dias_afastamento || 0));
+            const labelsTempo = tempoOrdenado.map(d => d.faixa_tempo_servico || 'Não informado');
+            const dadosDiasTempo = tempoOrdenado.map(d => d.dias_afastamento || 0);
+            config = {
+                type: 'bar',
+                data: {
+                    labels: labelsTempo,
+                    datasets: [{
+                        label: 'Dias de Afastamento',
+                        data: dadosDiasTempo,
+                        backgroundColor: coresRO.preto,
+                        borderColor: coresRO.preto,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const item = dados[index];
+                                    return [
+                                        `Dias de Afastamento: ${item.dias_afastamento || 0}`,
+                                        `Quantidade de Atestados: ${item.quantidade_atestados || 0}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxRotation: 45, minRotation: 45, font: { size: 11 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Dias de Afastamento' }
+                        }
+                    }
+                }
+            };
+            break;
+        
+        // ==================== NOVOS GRÁFICOS DE HORAS PERDIDAS (RODA DE OURO) ====================
+        case 'horas_perdidas_genero':
+            // Cor dourada para feminino: #FFD700 (gold), preto para masculino
+            const coresGenero = dados.map(d => d.genero === 'M' ? coresRO.preto : '#FFD700');
+            config = {
+                type: 'pie',
+                data: {
+                    labels: dados.map(d => `${d.genero_label} (${d.semanas_perdidas.toFixed(1)} semanas)`),
+                    datasets: [{
+                        label: 'Horas Perdidas',
+                        data: dados.map(d => d.horas_perdidas),
+                        backgroundColor: coresGenero,
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { padding: 15, font: { size: 12 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const dataIndex = context.dataIndex;
+                                    const semanas = dados[dataIndex]?.semanas_perdidas || 0;
+                                    return `${label}: ${value.toFixed(1)}h (${semanas.toFixed(1)} semanas)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            break;
+        
+        case 'horas_perdidas_setor':
+            // Ordena por horas perdidas (decrescente) - MESMA LÓGICA DO DASHBOARD
+            const setoresHorasOrdenados = [...dados].sort((a, b) => (b.horas_perdidas || 0) - (a.horas_perdidas || 0));
+            const top10SetoresHoras = setoresHorasOrdenados.slice(0, 10);
+            config = {
+                type: 'bar',
+                data: {
+                    labels: top10SetoresHoras.map(d => truncate(d.setor, 20)),
+                    datasets: [{
+                        label: 'Horas Perdidas',
+                        data: top10SetoresHoras.map(d => d.horas_perdidas),
+                        backgroundColor: coresRO.preto,
+                        borderColor: coresRO.cinzaEscuro,
+                        borderWidth: 1
+                    }, {
+                        label: 'Semanas Perdidas',
+                        data: top10SetoresHoras.map(d => d.semanas_perdidas),
+                        backgroundColor: coresRO.cinza,
+                        borderColor: coresRO.cinzaEscuro,
+                        borderWidth: 1,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y || 0;
+                                    if (label === 'Semanas Perdidas') {
+                                        return `${label}: ${value.toFixed(1)} semanas`;
+                                    }
+                                    return `${label}: ${value.toFixed(1)}h`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { maxRotation: 45, minRotation: 45 }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Horas' },
+                            grid: { color: '#f0f0f0' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            title: { display: true, text: 'Semanas (44h)' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            };
+            break;
+        
+        case 'evolucao_mensal_horas':
+            config = {
+                type: 'line',
+                data: {
+                    labels: dados.map(d => d.mes),
+                    datasets: [{
+                        label: 'Horas Perdidas',
+                        data: dados.map(d => d.horas_perdidas),
+                        borderColor: coresRO.preto,
+                        backgroundColor: coresRO.preto + '20',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Semanas Perdidas (44h)',
+                        data: dados.map(d => d.semanas_perdidas),
+                        borderColor: coresRO.cinza,
+                        backgroundColor: coresRO.cinza + '20',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y || 0;
+                                    if (label.includes('Semanas')) {
+                                        return `${label}: ${value.toFixed(1)} semanas`;
+                                    }
+                                    return `${label}: ${value.toFixed(1)}h`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Horas' },
+                            grid: { color: '#f0f0f0' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            title: { display: true, text: 'Semanas (44h)' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            };
+            break;
+        
+        case 'comparativo_dias_horas_genero':
+            // Ordena: Masculino primeiro, depois ordena por dias perdidos (decrescente)
+            const dadosCompOrdenados = [...dados].sort((a, b) => {
+                // Primeiro: Masculino (M) vem antes de Feminino (F)
+                if (a.genero === 'M' && b.genero !== 'M') return -1;
+                if (a.genero !== 'M' && b.genero === 'M') return 1;
+                // Se ambos são do mesmo gênero, ordena por dias perdidos (decrescente)
+                return (b.dias_perdidos || 0) - (a.dias_perdidos || 0);
+            });
+            
+            config = {
+                type: 'bar',
+                data: {
+                    labels: dadosCompOrdenados.map(d => d.genero_label),
+                    datasets: [{
+                        label: 'Dias Perdidos',
+                        data: dadosCompOrdenados.map(d => d.dias_perdidos),
+                        backgroundColor: coresRO.preto,
+                        borderColor: coresRO.cinzaEscuro,
+                        borderWidth: 1
+                    }, {
+                        label: 'Horas Perdidas',
+                        data: dadosCompOrdenados.map(d => d.horas_perdidas),
+                        backgroundColor: coresRO.cinza,
+                        borderColor: coresRO.cinzaEscuro,
+                        borderWidth: 1,
+                        yAxisID: 'y1'
+                    }, {
+                        label: 'Semanas Perdidas',
+                        data: dadosCompOrdenados.map(d => d.semanas_perdidas),
+                        backgroundColor: coresRO.cinzaClaro,
+                        borderColor: coresRO.cinza,
+                        borderWidth: 1,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.dataset.label || '';
+                                    const value = context.parsed.y || 0;
+                                    if (label.includes('Semanas')) {
+                                        return `${label}: ${value.toFixed(1)} semanas`;
+                                    } else if (label.includes('Horas')) {
+                                        return `${label}: ${value.toFixed(1)}h`;
+                                    }
+                                    return `${label}: ${value.toFixed(1)} dias`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Dias' },
+                            grid: { color: '#f0f0f0' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            title: { display: true, text: 'Horas / Semanas' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    }
+                }
+            };
+            break;
+        
+        case 'analise_detalhada_genero':
+            if (dados && dados.generos && Array.isArray(dados.generos)) {
+                // Ordena: Masculino primeiro
+                const generos = [...dados.generos].sort((a, b) => {
+                    // Masculino (M) vem antes de Feminino (F)
+                    if (a.genero === 'M' && b.genero !== 'M') return -1;
+                    if (a.genero !== 'M' && b.genero === 'M') return 1;
+                    return 0;
+                });
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: generos.map(g => g.genero_label),
+                        datasets: [{
+                            label: 'Percentual de Dias',
+                            data: generos.map(g => g.percentual_dias),
+                            backgroundColor: coresRO.preto,
+                            borderColor: coresRO.cinzaEscuro,
+                            borderWidth: 1
+                        }, {
+                            label: 'Percentual de Horas',
+                            data: generos.map(g => g.percentual_horas),
+                            backgroundColor: coresRO.cinza,
+                            borderColor: coresRO.cinzaEscuro,
+                            borderWidth: 1
+                        }, {
+                            label: 'Percentual de Registros',
+                            data: generos.map(g => g.percentual_registros),
+                            backgroundColor: coresRO.cinzaClaro,
+                            borderColor: coresRO.cinza,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.dataset.label || '';
+                                        const value = context.parsed.y || 0;
+                                        return `${label}: ${value.toFixed(1)}%`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: { display: true, text: 'Percentual (%)' },
+                                grid: { color: '#f0f0f0' }
+                            }
+                        }
+                    }
+                };
+            }
+            break;
+        
+        default:
+            console.warn(`[APRESENTACAO] Tipo de gráfico não reconhecido: ${tipo}`);
+            // Tenta renderizar como gráfico genérico se tiver dados
+            if (Array.isArray(dados) && dados.length > 0) {
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: dados.map((d, i) => d.label || d.nome || d.setor || `Item ${i + 1}`),
+                        datasets: [{
+                            label: 'Valor',
+                            data: dados.map(d => d.quantidade || d.dias_afastamento || d.dias_perdidos || 0),
+                            backgroundColor: CORES_EMPRESA.primary
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                };
+            }
+            break;
     }
     
-    if (config.type) {
+    if (config && config.type) {
+        // Destrói gráfico anterior se existir
+        if (charts['chartSlide']) {
+            try {
+                charts['chartSlide'].destroy();
+            } catch (e) {
+                console.warn('[APRESENTACAO] Erro ao destruir gráfico anterior:', e);
+            }
+        }
+        
+        try {
         charts['chartSlide'] = new Chart(ctx, config);
+            console.log(`[APRESENTACAO] Gráfico ${tipo} renderizado com sucesso`);
+        } catch (error) {
+            console.error(`[APRESENTACAO] Erro ao criar gráfico ${tipo}:`, error);
+        }
+    } else {
+        console.warn(`[APRESENTACAO] Configuração de gráfico não criada para ${tipo}`);
     }
 }
 
@@ -1196,14 +2045,19 @@ function renderizarAcoesIntro(tipo) {
         texto: "INTERVENÇÕES JUNTO<br>AOS COLABORADORES"
     };
     
+    // Obtém cores do cliente
+    const cores = getCoresApresentacao();
+    const corPrimaria = cores.primary || '#1a237e';
+    const corSecundaria = cores.secondary || '#556B2F';
+    
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 70px;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
             <!-- Linha decorativa no topo -->
-            <div style="height: 3px; background: linear-gradient(to right, #6B8E23 0%, #1a237e 50%, #6B8E23 100%); margin-bottom: 30px;"></div>
+            <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
             <div style="flex: 1; display: flex; align-items: center; justify-content: center; position: relative; min-height: 500px;">
                 <!-- Texto editável centralizado -->
-                <div style="text-align: center; background: linear-gradient(135deg, #6B8E23, #556B2F); color: white; padding: 60px 80px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); border: 3px solid rgba(255,255,255,0.2); max-width: 800px;">
+                <div style="text-align: center; background: linear-gradient(135deg, ${corSecundaria}, ${corPrimaria}); color: white; padding: 60px 80px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); border: 3px solid rgba(255,255,255,0.2); max-width: 800px;">
                     <div id="textoAcoesIntro" class="conteudo-editavel" contenteditable="false" style="font-size: 40px; font-weight: 700; margin: 0; line-height: 1.4; outline: none; min-height: 90px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); letter-spacing: 2px;">${dados.texto}</div>
                 </div>
             </div>
@@ -1211,24 +2065,102 @@ function renderizarAcoesIntro(tipo) {
     `;
 }
 
-function renderizarFooterAcoes() {
-    return `
-        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 60px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 0 40px 8px 40px; gap: 20px;">
-            <!-- Barra gradiente que vai até o limite do nome -->
-            <div style="flex: 1; height: 32px; background: linear-gradient(to right, #6B8E23 0%, #1a237e 50%, #6B8E23 100%); margin-right: 20px; margin-bottom: 0;"></div>
-            
-            <!-- Logo Conver no fundo branco (à direita, acima da barra) -->
-            <div style="display: flex; align-items: center; gap: 0; flex-shrink: 0; margin-bottom: 0;">
-                <span style="font-size: 48px; font-weight: 700; color: #1a237e; letter-spacing: 1px; line-height: 1;">C</span>
-                <div style="width: 46px; height: 46px; position: relative; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
-                    <svg width="46" height="46" viewBox="0 0 46 46">
-                        <circle cx="23" cy="23" r="20" fill="none" stroke="#6B8E23" stroke-width="3"/>
-                        <path d="M 23 7 A 16 16 0 1 1 21 39" fill="none" stroke="#1a237e" stroke-width="2.5" stroke-linecap="round"/>
-                        <circle cx="23" cy="9" r="2.5" fill="#6B8E23"/>
-                    </svg>
+async function renderizarFooterAcoes() {
+    // Busca dados do cliente atual
+    let clienteInfo = {
+        nome: 'Empresa',
+        nome_fantasia: '',
+        logo_url: null
+    };
+    
+    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+    if (clientId) {
+        try {
+            const response = await fetch(`/api/clientes/${clientId}`);
+            if (response.ok) {
+                const cliente = await response.json();
+                clienteInfo = {
+                    nome: cliente.nome || 'Empresa',
+                    nome_fantasia: cliente.nome_fantasia || cliente.nome || 'Empresa',
+                    logo_url: cliente.logo_url || null
+                };
+            }
+        } catch (error) {
+            console.error('Erro ao buscar dados do cliente para footer:', error);
+        }
+    }
+    
+    // Obtém cores do cliente
+    const cores = getCoresApresentacao();
+    const corPrimaria = cores.primary || '#1a237e';
+    const corSecundaria = cores.secondary || '#556B2F';
+    
+    // Gera nome da empresa para exibição
+    const nomeExibicao = clienteInfo.nome_fantasia || clienteInfo.nome || 'Empresa';
+    const iniciais = gerarIniciaisCapa(nomeExibicao);
+    
+    // Renderiza logo ou iniciais
+    // Para RODA DE OURO (client_id = 4): retangular (64px altura x 128px largura)
+    // Para outras empresas: mantém formato original
+    const isRodaOuro = clientId === 4;
+    
+    let logoHTML = '';
+    if (clienteInfo.logo_url) {
+        // Adiciona timestamp para evitar cache
+        const logoUrlComCache = clienteInfo.logo_url + (clienteInfo.logo_url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        
+        if (isRodaOuro) {
+            // RODA DE OURO: formato HORIZONTAL/RETANGULAR FORÇADO (120px altura x 360px largura) - 3:1 HORIZONTAL
+            logoHTML = `
+                <div style="display: flex !important; align-items: center !important; justify-content: center !important; gap: 0 !important; flex-shrink: 0 !important; margin-bottom: 0 !important; height: 120px !important; width: 360px !important; min-width: 360px !important; max-width: 360px !important; min-height: 120px !important; max-height: 120px !important; aspect-ratio: 3 / 1 !important; overflow: hidden !important; background: transparent !important; box-sizing: border-box !important;">
+                    <img src="${logoUrlComCache}" alt="${nomeExibicao}" style="width: 360px !important; height: 120px !important; max-width: 360px !important; max-height: 120px !important; aspect-ratio: 3 / 1 !important; object-fit: contain !important; object-position: center !important; display: block !important;">
                 </div>
-                <span style="font-size: 48px; font-weight: 700; color: #1a237e; letter-spacing: 1px; line-height: 1;">NVER</span>
+            `;
+        } else {
+            // Converplast e outras: formato original (aumentado)
+            logoHTML = `
+                <div style="display: flex; align-items: center; gap: 0; flex-shrink: 0; margin-bottom: 0;">
+                    <img src="${logoUrlComCache}" alt="${nomeExibicao}" style="max-height: 200px; max-width: 800px; object-fit: contain;">
+                </div>
+            `;
+        }
+    } else {
+        if (isRodaOuro) {
+            // RODA DE OURO: nome completo em formato HORIZONTAL (100px altura x 300px largura)
+            const tamanhoFonte = nomeExibicao.length > 20 ? 16 : (nomeExibicao.length > 15 ? 18 : 20);
+            logoHTML = `
+                <div style="display: flex !important; align-items: center !important; justify-content: center !important; flex-shrink: 0 !important; margin-bottom: 0 !important; height: 100px !important; width: 300px !important; min-width: 300px !important; max-width: 300px !important; background: ${corPrimaria} !important; border-radius: 4px !important; padding: 8px 12px !important; box-sizing: border-box !important; overflow: hidden !important;">
+                    <span style="font-size: ${tamanhoFonte}px; font-weight: 700; color: white; letter-spacing: 0.5px; line-height: 1.2; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; word-break: break-word; max-width: 100%;">${nomeExibicao}</span>
+                </div>
+            `;
+        } else {
+            // Converplast e outras: iniciais no formato original (aumentado)
+            logoHTML = `
+                <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-bottom: 0;">
+                    <span style="font-size: 192px; font-weight: 700; color: ${corPrimaria}; letter-spacing: 1px; line-height: 1;">${iniciais}</span>
+                </div>
+            `;
+        }
+    }
+    
+    // Para RODA DE OURO: remove o logo, mostra apenas a faixa (sem sobrepor barra de rolagem)
+    if (isRodaOuro) {
+        return `
+            <div style="position: absolute; bottom: 0; left: 0; right: 17px; height: 60px; display: flex; align-items: center; justify-content: flex-end; padding: 0 40px 0 40px; gap: 20px; z-index: 10; box-sizing: border-box;">
+                <!-- Barra gradiente (apenas a faixa, sem logo) - não sobrepõe barra de rolagem -->
+                <div style="flex: 1; height: 32px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%);"></div>
             </div>
+        `;
+    }
+    
+    // Para outras empresas: mostra logo + faixa
+    return `
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 60px; display: flex; align-items: center; justify-content: flex-end; padding: 0 40px; gap: 20px; z-index: 10; padding-right: 200px;">
+            <!-- Barra gradiente que vai até o limite do nome -->
+            <div style="flex: 1; height: 32px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-right: 20px;"></div>
+            
+            <!-- Logo da empresa (à direita, acima da barra) -->
+            ${logoHTML}
         </div>
     `;
 }
@@ -1251,33 +2183,38 @@ function renderizarAcoesSaudeFisica(tipo) {
         ]
     };
     
+    // Obtém cores do cliente
+    const cores = getCoresApresentacao();
+    const corPrimaria = cores.primary || '#1a237e';
+    const corSecundaria = cores.secondary || '#556B2F';
+    
     const acoesHTML = dados.acoes.map(acao => `
         <li class="acao-item" style="padding: 12px 0; padding-left: 30px; position: relative; font-size: 16px; line-height: 1.8; color: #333; border-bottom: 1px solid #f0f0f0;">
-            <span style="position: absolute; left: 0; color: #6B8E23; font-weight: bold;">•</span>
+            <span style="position: absolute; left: 0; color: ${corSecundaria}; font-weight: bold;">•</span>
             <span class="conteudo-editavel" contenteditable="false" style="outline: none;">${acao}</span>
         </li>
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 70px;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
             <!-- Linha decorativa no topo -->
-            <div style="height: 3px; background: linear-gradient(to right, #6B8E23 0%, #1a237e 50%, #6B8E23 100%); margin-bottom: 30px;"></div>
+            <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
             <!-- Tabs -->
-            <div style="display: flex; gap: 8px; margin-bottom: 30px; border-bottom: 3px solid #6B8E23;">
-                <div style="background: #6B8E23; color: white; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 14px;">
+            <div style="display: flex; gap: 8px; margin-bottom: 30px; border-bottom: 3px solid ${corSecundaria};">
+                <div style="background: ${corSecundaria}; color: white; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 14px;">
                     SAÚDE FÍSICA
                 </div>
-                <div style="background: white; color: #1a237e; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
+                <div style="background: white; color: ${corPrimaria}; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
                     SAÚDE EMOCIONAL
                 </div>
-                <div style="background: white; color: #1a237e; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
+                <div style="background: white; color: ${corPrimaria}; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
                     SAÚDE SOCIAL
                 </div>
             </div>
             
             <!-- Conteúdo -->
-            <div style="flex: 1; overflow-y: auto; padding-right: 20px;">
+            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeFisica" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeFisica" style="list-style: none; padding: 0; margin: 0;">
@@ -1306,33 +2243,38 @@ function renderizarAcoesSaudeEmocional(tipo) {
         ]
     };
     
+    // Obtém cores do cliente
+    const cores = getCoresApresentacao();
+    const corPrimaria = cores.primary || '#1a237e';
+    const corSecundaria = cores.secondary || '#556B2F';
+    
     const acoesHTML = dados.acoes.map(acao => `
         <li class="acao-item" style="padding: 12px 0; padding-left: 30px; position: relative; font-size: 16px; line-height: 1.8; color: #333; border-bottom: 1px solid #f0f0f0;">
-            <span style="position: absolute; left: 0; color: #6B8E23; font-weight: bold;">•</span>
+            <span style="position: absolute; left: 0; color: ${corSecundaria}; font-weight: bold;">•</span>
             <span class="conteudo-editavel" contenteditable="false" style="outline: none;">${acao}</span>
         </li>
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 70px;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
             <!-- Linha decorativa no topo -->
-            <div style="height: 3px; background: linear-gradient(to right, #6B8E23 0%, #1a237e 50%, #6B8E23 100%); margin-bottom: 30px;"></div>
+            <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
             <!-- Tabs -->
-            <div style="display: flex; gap: 8px; margin-bottom: 30px; border-bottom: 3px solid #6B8E23;">
-                <div style="background: white; color: #1a237e; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
+            <div style="display: flex; gap: 8px; margin-bottom: 30px; border-bottom: 3px solid ${corSecundaria};">
+                <div style="background: white; color: ${corPrimaria}; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
                     SAÚDE FÍSICA
                 </div>
-                <div style="background: #6B8E23; color: white; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 14px;">
+                <div style="background: ${corSecundaria}; color: white; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 14px;">
                     SAÚDE EMOCIONAL
                 </div>
-                <div style="background: white; color: #1a237e; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
+                <div style="background: white; color: ${corPrimaria}; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
                     SAÚDE SOCIAL
                 </div>
             </div>
             
             <!-- Conteúdo -->
-            <div style="flex: 1; overflow-y: auto; padding-right: 20px;">
+            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeEmocional" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeEmocional" style="list-style: none; padding: 0; margin: 0;">
@@ -1361,33 +2303,38 @@ function renderizarAcoesSaudeSocial(tipo) {
         ]
     };
     
+    // Obtém cores do cliente
+    const cores = getCoresApresentacao();
+    const corPrimaria = cores.primary || '#1a237e';
+    const corSecundaria = cores.secondary || '#556B2F';
+    
     const acoesHTML = dados.acoes.map(acao => `
         <li class="acao-item" style="padding: 12px 0; padding-left: 30px; position: relative; font-size: 16px; line-height: 1.8; color: #333; border-bottom: 1px solid #f0f0f0;">
-            <span style="position: absolute; left: 0; color: #6B8E23; font-weight: bold;">•</span>
+            <span style="position: absolute; left: 0; color: ${corSecundaria}; font-weight: bold;">•</span>
             <span class="conteudo-editavel" contenteditable="false" style="outline: none;">${acao}</span>
         </li>
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 70px;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
             <!-- Linha decorativa no topo -->
-            <div style="height: 3px; background: linear-gradient(to right, #6B8E23 0%, #1a237e 50%, #6B8E23 100%); margin-bottom: 30px;"></div>
+            <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
             <!-- Tabs -->
-            <div style="display: flex; gap: 8px; margin-bottom: 30px; border-bottom: 3px solid #6B8E23;">
-                <div style="background: white; color: #1a237e; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
+            <div style="display: flex; gap: 8px; margin-bottom: 30px; border-bottom: 3px solid ${corSecundaria};">
+                <div style="background: white; color: ${corPrimaria}; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
                     SAÚDE FÍSICA
                 </div>
-                <div style="background: white; color: #1a237e; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
+                <div style="background: white; color: ${corPrimaria}; padding: 12px 24px; border: 2px dashed #dee2e6; border-bottom: none; border-radius: 8px 8px 0 0; font-weight: 500; font-size: 14px; cursor: pointer;">
                     SAÚDE EMOCIONAL
                 </div>
-                <div style="background: #6B8E23; color: white; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 14px;">
+                <div style="background: ${corSecundaria}; color: white; padding: 12px 24px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 14px;">
                     SAÚDE SOCIAL
                 </div>
             </div>
             
             <!-- Conteúdo -->
-            <div style="flex: 1; overflow-y: auto; padding-right: 20px;">
+            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeSocial" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeSocial" style="list-style: none; padding: 0; margin: 0;">
@@ -1797,7 +2744,7 @@ function renderizarGraficoEvolucaoMensal(tipoGrafico) {
                                     label: 'Ocupacionais',
                                     data: dadosEvolucao.ocupacionais,
                                     borderColor: CORES_EMPRESA.primary,
-                                    backgroundColor: isArea ? 'rgba(26, 35, 126, 0.2)' : CORES_EMPRESA.primary,
+                                    backgroundColor: isArea ? (CORES_EMPRESA.primary + '33') : CORES_EMPRESA.primary,
                                     fill: isArea,
                                     tension: 0.4
                                 },
@@ -1805,7 +2752,7 @@ function renderizarGraficoEvolucaoMensal(tipoGrafico) {
                                     label: 'Assistenciais',
                                     data: dadosEvolucao.assistenciais,
                                     borderColor: CORES_EMPRESA.secondary,
-                                    backgroundColor: isArea ? 'rgba(85, 107, 47, 0.2)' : CORES_EMPRESA.secondary,
+                                    backgroundColor: isArea ? (CORES_EMPRESA.secondary + '33') : CORES_EMPRESA.secondary,
                                     fill: isArea,
                                     tension: 0.4
                                 },
@@ -1865,10 +2812,14 @@ function toggleEdicaoAcoes(tipo) {
     const btnEditar = document.getElementById('btnEditarAcoes');
     const btnSalvar = document.getElementById('btnSalvarAcoes');
     
+    // Obtém cores do cliente para borda de edição
+    const cores = getCoresApresentacao();
+    const corSecundaria = cores.secondary || '#556B2F';
+    
     editaveis.forEach(el => {
         el.contentEditable = modoEdicaoAcoes;
         if (modoEdicaoAcoes) {
-            el.style.border = '2px dashed #556B2F';
+            el.style.border = `2px dashed ${corSecundaria}`;
             el.style.borderRadius = '4px';
             el.style.padding = '4px';
             el.style.backgroundColor = '#f9f9f9';
@@ -1919,12 +2870,13 @@ function salvarAcoes(tipo) {
     // Mostra mensagem de sucesso
     const btnSalvar = document.getElementById('btnSalvarAcoes');
     const textoOriginal = btnSalvar.innerHTML;
+    
     btnSalvar.innerHTML = '<i class="fas fa-check"></i> Salvo!';
     btnSalvar.style.background = '#28a745';
     
     setTimeout(() => {
         btnSalvar.innerHTML = textoOriginal;
-        btnSalvar.style.background = '#1a237e';
+        btnSalvar.style.background = '#808080'; // Cinza para RODA DE OURO
     }, 2000);
 }
 

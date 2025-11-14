@@ -686,6 +686,18 @@
             background: #f57c00;
         }
         
+        .btn-card-danger {
+            background: #dc3545;
+            color: #fff;
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.25);
+        }
+        
+        .btn-card-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(220, 53, 69, 0.35);
+            background: #c82333;
+        }
+        
         .clientes-empty {
             background: var(--surface);
             border-radius: 20px;
@@ -1467,25 +1479,48 @@
                     </div>
 
                     <div class="form-section">
-                        <div class="logo-preview" id="logoPreview">
-                            <div class="logo-preview-empty">
-                                <i class="fas fa-image"></i>
-                                <span>Sem logo</span>
-                            </div>
-                        </div>
                         <div class="form-section-content">
                             <h3>Identidade visual</h3>
-                            <p>Defina o logo para personalizar cards, relatórios e a experiência do cliente.</p>
-                            <div class="logo-actions">
-                                <label class="btn-logo-upload">
-                                    <i class="fas fa-upload"></i>
-                                    Selecionar logo
-                                    <input type="file" id="logoArquivo" accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp">
-                                </label>
-                                <button type="button" class="btn-logo-remove" onclick="removerLogoSelecionado()">
-                                    <i class="fas fa-times"></i> Remover
-                                </button>
+                            <p>Gerencie múltiplos logos para personalizar cards, relatórios e a experiência do cliente.</p>
+                            
+                            <!-- Lista de logos existentes -->
+                            <div id="logosLista" style="margin-bottom: 16px; max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: #f9f9f9;">
+                                <div style="text-align: center; color: #999; padding: 20px;">
+                                    <i class="fas fa-spinner fa-spin"></i> Carregando logos...
+                                </div>
                             </div>
+                            
+                            <!-- Adicionar novo logo -->
+                            <div style="border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px;">
+                                <label class="form-label" style="font-size: 14px; margin-bottom: 8px;">Adicionar Novo Logo</label>
+                                <div class="logo-preview" id="logoPreview">
+                                    <div class="logo-preview-empty">
+                                        <i class="fas fa-image"></i>
+                                        <span>Sem logo</span>
+                                    </div>
+                                </div>
+                                <div class="logo-actions">
+                                    <label class="btn-logo-upload">
+                                        <i class="fas fa-plus"></i>
+                                        Adicionar Novo Logo
+                                        <input type="file" id="logoArquivo" accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp">
+                                    </label>
+                                    <button type="button" class="btn-logo-remove" onclick="removerLogoSelecionado()">
+                                        <i class="fas fa-times"></i> Limpar Seleção
+                                    </button>
+                                </div>
+                                <div class="form-group" style="margin-top: 12px;">
+                                    <label class="form-label" style="font-size: 13px;">Descrição (opcional)</label>
+                                    <input type="text" id="logoDescricao" class="form-input" placeholder="Ex: Logo principal, Logo horizontal, etc." style="font-size: 13px;">
+                                </div>
+                                <div class="form-group" style="margin-top: 8px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+                                        <input type="checkbox" id="logoPrincipal" style="width: auto;">
+                                        <span>Definir como logo principal</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
                             <span class="form-hint">Formatos PNG, JPG, SVG ou WEBP com até 1 MB. Use imagens com fundo transparente sempre que possível.</span>
                             <input type="hidden" id="logoUrl" value="">
                         </div>

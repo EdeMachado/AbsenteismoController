@@ -132,6 +132,11 @@ function limparCacheGraficos() {
         window.alertasData = [];
     }
     
+    // Chama função de limpeza do dashboard se existir
+    if (typeof limparTodosDadosDashboard === 'function') {
+        limparTodosDadosDashboard();
+    }
+    
     // Força recarregamento da página se estiver no dashboard
     if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
         console.log('[CACHE] Recarregando dashboard...');
@@ -366,32 +371,204 @@ async function enviarLogoCliente(clienteId) {
 
     const formData = new FormData();
     formData.append('arquivo', logoArquivoSelecionado);
-
-    const response = await fetch(`/api/clientes/${clienteId}/logo`, {
-        method: 'POST',
-        body: formData
-    });
-
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || 'Erro ao enviar logo');
+    
+    const descricao = document.getElementById('logoDescricao')?.value || null;
+    const isPrincipal = document.getElementById('logoPrincipal')?.checked || false;
+    
+    if (descricao) {
+        formData.append('descricao', descricao);
     }
+    // Envia como string 'true' ou 'false' para o Form do FastAPI converter corretamente
+    formData.append('is_principal', isPrincipal ? 'true' : 'false');
 
-    const data = await response.json();
-    const logoUrl = data.logo_url || '';
-    const logoUrlInput = document.getElementById('logoUrl');
-    if (logoUrlInput) {
-        logoUrlInput.value = logoUrl;
+    try {
+        // O interceptor do auth.js já adiciona o token automaticamente
+        // Mas para FormData, precisamos garantir que o header Authorization seja adicionado
+        const token = localStorage.getItem('access_token') || 
+                     (typeof getAccessToken === 'function' ? getAccessToken() : null);
+        
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(`/api/clientes/${clienteId}/logo`, {
+            method: 'POST',
+            headers: headers,
+            body: formData
+        });
+
+        if (!response.ok) {
+            let errorDetail = 'Erro ao enviar logo';
+            try {
+                const error = await response.json();
+                errorDetail = error.detail || error.message || errorDetail;
+                console.error('Erro do servidor:', error);
+            } catch (e) {
+                console.error('Erro ao parsear resposta:', e);
+                errorDetail = `Erro ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorDetail);
+        }
+
+        const data = await response.json();
+        console.log('Logo enviado com sucesso:', data);
+        
+        // Limpa o formulário
+        if (logoPreviewTempUrl) {
+            URL.revokeObjectURL(logoPreviewTempUrl);
+            logoPreviewTempUrl = null;
+        }
+        logoArquivoSelecionado = null;
+        const logoArquivoInput = document.getElementById('logoArquivo');
+        const logoDescricaoInput = document.getElementById('logoDescricao');
+        const logoPrincipalInput = document.getElementById('logoPrincipal');
+        
+        if (logoArquivoInput) logoArquivoInput.value = '';
+        if (logoDescricaoInput) logoDescricaoInput.value = '';
+        if (logoPrincipalInput) logoPrincipalInput.checked = false;
+        atualizarPreviewLogo('', false);
+        
+        // Recarrega a lista de logos
+        await carregarLogosCliente(clienteId);
+
+        return data.logo_url || '';
+    } catch (error) {
+        console.error('Erro completo ao enviar logo:', error);
+        throw error;
     }
+}
 
-    if (logoPreviewTempUrl) {
-        URL.revokeObjectURL(logoPreviewTempUrl);
-        logoPreviewTempUrl = null;
+async function carregarLogosCliente(clienteId) {
+    if (!clienteId) {
+        console.warn('[LOGOS] clienteId não fornecido');
+        return;
     }
-    logoArquivoSelecionado = null;
-    atualizarPreviewLogo(logoUrl, false);
+    
+    const listaContainer = document.getElementById('logosLista');
+    if (!listaContainer) {
+        console.warn('[LOGOS] Container logosLista não encontrado no DOM');
+        return;
+    }
+    
+    console.log(`[LOGOS] Carregando logos para cliente ${clienteId}...`);
+    
+    try {
+        const response = await fetch(`/api/clientes/${clienteId}/logos`);
+        if (!response.ok) {
+            console.error('[LOGOS] Erro na resposta:', response.status, response.statusText);
+            throw new Error('Erro ao carregar logos');
+        }
+        
+        const data = await response.json();
+        const logos = data.logos || [];
+        
+        console.log(`[LOGOS] ${logos.length} logos encontrados:`, logos);
+        
+        if (logos.length === 0) {
+            listaContainer.innerHTML = `
+                <div style="text-align: center; color: #999; padding: 20px;">
+                    <i class="fas fa-image" style="font-size: 24px; margin-bottom: 8px; display: block;"></i>
+                    <span>Nenhum logo cadastrado</span>
+                </div>
+            `;
+            return;
+        }
+        
+        listaContainer.innerHTML = logos.map(logo => `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: white; border-radius: 8px; margin-bottom: 8px; border: ${logo.is_principal ? '2px solid #1a237e' : '1px solid #ddd'};">
+                <img src="${logo.logo_url}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain; border: 1px solid #eee; border-radius: 4px; background: #f9f9f9;">
+                <div style="flex: 1;">
+                    <div style="font-weight: ${logo.is_principal ? 'bold' : 'normal'}; color: ${logo.is_principal ? '#1a237e' : '#333'}; margin-bottom: 4px;">
+                        ${logo.descricao || 'Sem descrição'} ${logo.is_principal ? '<span style="background: #1a237e; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px;">PRINCIPAL</span>' : ''}
+                    </div>
+                    <div style="font-size: 12px; color: #666;">
+                        ${new Date(logo.created_at).toLocaleDateString('pt-BR')}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    ${!logo.is_principal ? `
+                        <button onclick="definirLogoPrincipal(${clienteId}, ${logo.id})" style="padding: 6px 12px; background: #1a237e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            <i class="fas fa-star"></i> Principal
+                        </button>
+                    ` : ''}
+                    <button onclick="deletarLogoCliente(${clienteId}, ${logo.id})" style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        console.log('[LOGOS] Lista de logos renderizada com sucesso');
+    } catch (error) {
+        console.error('[LOGOS] Erro ao carregar logos:', error);
+        listaContainer.innerHTML = `
+            <div style="text-align: center; color: #dc3545; padding: 20px;">
+                <i class="fas fa-exclamation-triangle"></i> Erro ao carregar logos: ${error.message}
+            </div>
+        `;
+    }
+}
 
-    return logoUrl;
+window.definirLogoPrincipal = async function(clienteId, logoId) {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        mostrarErro('Não autenticado. Faça login novamente.');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/clientes/${clienteId}/logos/${logoId}/principal`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao definir logo principal');
+        }
+        
+        await carregarLogosCliente(clienteId);
+        mostrarSucesso('Logo definido como principal!');
+    } catch (error) {
+        console.error('Erro ao definir logo principal:', error);
+        mostrarErro('Erro ao definir logo principal: ' + error.message);
+    }
+}
+
+window.deletarLogoCliente = async function(clienteId, logoId) {
+    if (!confirm('Tem certeza que deseja deletar este logo?')) {
+        return;
+    }
+    
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        mostrarErro('Não autenticado. Faça login novamente.');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/clientes/${clienteId}/logos/${logoId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao deletar logo');
+        }
+        
+        await carregarLogosCliente(clienteId);
+        mostrarSucesso('Logo deletado com sucesso!');
+    } catch (error) {
+        console.error('Erro ao deletar logo:', error);
+        mostrarErro('Erro ao deletar logo: ' + error.message);
+    }
 }
 // ==================== RENDERIZAÇÃO DE CARDS ====================
 function renderizarCards() {
@@ -505,6 +682,9 @@ function renderizarCards() {
                         </button>
                         <button type="button" class="btn-card ${actionClass}" onclick="event.stopPropagation(); confirmarDeletar(${cliente.id})" title="${actionLabel}">
                             <i class="fas ${actionIcon}"></i>
+                        </button>
+                        <button type="button" class="btn-card btn-card-danger" onclick="event.stopPropagation(); confirmarExcluirDefinitivo(${cliente.id})" title="Excluir Definitivamente">
+                            <i class="fas fa-trash-alt"></i>
                         </button>
                     </div>
                     <button type="button" class="btn-card btn-card-enter" onclick="entrarCliente(event, ${cliente.id})">
@@ -692,8 +872,13 @@ async function carregarAlertasHome() {
     }
 
     try {
+        // O interceptor do auth.js já adiciona o token automaticamente
         const response = await fetch(`/api/alertas?client_id=${clientId}`);
         if (!response.ok) {
+            if (response.status === 401) {
+                console.warn('Token expirado ou inválido para alertas - ignorando');
+                return; // Não mostra erro, apenas retorna silenciosamente
+            }
             throw new Error('Erro ao buscar alertas');
         }
 
@@ -878,6 +1063,19 @@ function abrirModalNovo() {
     document.getElementById('clienteId').value = '';
     resetLogoPreview('', gerarIniciais('Novo Cliente'));
     
+    // Limpa lista de logos para novo cliente
+    setTimeout(() => {
+        const listaContainer = document.getElementById('logosLista');
+        if (listaContainer) {
+            listaContainer.innerHTML = `
+                <div style="text-align: center; color: #999; padding: 20px;">
+                    <i class="fas fa-image" style="font-size: 24px; margin-bottom: 8px; display: block;"></i>
+                    <span>Nenhum logo cadastrado</span>
+                </div>
+            `;
+        }
+    }, 100);
+    
     // Inicializa cores para novo cliente
     setTimeout(() => {
         sincronizarCores();
@@ -938,7 +1136,15 @@ async function carregarDadosCliente(id) {
         document.getElementById('email').value = cliente.email || '';
 
         const iniciaisLogo = gerarIniciais(cliente.nome_fantasia || cliente.nome || '');
-        resetLogoPreview(cliente.logo_url || '', iniciaisLogo);
+        resetLogoPreview('', iniciaisLogo);
+        
+        // Carrega lista de logos (múltiplos logos) - com delay para garantir que o DOM está pronto
+        setTimeout(async () => {
+            await carregarLogosCliente(id);
+        }, 100);
+        
+        // Abre o modal primeiro
+        document.getElementById('modalCliente').classList.add('show');
         
         // Carrega cores do cliente
         setTimeout(() => {
@@ -954,8 +1160,6 @@ async function carregarDadosCliente(id) {
                 console.warn('Seção de cores não encontrada!');
             }
         }, 300);
-        
-        document.getElementById('modalCliente').classList.add('show');
     } catch (error) {
         console.error('Erro ao carregar dados do cliente:', error);
         mostrarErro('Erro ao carregar dados do cliente: ' + error.message);
@@ -1032,7 +1236,7 @@ async function salvarCliente(event) {
         nome: document.getElementById('nome').value,
         cnpj: document.getElementById('cnpj').value,
         nome_fantasia: document.getElementById('nome_fantasia').value,
-        logo_url: logoRemoverSelecionado ? '' : (document.getElementById('logoUrl').value || null),
+        logo_url: null,  // Mantém null - logos são gerenciados via tabela client_logos
         inscricao_estadual: document.getElementById('inscricao_estadual').value,
         inscricao_municipal: document.getElementById('inscricao_municipal').value,
         cep: document.getElementById('cep').value,
@@ -1076,9 +1280,12 @@ async function salvarCliente(event) {
             console.error('Erro ao enviar logo:', uploadErro);
             mostrarErro('Cliente salvo, mas ocorreu erro ao enviar o logo: ' + uploadErro.message);
         }
-
+        
         fecharModal();
         await carregarClientes();
+        
+        // Se o modal foi reaberto, recarrega os logos
+        // (não recarrega aqui pois o modal foi fechado)
 
         mostrarSucesso(resultado.message || 'Cliente salvo com sucesso!');
     } catch (error) {
@@ -1110,21 +1317,54 @@ async function confirmarDeletar(id) {
     }
     }
     
-async function deletarCliente(id) {
+async function deletarCliente(id, forcar = false) {
     try {
-        const response = await fetch(`/api/clientes/${id}`, { method: 'DELETE' });
+        const url = `/api/clientes/${id}${forcar ? '?forcar=true' : ''}`;
+        const response = await fetch(url, { method: 'DELETE' });
         
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Erro ao deletar cliente');
         }
         
-        mostrarSucesso('Cliente deletado com sucesso!');
+        const result = await response.json();
+        mostrarSucesso(result.message || 'Cliente deletado com sucesso!');
         carregarClientes();
     } catch (error) {
         console.error('Erro ao deletar cliente:', error);
         mostrarErro(error.message || 'Erro ao deletar cliente.');
     }
+}
+
+async function confirmarExcluirDefinitivo(id) {
+    const cliente = clientes.find(c => c.id === id);
+    if (!cliente) return;
+    
+    const nomeCliente = cliente.nome_fantasia || cliente.nome || 'este cliente';
+    const temDados = (cliente.total_uploads || 0) > 0;
+    
+    let mensagem = `⚠️ ATENÇÃO: Esta ação é IRREVERSÍVEL!\n\n`;
+    if (temDados) {
+        mensagem += `O cliente "${nomeCliente}" possui ${cliente.total_uploads || 0} upload(s) de dados.\n\n`;
+        mensagem += `Se você excluir definitivamente, TODOS os dados serão perdidos permanentemente.\n\n`;
+        mensagem += `Deseja realmente excluir definitivamente este cliente e todos os seus dados?`;
+    } else {
+        mensagem += `Deseja realmente excluir definitivamente o cliente "${nomeCliente}"?`;
+    }
+    
+    if (!confirm(mensagem)) {
+        return;
+    }
+    
+    // Confirmação dupla para clientes com dados
+    if (temDados) {
+        if (!confirm('⚠️ ÚLTIMA CONFIRMAÇÃO:\n\nVocê tem CERTEZA que deseja excluir TODOS os dados permanentemente?\n\nDigite OK para confirmar.')) {
+            return;
+        }
+    }
+    
+    // Força exclusão mesmo com dados
+    await deletarCliente(id, true);
 }
 
 async function arquivarCliente(id) {
@@ -1237,6 +1477,7 @@ window.entrarCliente = entrarCliente;
 window.buscarCNPJ = buscarCNPJ;
 window.salvarCliente = salvarCliente;
 window.confirmarDeletar = confirmarDeletar;
+window.confirmarExcluirDefinitivo = confirmarExcluirDefinitivo;
 window.abrirModalNovo = abrirModalNovo;
 window.arquivarCliente = arquivarCliente;
 window.removerLogoSelecionado = removerLogoSelecionado;

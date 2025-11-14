@@ -35,6 +35,7 @@ class Client(Base):
     
     # Relationships
     uploads = relationship("Upload", back_populates="client", cascade="all, delete-orphan")
+    logos = relationship("ClientLogo", back_populates="client", cascade="all, delete-orphan")
 
 class Upload(Base):
     """Upload de planilha mensal"""
@@ -169,4 +170,37 @@ class Produtividade(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relationships
+    client = relationship("Client")
+
+class ClientLogo(Base):
+    """Logos de um cliente (suporte a múltiplos logos)"""
+    __tablename__ = "client_logos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    logo_url = Column(String(500), nullable=False)
+    is_principal = Column(Boolean, default=False)  # Logo principal (usado por padrão)
+    descricao = Column(String(200), nullable=True)  # Descrição opcional do logo
+    created_at = Column(DateTime, default=datetime.now)
+    
+    # Relationships
+    client = relationship("Client", back_populates="logos")
+
+class SavedFilter(Base):
+    """Filtros salvos para acesso rápido"""
+    __tablename__ = "saved_filters"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    nome = Column(String(100), nullable=False)  # Nome do filtro salvo
+    mes_inicio = Column(String(7), nullable=True)  # YYYY-MM
+    mes_fim = Column(String(7), nullable=True)  # YYYY-MM
+    funcionarios = Column(Text, nullable=True)  # JSON array de funcionários
+    setores = Column(Text, nullable=True)  # JSON array de setores
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    user = relationship("User")
     client = relationship("Client")

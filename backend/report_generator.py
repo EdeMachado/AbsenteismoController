@@ -26,18 +26,100 @@ from openpyxl.utils import get_column_letter
 class ReportGenerator:
     """Gerador de relatórios"""
     
-    def __init__(self):
+    def __init__(self, db=None, client_id=None):
         self.styles = getSampleStyleSheet()
+        self.db = db
+        self.client_id = client_id
+        # Carrega cores primeiro (antes de configurar estilos)
+        self._load_client_colors()
         self._setup_custom_styles()
     
+    def _load_client_colors(self):
+        """Carrega cores do cliente do banco de dados"""
+        import json
+        from .models import Client
+        
+        # Cores padrão (Converplast)
+        self.cores = {
+            'primary': '#1a237e',
+            'primaryDark': '#0d47a1',
+            'primaryLight': '#3949ab',
+            'secondary': '#556B2F',
+            'secondaryDark': '#4a5d23',
+            'secondaryLight': '#6B8E23',
+            'masculino': '#1a237e',
+            'feminino': '#556B2F',
+            'preto': '#000000',
+            'dourado': '#FFD700'
+        }
+        
+        # Paleta padrão
+        self.paleta = ['#1a237e', '#556B2F', '#3949ab', '#6B8E23', '#0d47a1', '#808000', '#5c6bc0', '#4a5d23', '#9E9E9E', '#757575']
+        
+        # Se tem client_id e db, busca cores personalizadas
+        if self.client_id and self.db:
+            try:
+                cliente = self.db.query(Client).filter(Client.id == self.client_id).first()
+                if cliente and cliente.cores_personalizadas:
+                    cores_json = json.loads(cliente.cores_personalizadas)
+                    if isinstance(cores_json, dict):
+                        self.cores.update(cores_json)
+                        # Atualiza paleta baseada nas cores
+                        self.paleta = [
+                            self.cores.get('primary', '#1a237e'),
+                            self.cores.get('secondary', '#556B2F'),
+                            self.cores.get('primaryLight', '#3949ab'),
+                            self.cores.get('secondaryLight', '#6B8E23'),
+                            self.cores.get('primaryDark', '#0d47a1'),
+                            self.cores.get('secondaryDark', '#808000'),
+                            self.cores.get('primaryLighter', '#5c6bc0'),
+                            self.cores.get('secondaryLighter', '#4a5d23'),
+                            self.cores.get('gray', '#9E9E9E'),
+                            self.cores.get('grayDark', '#757575')
+                        ]
+            except Exception as e:
+                print(f"Erro ao carregar cores do cliente: {e}")
+        
+        # Roda de Ouro (client_id == 4) - cores específicas (mais preto e cinza, menos dourado)
+        if self.client_id == 4:
+            self.cores.update({
+                'primary': '#000000',  # Preto
+                'primaryDark': '#000000',
+                'primaryLight': '#1a1a1a',  # Preto mais claro
+                'secondary': '#808080',  # Cinza (substitui dourado como secundária)
+                'secondaryDark': '#606060',  # Cinza escuro
+                'secondaryLight': '#A0A0A0',  # Cinza claro
+                'masculino': '#000000',  # Preto
+                'feminino': '#FFD700',  # Dourado (apenas para feminino)
+                'preto': '#000000',
+                'dourado': '#FFD700'  # Mantém dourado apenas para acentos
+            })
+            # Paleta: principalmente preto e cinzas, com dourado apenas como acento
+            self.paleta = [
+                '#000000',  # Preto
+                '#1a1a1a',  # Preto claro
+                '#404040',  # Cinza escuro
+                '#606060',  # Cinza médio escuro
+                '#808080',  # Cinza médio
+                '#A0A0A0',  # Cinza claro
+                '#C0C0C0',  # Cinza muito claro
+                '#E0E0E0',  # Cinza quase branco
+                '#FFD700',  # Dourado (apenas como acento)
+                '#DAA520'   # Dourado escuro (apenas como acento)
+            ]
+    
     def _setup_custom_styles(self):
-        """Configura estilos customizados"""
+        """Configura estilos customizados - usa cores do cliente"""
+        # Define cor primária (será atualizada após carregar cores)
+        cor_primaria = self.cores.get('primary', '#1a237e') if hasattr(self, 'cores') else '#1a237e'
+        cor_secundaria = self.cores.get('primaryLight', '#283593') if hasattr(self, 'cores') else '#283593'
+        
         # Título principal
         self.title_style = ParagraphStyle(
             'CustomTitle',
             parent=self.styles['Heading1'],
             fontSize=24,
-            textColor=colors.HexColor('#1a237e'),
+            textColor=colors.HexColor(cor_primaria),
             spaceAfter=30,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
@@ -48,7 +130,7 @@ class ReportGenerator:
             'CustomSubtitle',
             parent=self.styles['Heading2'],
             fontSize=16,
-            textColor=colors.HexColor('#283593'),
+            textColor=colors.HexColor(cor_secundaria),
             spaceAfter=20,
             alignment=TA_CENTER
         )
@@ -58,7 +140,7 @@ class ReportGenerator:
             'CustomSection',
             parent=self.styles['Heading2'],
             fontSize=18,
-            textColor=colors.HexColor('#1a237e'),
+            textColor=colors.HexColor(cor_primaria),
             spaceAfter=15,
             spaceBefore=20,
             fontName='Helvetica-Bold'
@@ -72,6 +154,19 @@ class ReportGenerator:
             textColor=colors.HexColor('#212121'),
             spaceAfter=12
         )
+        
+        # Atualiza estilos após carregar cores (se já carregou)
+        if hasattr(self, 'cores'):
+            self._update_styles_colors()
+    
+    def _update_styles_colors(self):
+        """Atualiza cores dos estilos após carregar cores do cliente"""
+        cor_primaria = self.cores.get('primary', '#1a237e')
+        cor_secundaria = self.cores.get('primaryLight', '#283593')
+        
+        self.title_style.textColor = colors.HexColor(cor_primaria)
+        self.subtitle_style.textColor = colors.HexColor(cor_secundaria)
+        self.section_style.textColor = colors.HexColor(cor_primaria)
     
     def _buscar_insight_grafico(self, tipo_grafico: str, insights: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Busca o insight correspondente a um tipo de gráfico"""
@@ -124,7 +219,8 @@ class ReportGenerator:
             cids = [f"{c.get('cid', 'N/A')}" for c in top10]
             quantidades = [c.get('quantidade', 0) for c in top10]
             
-            colors_list = ['#1a237e' if i % 2 == 0 else '#556B2F' for i in range(len(cids))]
+            # Usa cores do cliente (preto e cinza para Roda de Ouro)
+            colors_list = [self.cores['primary'] if i % 2 == 0 else self.cores['secondary'] for i in range(len(cids))]
             bars = ax.barh(range(len(cids)), quantidades, color=colors_list)
             
             ax.set_yticks(range(len(cids)))
@@ -158,7 +254,11 @@ class ReportGenerator:
             nomes = [f.get('nome', 'N/A')[:20] for f in top10]
             dias = [f.get('dias_perdidos', 0) for f in top10]
             
-            colors_list = ['#1a237e' if i % 2 == 0 else '#556B2F' for i in range(len(nomes))]
+            # Usa cores do cliente (para Roda de Ouro: preto e cinza)
+            if self.client_id == 4:
+                colors_list = [self.cores['primary'] if i % 2 == 0 else self.cores['secondary'] for i in range(len(nomes))]
+            else:
+                colors_list = [self.cores['primary'] if i % 2 == 0 else self.cores['secondary'] for i in range(len(nomes))]
             bars = ax.bar(range(len(nomes)), dias, color=colors_list)
             
             ax.set_xticks(range(len(nomes)))
@@ -193,7 +293,8 @@ class ReportGenerator:
             setores = [s.get('setor', 'N/A')[:20] for s in top10]
             dias = [s.get('dias_perdidos', 0) for s in top10]
             
-            colors_list = ['#1a237e' if i % 2 == 0 else '#556B2F' for i in range(len(setores))]
+            # Usa cores do cliente
+            colors_list = [self.cores['primary'] if i % 2 == 0 else self.cores['secondary'] for i in range(len(setores))]
             bars = ax.bar(range(len(setores)), dias, color=colors_list)
             
             ax.set_xticks(range(len(setores)))
@@ -230,18 +331,18 @@ class ReportGenerator:
             
             # Eixo Y esquerdo para dias perdidos
             ax.plot(range(len(meses)), dias, marker='o', linewidth=2, markersize=6, 
-                   color='#1a237e', label='Dias Perdidos')
-            ax.fill_between(range(len(meses)), dias, alpha=0.3, color='#1a237e')
-            ax.set_ylabel('Dias Perdidos', fontsize=10, fontweight='bold', color='#1a237e')
-            ax.tick_params(axis='y', labelcolor='#1a237e')
+                   color=self.cores['primary'], label='Dias Perdidos')
+            ax.fill_between(range(len(meses)), dias, alpha=0.3, color=self.cores['primary'])
+            ax.set_ylabel('Dias Perdidos', fontsize=10, fontweight='bold', color=self.cores['primary'])
+            ax.tick_params(axis='y', labelcolor=self.cores['primary'])
             
             # Eixo Y direito para quantidade de atestados
             ax2 = ax.twinx()
             ax2.plot(range(len(meses)), quantidades, marker='s', linewidth=2, markersize=6, 
-                    color='#556B2F', label='Quantidade de Atestados')
-            ax2.fill_between(range(len(meses)), quantidades, alpha=0.3, color='#556B2F')
-            ax2.set_ylabel('Quantidade de Atestados', fontsize=10, fontweight='bold', color='#556B2F')
-            ax2.tick_params(axis='y', labelcolor='#556B2F')
+                    color=self.cores['secondary'], label='Quantidade de Atestados')
+            ax2.fill_between(range(len(meses)), quantidades, alpha=0.3, color=self.cores['secondary'])
+            ax2.set_ylabel('Quantidade de Atestados', fontsize=10, fontweight='bold', color=self.cores['secondary'])
+            ax2.tick_params(axis='y', labelcolor=self.cores['secondary'])
             
             ax.set_xticks(range(len(meses)))
             ax.set_xticklabels(meses, rotation=45, ha='right', fontsize=9)
@@ -269,21 +370,36 @@ class ReportGenerator:
             
             fig, ax = plt.subplots(figsize=(10, 6))
             
-            labels = []
-            valores = []
+            # Ordena os dados para garantir ordem correta: Masculino primeiro, depois Feminino
+            dados_ordenados = []
             for item in distribuicao_genero:
                 genero = item.get('genero', '')
                 if genero == 'M':
-                    labels.append('Masculino')
+                    dados_ordenados.append(('Masculino', item.get('quantidade', 0), 'M'))
                 elif genero == 'F':
-                    labels.append('Feminino')
+                    dados_ordenados.append(('Feminino', item.get('quantidade', 0), 'F'))
                 else:
-                    labels.append(genero)
-                valores.append(item.get('quantidade', 0))
+                    dados_ordenados.append((genero, item.get('quantidade', 0), genero))
             
-            colors_list = ['#1a237e', '#556B2F']
+            # Ordena: Masculino primeiro, depois Feminino
+            dados_ordenados.sort(key=lambda x: (0 if x[2] == 'M' else 1 if x[2] == 'F' else 2))
+            
+            labels = [d[0] for d in dados_ordenados]
+            valores = [d[1] for d in dados_ordenados]
+            generos = [d[2] for d in dados_ordenados]
+            
+            # Mapeia cores corretamente: Masculino = preto, Feminino = dourado
+            colors_list = []
+            for gen in generos:
+                if gen == 'M':
+                    colors_list.append(self.cores['masculino'])  # Preto
+                elif gen == 'F':
+                    colors_list.append(self.cores['feminino'])  # Dourado
+                else:
+                    colors_list.append(self.cores.get('primary', '#1a237e'))
+            
             wedges, texts, autotexts = ax.pie(valores, labels=labels, autopct='%1.1f%%',
-                                             colors=colors_list[:len(valores)], startangle=90,
+                                             colors=colors_list, startangle=90,
                                              pctdistance=0.85)
             
             # Cria efeito de rosca
@@ -293,7 +409,7 @@ class ReportGenerator:
             # Adiciona total no centro
             total = sum(valores)
             ax.text(0, 0, f'Total\n{int(total)}', ha='center', va='center', 
-                   fontsize=14, fontweight='bold', color='#1a237e')
+                   fontsize=14, fontweight='bold', color=self.cores['primary'])
             
             ax.set_title('Distribuição por Gênero', fontsize=12, fontweight='bold', pad=15)
             plt.tight_layout()
@@ -316,7 +432,8 @@ class ReportGenerator:
             descricoes = [d.get('descricao', d.get('cid', 'N/A'))[:30] for d in top5]
             dias = [d.get('dias_perdidos', 0) for d in top5]
             
-            colors_list = ['#556B2F' if i % 2 == 0 else '#6B8E23' for i in range(len(descricoes))]
+            # Usa cores do cliente
+            colors_list = [self.cores['secondary'] if i % 2 == 0 else self.cores['secondaryLight'] for i in range(len(descricoes))]
             bars = ax.bar(range(len(descricoes)), dias, color=colors_list)
             
             ax.set_xticks(range(len(descricoes)))
@@ -351,9 +468,8 @@ class ReportGenerator:
             escalas = [e.get('escala', 'N/A')[:25] for e in top10]
             quantidades = [e.get('quantidade', 0) for e in top10]
             
-            colors_list = ['#1a237e', '#556B2F', '#3949ab', '#6B8E23', '#0d47a1', 
-                          '#808000', '#1a237e', '#556B2F', '#3949ab', '#6B8E23']
-            bars = ax.barh(range(len(escalas)), quantidades, color=colors_list[:len(escalas)])
+            # Usa paleta do cliente
+            bars = ax.barh(range(len(escalas)), quantidades, color=self.paleta[:len(escalas)])
             
             ax.set_yticks(range(len(escalas)))
             ax.set_yticklabels(escalas, fontsize=9)
@@ -389,8 +505,8 @@ class ReportGenerator:
             total = sum(quantidades)
             
             # Cores alternadas
-            colors_list = ['#1a237e', '#556B2F', '#3949ab', '#6B8E23', '#0d47a1', 
-                          '#808000', '#4a148c', '#004d40', '#e65100', '#1b5e20']
+            # Usa paleta do cliente
+            colors_list = self.paleta[:len(motivos)] if len(motivos) <= len(self.paleta) else (self.paleta * ((len(motivos) // len(self.paleta)) + 1))[:len(motivos)]
             
             # Calcula percentuais
             percentuais = [(q / total * 100) if total > 0 else 0 for q in quantidades]
@@ -467,7 +583,8 @@ class ReportGenerator:
             faixas = [str(d.get('faixa', d.get('dias', 'N/A'))) for d in distribuicao_dias]
             quantidades = [d.get('quantidade', 0) for d in distribuicao_dias]
             
-            colors_list = ['#3949ab' if i % 2 == 0 else '#556B2F' for i in range(len(faixas))]
+            # Usa cores do cliente
+            colors_list = [self.cores['primaryLight'] if i % 2 == 0 else self.cores['secondary'] for i in range(len(faixas))]
             bars = ax.bar(range(len(faixas)), quantidades, color=colors_list)
             
             ax.set_xticks(range(len(faixas)))
@@ -504,7 +621,8 @@ class ReportGenerator:
                      for m in top10]
             medias = [m.get('media_dias', 0) for m in top10]
             
-            colors_list = ['#1a237e' if i % 2 == 0 else '#556B2F' for i in range(len(labels))]
+            # Usa cores do cliente
+            colors_list = [self.cores['primary'] if i % 2 == 0 else self.cores['secondary'] for i in range(len(labels))]
             bars = ax.barh(range(len(labels)), medias, color=colors_list)
             
             ax.set_yticks(range(len(labels)))
@@ -562,8 +680,9 @@ class ReportGenerator:
             x = np.arange(len(setores))
             width = 0.35
             
-            bars1 = ax.bar(x - width/2, masculino, width, label='Masculino', color='#1a237e')
-            bars2 = ax.bar(x + width/2, feminino, width, label='Feminino', color='#556B2F')
+            # Usa cores do cliente (masculino e feminino)
+            bars1 = ax.bar(x - width/2, masculino, width, label='Masculino', color=self.cores.get('masculino', '#1a237e'))
+            bars2 = ax.bar(x + width/2, feminino, width, label='Feminino', color=self.cores.get('feminino', '#556B2F'))
             
             ax.set_xticks(x)
             ax.set_xticklabels(setores, rotation=45, ha='right', fontsize=9)
@@ -580,38 +699,142 @@ class ReportGenerator:
             print(f"Erro ao gerar gráfico setor e gênero: {e}")
             return None
     
+    def _gerar_grafico_dias_ano_coerencia(self, dados: Dict, output_path: str) -> Optional[str]:
+        """Gera gráfico de barras agrupadas para dias por ano e coerência"""
+        try:
+            if not dados or not isinstance(dados, dict):
+                return None
+            
+            anos = dados.get('anos', [])
+            coerente = dados.get('coerente', [])
+            sem_coerencia = dados.get('sem_coerencia', [])
+            
+            if not anos or len(anos) == 0:
+                return None
+            
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            x = np.arange(len(anos))
+            width = 0.35
+            
+            bars1 = ax.bar(x - width/2, coerente, width, label='Coerente', color=self.cores.get('primary', '#1a237e'))
+            bars2 = ax.bar(x + width/2, sem_coerencia, width, label='Sem Coerência', color=self.cores.get('secondary', '#808080'))
+            
+            ax.set_xticks(x)
+            ax.set_xticklabels(anos, fontsize=9)
+            ax.set_ylabel('Dias Perdidos', fontsize=10, fontweight='bold')
+            ax.set_title('Dias Atestados por Ano - Coerente vs Sem Coerência', fontsize=12, fontweight='bold', pad=15)
+            ax.legend()
+            ax.grid(axis='y', alpha=0.3)
+            
+            # Adiciona valores nas barras
+            for bars in [bars1, bars2]:
+                for bar in bars:
+                    height = bar.get_height()
+                    if height > 0:
+                        ax.text(bar.get_x() + bar.get_width()/2., height,
+                               f'{int(height)}', ha='center', va='bottom', fontsize=8)
+            
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=150, bbox_inches='tight')
+            plt.close()
+            return output_path
+        except Exception as e:
+            print(f"Erro ao gerar gráfico dias por ano coerência: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def _gerar_grafico_analise_coerencia(self, dados: Dict, output_path: str) -> Optional[str]:
+        """Gera gráfico de rosca para análise de coerência"""
+        try:
+            if not dados or not isinstance(dados, dict):
+                return None
+            
+            coerente = dados.get('coerente', 0)
+            sem_coerencia = dados.get('sem_coerencia', 0)
+            
+            if coerente == 0 and sem_coerencia == 0:
+                return None
+            
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            labels = ['Coerente', 'Sem Coerência']
+            valores = [coerente, sem_coerencia]
+            colors_list = [self.cores.get('primary', '#1a237e'), self.cores.get('secondary', '#808080')]
+            
+            wedges, texts, autotexts = ax.pie(valores, labels=labels, autopct='%1.1f%%',
+                                             colors=colors_list, startangle=90,
+                                             pctdistance=0.85)
+            
+            # Cria efeito de rosca
+            centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+            ax.add_artist(centre_circle)
+            
+            # Adiciona total no centro
+            total = coerente + sem_coerencia
+            ax.text(0, 0, f'Total\n{int(total)}', ha='center', va='center', 
+                   fontsize=14, fontweight='bold', color=self.cores['primary'])
+            
+            ax.set_title('Análise Atestados - Coerente vs Sem Coerência', fontsize=12, fontweight='bold', pad=15)
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=150, bbox_inches='tight')
+            plt.close()
+            return output_path
+        except Exception as e:
+            print(f"Erro ao gerar gráfico análise coerência: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
     def generate_pdf_report(self, 
                            output_path: str,
                            dados: Dict[str, Any],
                            metricas: Dict[str, Any],
                            insights: Optional[List[Dict[str, Any]]] = None,
                            periodo: Optional[str] = None,
-                           insights_engine: Optional[Any] = None) -> bool:
+                           insights_engine: Optional[Any] = None,
+                           client_id: Optional[int] = None) -> bool:
         """Gera relatório PDF completo"""
         try:
-            doc = SimpleDocTemplate(
-                output_path,
-                pagesize=A4,
-                rightMargin=2*cm,
-                leftMargin=2*cm,
-                topMargin=2*cm,
-                bottomMargin=2*cm
-            )
+            # Garante que o diretório existe
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Remove arquivo existente se houver (para evitar corrupção)
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except:
+                    pass
+            
+            # SimpleDocTemplate será criado dentro do try/catch do build
+            # (não criar aqui para evitar problemas de encoding)
             
             story = []
             
+            # Função auxiliar para sanitizar texto (remove caracteres problemáticos)
+            def sanitize_text(text):
+                if not text:
+                    return ""
+                # Remove caracteres de controle que podem corromper PDF
+                text = str(text)
+                # Remove caracteres de controle (exceto \n, \r, \t)
+                import re
+                text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
+                return text
+            
             # Cabeçalho
-            story.append(Paragraph("Relatório de Absenteísmo", self.title_style))
-            story.append(Paragraph("AbsenteismoController - GrupoBiomed", self.subtitle_style))
+            story.append(Paragraph(sanitize_text("Relatório de Absenteísmo"), self.title_style))
+            story.append(Paragraph(sanitize_text("AbsenteismoController - GrupoBiomed"), self.subtitle_style))
             
             if periodo:
-                story.append(Paragraph(f"Período: {periodo}", self.normal_style))
+                story.append(Paragraph(sanitize_text(f"Período: {periodo}"), self.normal_style))
             
-            story.append(Paragraph(f"Data de geração: {datetime.now().strftime('%d/%m/%Y %H:%M')}", self.normal_style))
+            story.append(Paragraph(sanitize_text(f"Data de geração: {datetime.now().strftime('%d/%m/%Y %H:%M')}"), self.normal_style))
             story.append(Spacer(1, 20))
             
             # Métricas principais
-            story.append(Paragraph("Indicadores Principais", self.section_style))
+            story.append(Paragraph(sanitize_text("Indicadores Principais"), self.section_style))
             
             # Arredonda horas corretamente (sem truncar)
             total_horas = metricas.get('total_horas_perdidas', 0)
@@ -627,7 +850,7 @@ class ReportGenerator:
             
             metrics_table = Table(metrics_data, colWidths=[10*cm, 6*cm])
             metrics_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a237e')),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(self.cores.get('primary', '#1a237e'))),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -663,111 +886,256 @@ class ReportGenerator:
                 ('dias_setor_genero', 'Dias Perdidos por Setor e Gênero', self._gerar_grafico_setor_genero),
             ]
             
+            # Adiciona gráficos específicos da Roda de Ouro (client_id == 4) - REPLICA APRESENTAÇÃO
+            if client_id == 4:
+                graficos_config.extend([
+                    ('classificacao_funcionarios_ro', 'Classificação por Funcionário', self._gerar_grafico_funcionarios),
+                    ('classificacao_setores_ro', 'Classificação por Setor', self._gerar_grafico_setores),
+                    ('classificacao_doencas_ro', 'Classificação por Doença', self._gerar_grafico_cids),
+                    ('dias_ano_coerencia', 'Dias Atestados por Ano', self._gerar_grafico_dias_ano_coerencia),  # Função específica
+                    ('analise_coerencia', 'Análise Atestados - Coerente vs Sem Coerência', self._gerar_grafico_analise_coerencia),  # Função específica
+                    ('tempo_servico_atestados', 'Tempo Serviço x Atestados', self._gerar_grafico_setores),  # Replica apresentação
+                    ('horas_perdidas_genero', 'Horas Perdidas por Gênero', self._gerar_grafico_genero),
+                    ('horas_perdidas_setor', 'Horas Perdidas por Setor', self._gerar_grafico_setores),
+                    ('evolucao_mensal_horas', 'Evolução Mensal de Horas Perdidas', self._gerar_grafico_evolucao),
+                    ('comparativo_dias_horas_genero', 'Comparativo: Dias vs Horas vs Semanas', self._gerar_grafico_setor_genero),
+                    ('horas_perdidas_setor_genero', 'Horas Perdidas por Setor e Gênero', self._gerar_grafico_setor_genero),
+                    ('analise_detalhada_genero', 'Análise Detalhada por Gênero', self._gerar_grafico_genero),  # Replica apresentação
+                ])
+            
             # Gera cada gráfico com título e insight
             for chave_dados, titulo, funcao_grafico in graficos_config:
                 if chave_dados in dados and dados[chave_dados]:
-                    grafico_path = os.path.join(temp_dir, f"{chave_dados}_{timestamp_unique}.png")
-                    if funcao_grafico(dados[chave_dados], grafico_path):
-                        graficos_temp.append(grafico_path)
+                    try:
+                        # Valida se os dados não estão vazios ou em formato inválido
+                        dados_grafico = dados[chave_dados]
+                        if not dados_grafico:
+                            print(f"⚠️ Dados vazios para {chave_dados}, pulando...")
+                            continue
                         
-                        # Busca insight correspondente - tenta múltiplas estratégias
-                        insight = None
-                        if insights:
-                            # Primeiro tenta buscar pelo mapeamento
-                            insight = self._buscar_insight_grafico(chave_dados, insights)
+                        # Valida formato dos dados (deve ser lista ou dict)
+                        if not isinstance(dados_grafico, (list, dict)):
+                            print(f"⚠️ Formato inválido para {chave_dados}: {type(dados_grafico)}, pulando...")
+                            continue
+                        
+                        # Se for dict, verifica se não está vazio e se tem estrutura válida
+                        if isinstance(dados_grafico, dict):
+                            # Para dicts complexos da Roda de Ouro (ex: dias_ano_coerencia, analise_coerencia)
+                            # Verifica se tem dados válidos
+                            if len(dados_grafico) == 0:
+                                print(f"⚠️ Dict vazio para {chave_dados}, pulando...")
+                                continue
+                            # Se for dict com estrutura específica (ex: {'anos': [], 'coerente': []})
+                            # Verifica se tem pelo menos uma chave com dados
+                            if any(isinstance(v, list) and len(v) > 0 for v in dados_grafico.values() if isinstance(v, list)):
+                                # Tem dados, continua
+                                pass
+                            elif all(not v or (isinstance(v, (int, float)) and v == 0) for v in dados_grafico.values()):
+                                print(f"⚠️ Dict sem dados válidos para {chave_dados}, pulando...")
+                                continue
+                        
+                        # Se for list, verifica se não está vazio
+                        if isinstance(dados_grafico, list) and len(dados_grafico) == 0:
+                            print(f"⚠️ Lista vazia para {chave_dados}, pulando...")
+                            continue
+                        
+                        grafico_path = os.path.join(temp_dir, f"{chave_dados}_{timestamp_unique}.png")
+                        resultado_grafico = funcao_grafico(dados_grafico, grafico_path)
+                        
+                        if resultado_grafico and os.path.exists(grafico_path) and os.path.getsize(grafico_path) > 0:
+                            graficos_temp.append(grafico_path)
                             
-                            # Se não encontrou, tenta busca mais ampla por palavras-chave
-                            if not insight:
-                                # Lista de palavras-chave alternativas para cada tipo
-                                busca_alternativa = {
-                                    'evolucao_mensal': ['evolução', 'evolucao', 'mensal', 'tendência'],
-                                    'top_cids': ['cid', 'doença', 'diagnóstico', 'frequente'],
-                                    'funcionarios_dias': ['funcionário', 'funcionario', 'colaborador'],
-                                    'top_setores': ['setor', 'departamento', 'área'],
-                                    'genero': ['gênero', 'genero', 'masculino', 'feminino', 'sexo'],
-                                    'dias_doenca': ['doença', 'dias perdidos', 'afastamento'],
-                                    'escalas': ['escala', 'turno', 'horário'],
-                                    'motivos': ['motivo', 'causa', 'razão', 'incidência'],
-                                    'centro_custo': ['centro', 'custo', 'setor'],
-                                    'distribuicao_dias': ['distribuição', 'distribuicao', 'histograma'],
-                                    'media_cid': ['média', 'media', 'duração'],
-                                    'setor_genero': ['setor', 'gênero', 'genero', 'comparativo']
-                                }
+                            # Busca insight correspondente - tenta múltiplas estratégias
+                            insight = None
+                            if insights:
+                                # Primeiro tenta buscar pelo mapeamento
+                                insight = self._buscar_insight_grafico(chave_dados, insights)
                                 
-                                if chave_dados in busca_alternativa:
-                                    palavras = busca_alternativa[chave_dados]
-                                    for ins in insights:
-                                        titulo_lower = ins.get('titulo', '').lower()
-                                        if any(palavra in titulo_lower for palavra in palavras):
-                                            insight = ins
-                                            break
-                        
-                        # Se ainda não encontrou insight e temos insights_engine, gera na hora
-                        if not insight and insights_engine and chave_dados in dados and dados[chave_dados]:
-                            try:
-                                analise_texto = insights_engine.gerar_analise_grafico(chave_dados, dados[chave_dados], metricas)
-                                if analise_texto:
-                                    partes = analise_texto.split('💡')
-                                    insight = {
-                                        'tipo': 'analise',
-                                        'icone': '📊',
-                                        'titulo': f'Análise: {titulo}',
-                                        'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_texto.replace('**', ''),
-                                        'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                                # Se não encontrou, tenta busca mais ampla por palavras-chave
+                                if not insight:
+                                    # Lista de palavras-chave alternativas para cada tipo
+                                    busca_alternativa = {
+                                        'evolucao_mensal': ['evolução', 'evolucao', 'mensal', 'tendência'],
+                                        'top_cids': ['cid', 'doença', 'diagnóstico', 'frequente'],
+                                        'funcionarios_dias': ['funcionário', 'funcionario', 'colaborador'],
+                                        'top_setores': ['setor', 'departamento', 'área'],
+                                        'genero': ['gênero', 'genero', 'masculino', 'feminino', 'sexo'],
+                                        'dias_doenca': ['doença', 'dias perdidos', 'afastamento'],
+                                        'escalas': ['escala', 'turno', 'horário'],
+                                        'motivos': ['motivo', 'causa', 'razão', 'incidência'],
+                                        'centro_custo': ['centro', 'custo', 'setor'],
+                                        'distribuicao_dias': ['distribuição', 'distribuicao', 'histograma'],
+                                        'media_cid': ['média', 'media', 'duração'],
+                                        'setor_genero': ['setor', 'gênero', 'genero', 'comparativo']
                                     }
+                                    
+                                    if chave_dados in busca_alternativa:
+                                        palavras = busca_alternativa[chave_dados]
+                                        for ins in insights:
+                                            titulo_lower = ins.get('titulo', '').lower()
+                                            if any(palavra in titulo_lower for palavra in palavras):
+                                                insight = ins
+                                                break
+                            
+                            # Se ainda não encontrou insight e temos insights_engine, gera na hora
+                            if not insight and insights_engine and chave_dados in dados and dados[chave_dados]:
+                                try:
+                                    analise_texto = insights_engine.gerar_analise_grafico(chave_dados, dados[chave_dados], metricas)
+                                    if analise_texto:
+                                        partes = analise_texto.split('💡')
+                                        insight = {
+                                            'tipo': 'analise',
+                                            'icone': '📊',
+                                            'titulo': f'Análise: {titulo}',
+                                            'descricao': partes[0].strip().replace('**', '') if len(partes) > 0 else analise_texto.replace('**', ''),
+                                            'recomendacao': partes[1].strip().replace('**', '').replace('💡', '').replace('Recomendação:', '').strip() if len(partes) > 1 else None
+                                        }
+                                except Exception as e:
+                                    print(f"Erro ao gerar insight para {chave_dados}: {e}")
+                            
+                            # Cria conteúdo do gráfico (título + gráfico + insight) que deve ficar junto
+                            conteudo_grafico = []
+                            
+                            # Título
+                            conteudo_grafico.append(Paragraph(sanitize_text(titulo), self.section_style))
+                            conteudo_grafico.append(Spacer(1, 10))
+                            
+                            # Gráfico (com verificação de existência e validação)
+                            try:
+                                if os.path.exists(grafico_path) and os.path.getsize(grafico_path) > 0:
+                                    # Valida se é uma imagem válida (sem usar verify que fecha o arquivo)
+                                    imagem_valida = True
+                                    try:
+                                        from PIL import Image as PILImage
+                                        # Abre e fecha sem verify para não corromper o arquivo
+                                        with PILImage.open(grafico_path) as pil_img:
+                                            pil_img.load()  # Carrega a imagem sem fechar
+                                        # Verifica se o arquivo é PNG válido lendo os primeiros bytes
+                                        with open(grafico_path, 'rb') as f:
+                                            header = f.read(8)
+                                            if not (header.startswith(b'\x89PNG\r\n\x1a\n') or header.startswith(b'\xff\xd8\xff')):
+                                                print(f"⚠️ Arquivo não é uma imagem PNG/JPG válida: {grafico_path}")
+                                                imagem_valida = False
+                                    except ImportError:
+                                        # PIL não disponível, mas continua mesmo assim
+                                        pass
+                                    except Exception as img_error:
+                                        print(f"⚠️ Erro ao validar imagem {grafico_path}: {img_error}")
+                                        imagem_valida = False
+                                    
+                                    if imagem_valida:
+                                        # Adiciona imagem ao PDF
+                                        try:
+                                            # Calcula proporção da imagem para manter aspect ratio
+                                            try:
+                                                from PIL import Image as PILImage
+                                                with PILImage.open(grafico_path) as pil_img:
+                                                    img_width, img_height = pil_img.size
+                                                    aspect_ratio = img_width / img_height if img_height > 0 else 1.0
+                                            except:
+                                                aspect_ratio = 2.0  # Default 2:1
+                                            
+                                            # Ajusta altura baseado na largura e aspect ratio
+                                            width_pdf = 16*cm
+                                            height_pdf = width_pdf / aspect_ratio if aspect_ratio > 0 else 8*cm
+                                            # Limita altura máxima
+                                            if height_pdf > 10*cm:
+                                                height_pdf = 10*cm
+                                                width_pdf = height_pdf * aspect_ratio
+                                            
+                                            img = Image(grafico_path, width=width_pdf, height=height_pdf)
+                                            conteudo_grafico.append(img)
+                                            conteudo_grafico.append(Spacer(1, 15))
+                                        except Exception as pdf_img_error:
+                                            print(f"⚠️ Erro ao adicionar imagem ao PDF: {pdf_img_error}")
+                                            import traceback
+                                            traceback.print_exc()
+                                            conteudo_grafico.append(Paragraph(f"<i>Gráfico não disponível</i>", self.normal_style))
+                                            conteudo_grafico.append(Spacer(1, 15))
+                                    else:
+                                        conteudo_grafico.append(Paragraph(f"<i>Gráfico não disponível (imagem inválida)</i>", self.normal_style))
+                                        conteudo_grafico.append(Spacer(1, 15))
+                                else:
+                                    conteudo_grafico.append(Paragraph(f"<i>Gráfico não disponível (arquivo não encontrado)</i>", self.normal_style))
+                                    conteudo_grafico.append(Spacer(1, 15))
                             except Exception as e:
-                                print(f"Erro ao gerar insight para {chave_dados}: {e}")
-                        
-                        # Cria conteúdo do gráfico (título + gráfico + insight) que deve ficar junto
-                        conteudo_grafico = []
-                        
-                        # Título
-                        conteudo_grafico.append(Paragraph(titulo, self.section_style))
-                        conteudo_grafico.append(Spacer(1, 10))
-                        
-                        # Gráfico
-                        conteudo_grafico.append(Image(grafico_path, width=16*cm, height=8*cm))
-                        conteudo_grafico.append(Spacer(1, 15))
-                        
-                        # Insight abaixo do gráfico
-                        if insight:
-                            # Título do insight
-                            insight_title_style = ParagraphStyle(
-                                'InsightTitle', 
-                                parent=self.normal_style, 
-                                fontSize=12, 
-                                textColor=colors.HexColor('#1a237e'), 
-                                spaceAfter=8, 
-                                spaceBefore=10
-                            )
-                            conteudo_grafico.append(Paragraph(
-                                f"<b>{insight.get('icone', '📊')} Análise e Insights</b>", 
-                                insight_title_style
-                            ))
-                    
-                            # Descrição
-                            descricao = insight.get('descricao', '').replace('**', '')
-                            conteudo_grafico.append(Paragraph(descricao, self.normal_style))
-                    
-                            # Recomendação
-                            if insight.get('recomendacao'):
-                                recomendacao = insight.get('recomendacao').replace('**', '')
-                                recomendacao_style = ParagraphStyle(
-                                    'Recomendacao', 
+                                print(f"⚠️ Erro ao adicionar imagem {grafico_path} ao PDF: {e}")
+                                import traceback
+                                traceback.print_exc()
+                                conteudo_grafico.append(Paragraph(f"<i>Erro ao carregar gráfico</i>", self.normal_style))
+                                conteudo_grafico.append(Spacer(1, 15))
+                            
+                            # Insight abaixo do gráfico
+                            if insight:
+                                # Título do insight
+                                insight_title_style = ParagraphStyle(
+                                    'InsightTitle', 
                                     parent=self.normal_style, 
-                                    fontSize=10, 
-                                    leftIndent=20, 
-                                    textColor=colors.HexColor('#556B2F'), 
-                                    spaceAfter=15
+                                    fontSize=12, 
+                                    textColor=colors.HexColor(self.cores.get('primary', '#1a237e')), 
+                                    spaceAfter=8, 
+                                    spaceBefore=10
                                 )
+                                # Remove emojis do título para evitar problemas no PDF
+                                icone_texto = insight.get('icone', '📊')
+                                # Tenta manter emoji, mas se der problema, remove
+                                try:
+                                    titulo_insight = f"<b>{icone_texto} Análise e Insights</b>"
+                                except:
+                                    titulo_insight = "<b>Análise e Insights</b>"
                                 conteudo_grafico.append(Paragraph(
-                                    f"<b>💡 Recomendação:</b> {recomendacao}", 
-                                    recomendacao_style
+                                    sanitize_text(titulo_insight), 
+                                    insight_title_style
                                 ))
                         
-                        # Adiciona tudo junto usando KeepTogether para manter título e gráfico na mesma página
-                        story.append(KeepTogether(conteudo_grafico))
-                        story.append(Spacer(1, 20))
+                                # Descrição
+                                descricao = sanitize_text(insight.get('descricao', '').replace('**', ''))
+                                conteudo_grafico.append(Paragraph(descricao, self.normal_style))
+                        
+                                # Recomendação
+                                if insight.get('recomendacao'):
+                                    recomendacao = sanitize_text(insight.get('recomendacao').replace('**', ''))
+                                    recomendacao_style = ParagraphStyle(
+                                        'Recomendacao', 
+                                        parent=self.normal_style, 
+                                        fontSize=10, 
+                                        leftIndent=20, 
+                                        textColor=colors.HexColor('#556B2F'), 
+                                        spaceAfter=15
+                                    )
+                                    # Remove emoji da recomendação
+                                    conteudo_grafico.append(Paragraph(
+                                        sanitize_text(f"<b>Recomendação:</b> {recomendacao}"), 
+                                        recomendacao_style
+                                    ))
+                            
+                            # Adiciona tudo junto usando KeepTogether para manter título e gráfico na mesma página
+                            # Mas evita KeepTogether se o conteúdo for muito grande (pode causar problemas)
+                            try:
+                                # Conta quantos elementos há no conteúdo
+                                num_elementos = len(conteudo_grafico)
+                                # Se tiver muitos elementos, não usa KeepTogether para evitar problemas
+                                if num_elementos <= 10:
+                                    story.append(KeepTogether(conteudo_grafico))
+                                else:
+                                    # Adiciona sem KeepTogether se for muito grande
+                                    for item in conteudo_grafico:
+                                        story.append(item)
+                            except Exception as e:
+                                # Se KeepTogether falhar, adiciona sem ele
+                                print(f"⚠️ Erro ao usar KeepTogether, adicionando conteúdo normalmente: {e}")
+                                for item in conteudo_grafico:
+                                    try:
+                                        story.append(item)
+                                    except Exception as item_error:
+                                        print(f"⚠️ Erro ao adicionar item ao PDF: {item_error}")
+                                        continue
+                            story.append(Spacer(1, 20))
+                    except Exception as e:
+                        print(f"Erro ao processar gráfico {chave_dados}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        continue
             
             story.append(PageBreak())
             
@@ -775,20 +1143,20 @@ class ReportGenerator:
             
             # TOP 10 CIDs (Tabela)
             if 'top_cids' in dados and dados['top_cids']:
-                story.append(Paragraph("TOP 10 Doenças Mais Frequentes", self.section_style))
+                story.append(Paragraph(sanitize_text("TOP 10 Doenças Mais Frequentes"), self.section_style))
                 
                 cids_data = [['CID', 'Diagnóstico', 'Quantidade', 'Dias Perdidos']]
                 for cid in dados['top_cids'][:10]:
                     cids_data.append([
-                        cid.get('cid', 'N/A'),
-                        cid.get('descricao', cid.get('diagnostico', 'N/A'))[:50],
+                        sanitize_text(cid.get('cid', 'N/A')),
+                        sanitize_text(cid.get('descricao', cid.get('diagnostico', 'N/A'))[:50]),
                         str(cid.get('quantidade', 0)),
                         str(int(cid.get('dias_perdidos', 0)))
                     ])
                 
                 cids_table = Table(cids_data, colWidths=[3*cm, 7*cm, 3*cm, 3*cm])
                 cids_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a237e')),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(self.cores.get('primary', '#1a237e'))),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -805,20 +1173,20 @@ class ReportGenerator:
             
             # TOP Funcionários
             if 'top_funcionarios' in dados and dados['top_funcionarios']:
-                story.append(Paragraph("TOP 10 Funcionários com Mais Dias Perdidos", self.section_style))
+                story.append(Paragraph(sanitize_text("TOP 10 Funcionários com Mais Dias Perdidos"), self.section_style))
                 
                 func_data = [['Funcionário', 'Setor', 'Dias Perdidos', 'Atestados']]
                 for func in dados['top_funcionarios'][:10]:
                     func_data.append([
-                        func.get('nome', 'N/A')[:40],
-                        func.get('setor', 'N/A')[:30],
+                        sanitize_text(func.get('nome', 'N/A')[:40]),
+                        sanitize_text(func.get('setor', 'N/A')[:30]),
                         str(int(func.get('dias_perdidos', 0))),
                         str(func.get('quantidade_atestados', func.get('quantidade', 0)))
                     ])
                 
                 func_table = Table(func_data, colWidths=[5*cm, 4*cm, 3*cm, 3*cm])
                 func_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a237e')),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(self.cores.get('primary', '#1a237e'))),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -835,19 +1203,19 @@ class ReportGenerator:
             
             # TOP Setores
             if 'top_setores' in dados and dados['top_setores']:
-                story.append(Paragraph("TOP 10 Setores com Mais Atestados", self.section_style))
+                story.append(Paragraph(sanitize_text("TOP 10 Setores com Mais Atestados"), self.section_style))
                 
                 setor_data = [['Setor', 'Dias Perdidos', 'Atestados']]
                 for setor in dados['top_setores'][:10]:
                     setor_data.append([
-                        setor.get('setor', 'N/A')[:40],
+                        sanitize_text(setor.get('setor', 'N/A')[:40]),
                         str(int(setor.get('dias_perdidos', 0))),
                         str(setor.get('quantidade', 0))
                     ])
                 
                 setor_table = Table(setor_data, colWidths=[8*cm, 4*cm, 4*cm])
                 setor_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a237e')),
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(self.cores.get('primary', '#1a237e'))),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -865,12 +1233,139 @@ class ReportGenerator:
             # Rodapé
             story.append(Spacer(1, 20))
             story.append(Paragraph(
-                f"<i>Relatório gerado automaticamente pelo AbsenteismoController v2.0</i>",
+                sanitize_text("<i>Relatório gerado automaticamente pelo AbsenteismoController v2.0</i>"),
                 self.normal_style
             ))
             
-            # Build PDF
-            doc.build(story)
+            # Valida se há conteúdo antes de gerar PDF
+            if len(story) == 0:
+                print("⚠️ Erro: Nenhum conteúdo para adicionar ao PDF!")
+                return False
+            
+            # Build PDF com tratamento de erro robusto
+            try:
+                # Limpa qualquer arquivo existente antes de gerar
+                if os.path.exists(output_path):
+                    try:
+                        os.remove(output_path)
+                    except Exception as e:
+                        print(f"⚠️ Aviso: Não foi possível remover arquivo existente: {e}")
+                
+                # Valida se há conteúdo antes de gerar
+                if len(story) == 0:
+                    print("❌ Erro: Nenhum conteúdo para adicionar ao PDF!")
+                    return False
+                
+                # Gera PDF em arquivo temporário primeiro, depois move
+                import tempfile
+                import shutil
+                temp_output = output_path + '.tmp'
+                
+                try:
+                    # Cria SimpleDocTemplate (sem encoding, reportlab usa UTF-8 por padrão)
+                    doc_temp = SimpleDocTemplate(
+                        temp_output,
+                        pagesize=A4,
+                        rightMargin=2*cm,
+                        leftMargin=2*cm,
+                        topMargin=2*cm,
+                        bottomMargin=2*cm
+                    )
+                    
+                    # Gera PDF no arquivo temporário
+                    doc_temp.build(story, onFirstPage=None, onLaterPages=None)
+                    
+                    # Fecha explicitamente
+                    del doc_temp
+                    
+                    # Aguarda um pouco para garantir que o arquivo foi escrito
+                    import time
+                    time.sleep(0.3)
+                    
+                    # Valida arquivo temporário
+                    if not os.path.exists(temp_output):
+                        print(f"❌ Erro: PDF temporário não foi criado")
+                        return False
+                    
+                    tamanho_temp = os.path.getsize(temp_output)
+                    if tamanho_temp == 0:
+                        print(f"❌ Erro: PDF temporário está vazio")
+                        if os.path.exists(temp_output):
+                            try:
+                                os.remove(temp_output)
+                            except:
+                                pass
+                        return False
+                    
+                    # Valida header do PDF temporário
+                    with open(temp_output, 'rb') as f:
+                        header = f.read(4)
+                        if header != b'%PDF':
+                            print(f"❌ Erro: Arquivo temporário não é PDF válido. Header: {header}")
+                            if os.path.exists(temp_output):
+                                try:
+                                    os.remove(temp_output)
+                                except:
+                                    pass
+                            return False
+                    
+                    # Move arquivo temporário para o destino final
+                    shutil.move(temp_output, output_path)
+                    
+                    # Valida arquivo final
+                    if not os.path.exists(output_path):
+                        print(f"❌ Erro: PDF não foi movido para destino final")
+                        return False
+                    
+                    tamanho = os.path.getsize(output_path)
+                    if tamanho == 0:
+                        print(f"❌ Erro: PDF final está vazio")
+                        if os.path.exists(output_path):
+                            try:
+                                os.remove(output_path)
+                            except:
+                                pass
+                        return False
+                    
+                    # Valida header do PDF final
+                    with open(output_path, 'rb') as f:
+                        header = f.read(8)
+                        if not header.startswith(b'%PDF'):
+                            print(f"❌ Erro: PDF final não tem header válido")
+                            if os.path.exists(output_path):
+                                try:
+                                    os.remove(output_path)
+                                except:
+                                    pass
+                            return False
+                    
+                    print(f"✅ PDF válido gerado: {output_path} ({tamanho} bytes)")
+                    
+                except Exception as build_inner_error:
+                    print(f"❌ Erro interno ao construir PDF: {build_inner_error}")
+                    import traceback
+                    traceback.print_exc()
+                    # Remove arquivos corrompidos
+                    for file_path in [temp_output, output_path]:
+                        if os.path.exists(file_path):
+                            try:
+                                os.remove(file_path)
+                            except:
+                                pass
+                    return False
+                
+            except Exception as build_error:
+                print(f"❌ Erro ao construir PDF: {build_error}")
+                import traceback
+                traceback.print_exc()
+                # Remove arquivo corrompido se existir
+                for file_path in [output_path, output_path + '.tmp']:
+                    if os.path.exists(file_path):
+                        try:
+                            os.remove(file_path)
+                        except:
+                            pass
+                return False
             
             # Remove arquivos temporários de gráficos
             for temp_file in graficos_temp:
@@ -886,6 +1381,12 @@ class ReportGenerator:
             print(f"Erro ao gerar PDF: {e}")
             import traceback
             traceback.print_exc()
+            # Remove arquivo corrompido se existir
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except:
+                    pass
             return False
     
     def generate_excel_report(self,
@@ -893,7 +1394,8 @@ class ReportGenerator:
                              dados: List[Dict[str, Any]],
                              metricas: Dict[str, Any],
                              dados_relatorio: Optional[Dict[str, Any]] = None,
-                             periodo: Optional[str] = None) -> bool:
+                             periodo: Optional[str] = None,
+                             client_id: Optional[int] = None) -> bool:
         """Gera relatório Excel completo com gráficos"""
         try:
             # Gera gráficos temporários primeiro
@@ -918,6 +1420,23 @@ class ReportGenerator:
                 ('media_cid', 'Média por CID', self._gerar_grafico_media_cid),
                 ('dias_setor_genero', 'Setor e Gênero', self._gerar_grafico_setor_genero),
             ]
+            
+            # Adiciona gráficos específicos da Roda de Ouro (client_id == 4) - REPLICA APRESENTAÇÃO
+            if client_id == 4:
+                graficos_config.extend([
+                    ('classificacao_funcionarios_ro', 'Classificação Funcionários', self._gerar_grafico_funcionarios),
+                    ('classificacao_setores_ro', 'Classificação Setores', self._gerar_grafico_setores),
+                    ('classificacao_doencas_ro', 'Classificação Doenças', self._gerar_grafico_cids),
+                    ('dias_ano_coerencia', 'Dias por Ano', self._gerar_grafico_evolucao),  # Replica apresentação
+                    ('analise_coerencia', 'Análise Coerência', self._gerar_grafico_genero),  # Replica apresentação
+                    ('tempo_servico_atestados', 'Tempo Serviço', self._gerar_grafico_setores),  # Replica apresentação
+                    ('horas_perdidas_genero', 'Horas por Gênero', self._gerar_grafico_genero),
+                    ('horas_perdidas_setor', 'Horas por Setor', self._gerar_grafico_setores),
+                    ('evolucao_mensal_horas', 'Evolução Horas', self._gerar_grafico_evolucao),
+                    ('comparativo_dias_horas_genero', 'Comparativo Dias/Horas', self._gerar_grafico_setor_genero),
+                    ('horas_perdidas_setor_genero', 'Horas Setor/Gênero', self._gerar_grafico_setor_genero),
+                    ('analise_detalhada_genero', 'Análise Detalhada Gênero', self._gerar_grafico_genero),  # Replica apresentação
+                ])
             
             # Gera todos os gráficos
             for chave, nome_aba, funcao_grafico in graficos_config:
@@ -958,39 +1477,120 @@ class ReportGenerator:
                     'dias_setor_genero': 'Setor e Gênero',
                 }
                 
-                for chave, nome_aba in mapeamento_abas.items():
-                    if chave in dados_graficos and dados_graficos[chave]:
-                        df = pd.DataFrame(dados_graficos[chave])
-                        df.to_excel(writer, sheet_name=nome_aba, index=False)
-            
-            # Adiciona gráficos às abas
-            try:
-                from openpyxl import load_workbook
-                wb = load_workbook(output_path)
+                # Adiciona abas específicas da Roda de Ouro - REPLICA APRESENTAÇÃO
+                if client_id == 4:
+                    mapeamento_abas.update({
+                        'classificacao_funcionarios_ro': 'Classificação Funcionários',
+                        'classificacao_setores_ro': 'Classificação Setores',
+                        'classificacao_doencas_ro': 'Classificação Doenças',
+                        'dias_ano_coerencia': 'Dias por Ano',  # Replica apresentação
+                        'analise_coerencia': 'Análise Coerência',  # Replica apresentação
+                        'tempo_servico_atestados': 'Tempo Serviço',  # Replica apresentação
+                        'horas_perdidas_genero': 'Horas por Gênero',
+                        'horas_perdidas_setor': 'Horas por Setor',
+                        'evolucao_mensal_horas': 'Evolução Horas',
+                        'comparativo_dias_horas_genero': 'Comparativo Dias/Horas',
+                        'horas_perdidas_setor_genero': 'Horas Setor/Gênero',
+                        'analise_detalhada_genero': 'Análise Detalhada Gênero',  # Replica apresentação
+                    })
                 
                 for chave, nome_aba in mapeamento_abas.items():
-                    if chave in graficos_temp and nome_aba in wb.sheetnames:
+                    if chave in dados_graficos and dados_graficos[chave]:
+                        try:
+                            df = pd.DataFrame(dados_graficos[chave])
+                            df.to_excel(writer, sheet_name=nome_aba, index=False)
+                        except Exception as e:
+                            print(f"Erro ao criar aba {nome_aba}: {e}")
+                            continue
+            
+            # Adiciona gráficos às abas e formatação
+            try:
+                from openpyxl import load_workbook
+                from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                from openpyxl.utils import get_column_letter
+                
+                wb = load_workbook(output_path)
+                
+                # Define cores do cliente
+                cor_primaria_hex = self.cores.get('primary', '#1a237e')
+                cor_secundaria_hex = self.cores.get('secondary', '#556B2F')
+                
+                # Converte hex para RGB
+                def hex_to_rgb(hex_color):
+                    hex_color = hex_color.lstrip('#')
+                    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+                
+                cor_primaria_rgb = hex_to_rgb(cor_primaria_hex)
+                cor_secundaria_rgb = hex_to_rgb(cor_secundaria_hex)
+                
+                # Estilos
+                header_fill = PatternFill(start_color=''.join(f'{c:02X}' for c in cor_primaria_rgb), 
+                                         end_color=''.join(f'{c:02X}' for c in cor_primaria_rgb), 
+                                         fill_type='solid')
+                header_font = Font(bold=True, color='FFFFFF', size=11)
+                border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+                
+                for chave, nome_aba in mapeamento_abas.items():
+                    if nome_aba in wb.sheetnames:
                         try:
                             ws = wb[nome_aba]
-                            img_path = graficos_temp[chave]
                             
-                            # Adiciona imagem após os dados (na coluna E, linha 2)
-                            img = ExcelImage(img_path)
-                            # Redimensiona para caber melhor no Excel (largura ~500px)
-                            img.width = 500
-                            img.height = int(img.height * (500 / img.width))
+                            # Formata cabeçalho
+                            if ws.max_row > 0:
+                                for cell in ws[1]:
+                                    cell.fill = header_fill
+                                    cell.font = header_font
+                                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                                    cell.border = border
+                                
+                                # Ajusta largura das colunas
+                                for col in ws.columns:
+                                    max_length = 0
+                                    col_letter = get_column_letter(col[0].column)
+                                    for cell in col:
+                                        try:
+                                            if len(str(cell.value)) > max_length:
+                                                max_length = len(str(cell.value))
+                                        except:
+                                            pass
+                                    adjusted_width = min(max_length + 2, 50)
+                                    ws.column_dimensions[col_letter].width = adjusted_width
+                                
+                                # Aplica bordas nas células com dados
+                                for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                                    for cell in row:
+                                        if cell.value:
+                                            cell.border = border
                             
-                            # Posiciona após os dados
-                            max_row = ws.max_row
-                            # Se tiver poucas linhas, coloca na linha 5, senão após os dados
-                            img_cell = f'E{max(5, max_row + 3)}'
-                            ws.add_image(img, img_cell)
-                            
-                            # Ajusta largura das colunas para acomodar a imagem
-                            ws.column_dimensions['E'].width = 70
+                            # Adiciona gráfico se disponível
+                            if chave in graficos_temp:
+                                try:
+                                    img_path = graficos_temp[chave]
+                                    if os.path.exists(img_path):
+                                        img = ExcelImage(img_path)
+                                        # Redimensiona para caber melhor no Excel
+                                        img.width = 600
+                                        img.height = int(img.height * (600 / img.width)) if img.width > 0 else 400
+                                        
+                                        # Posiciona após os dados (coluna A, após última linha)
+                                        max_row = ws.max_row
+                                        img_row = max(5, max_row + 3)
+                                        img_cell = f'A{img_row}'
+                                        ws.add_image(img, img_cell)
+                                        
+                                        # Ajusta altura da linha para acomodar a imagem
+                                        ws.row_dimensions[img_row].height = img.height * 0.75
+                                except Exception as e:
+                                    print(f"Erro ao adicionar gráfico {nome_aba}: {e}")
+                                    continue
                             
                         except Exception as e:
-                            print(f"Erro ao adicionar gráfico {nome_aba}: {e}")
+                            print(f"Erro ao formatar aba {nome_aba}: {e}")
                             continue
                 
                 wb.save(output_path)
@@ -1018,7 +1618,7 @@ class ReportGenerator:
     
     def generate_powerpoint_report(self, output_path: str, dados_relatorio: Dict[str, Any], 
                                    metricas: Dict[str, Any], insights: List[Dict[str, Any]], 
-                                   periodo: str = None, insights_engine=None) -> bool:
+                                   periodo: str = None, insights_engine=None, client_id: Optional[int] = None) -> bool:
         """Gera relatório em formato PowerPoint com gráficos e análises"""
         try:
             from pptx import Presentation
@@ -1031,10 +1631,25 @@ class ReportGenerator:
             prs.slide_width = Inches(10)
             prs.slide_height = Inches(7.5)
             
-            # Define cores da empresa
-            cor_primaria = RGBColor(26, 35, 126)  # #1a237e
-            cor_secundaria = RGBColor(85, 107, 47)  # #556B2F
+            # Define cores da empresa (usa cores do cliente)
+            cor_primaria_hex = self.cores.get('primary', '#1a237e')
+            cor_secundaria_hex = self.cores.get('secondary', '#556B2F')
+            
+            # Para Roda de Ouro: usa cinza como secundária (não dourado)
+            if client_id == 4:
+                cor_secundaria_hex = '#808080'  # Cinza médio
+            
+            # Converte hex para RGB
+            def hex_to_rgb(hex_color):
+                hex_color = hex_color.lstrip('#')
+                return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+            
+            cor_primaria = RGBColor(*hex_to_rgb(cor_primaria_hex))
+            cor_secundaria = RGBColor(*hex_to_rgb(cor_secundaria_hex))
             cor_texto = RGBColor(33, 33, 33)  # #212121
+            
+            # Cor dourada apenas para acentos (Roda de Ouro)
+            cor_dourado = RGBColor(255, 215, 0) if client_id == 4 else cor_secundaria
             
             # Cria diretório temporário para gráficos
             temp_dir = os.path.join(os.path.dirname(output_path), 'temp_pptx')
@@ -1043,11 +1658,11 @@ class ReportGenerator:
             # Slide 0: Capa
             slide_capa = prs.slides.add_slide(prs.slide_layouts[6])  # Layout em branco
             
-            # Linha decorativa superior
+            # Linha decorativa superior (usa cor secundária do cliente)
             linha_superior = slide_capa.shapes.add_shape(1, Inches(0), Inches(0), Inches(10), Inches(0.15))
             linha_superior.fill.solid()
-            linha_superior.fill.fore_color.rgb = RGBColor(107, 142, 35)  # Verde à esquerda
-            linha_superior.line.color.rgb = RGBColor(107, 142, 35)
+            linha_superior.fill.fore_color.rgb = cor_secundaria
+            linha_superior.line.color.rgb = cor_secundaria
             
             # Título principal
             caixa_titulo = slide_capa.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(1))
@@ -1080,11 +1695,11 @@ class ReportGenerator:
             p_data.font.color.rgb = cor_primaria
             p_data.alignment = PP_ALIGN.RIGHT
             
-            # Linha decorativa inferior
+            # Linha decorativa inferior (usa cor secundária do cliente)
             linha_inferior = slide_capa.shapes.add_shape(1, Inches(0), Inches(7.35), Inches(10), Inches(0.15))
             linha_inferior.fill.solid()
-            linha_inferior.fill.fore_color.rgb = RGBColor(107, 142, 35)  # Verde à direita
-            linha_inferior.line.color.rgb = RGBColor(107, 142, 35)
+            linha_inferior.fill.fore_color.rgb = cor_secundaria
+            linha_inferior.line.color.rgb = cor_secundaria
             
             dados_graficos = dados_relatorio if dados_relatorio else {}
             
@@ -1174,6 +1789,23 @@ class ReportGenerator:
                 ('media_cid', 'Média de Dias por CID', self._gerar_grafico_media_cid),
                 ('dias_setor_genero', 'Dias Perdidos por Setor e Gênero', self._gerar_grafico_setor_genero),
             ]
+            
+            # Adiciona gráficos específicos da Roda de Ouro (client_id == 4) - REPLICA APRESENTAÇÃO
+            if client_id == 4:
+                graficos_config.extend([
+                    ('classificacao_funcionarios_ro', 'Classificação por Funcionário', self._gerar_grafico_funcionarios),
+                    ('classificacao_setores_ro', 'Classificação por Setor', self._gerar_grafico_setores),
+                    ('classificacao_doencas_ro', 'Classificação por Doença', self._gerar_grafico_cids),
+                    ('dias_ano_coerencia', 'Dias Atestados por Ano', self._gerar_grafico_dias_ano_coerencia),  # Função específica
+                    ('analise_coerencia', 'Análise Atestados - Coerente vs Sem Coerência', self._gerar_grafico_analise_coerencia),  # Função específica
+                    ('tempo_servico_atestados', 'Tempo Serviço x Atestados', self._gerar_grafico_setores),  # Replica apresentação
+                    ('horas_perdidas_genero', 'Horas Perdidas por Gênero', self._gerar_grafico_genero),
+                    ('horas_perdidas_setor', 'Horas Perdidas por Setor', self._gerar_grafico_setores),
+                    ('evolucao_mensal_horas', 'Evolução Mensal de Horas Perdidas', self._gerar_grafico_evolucao),
+                    ('comparativo_dias_horas_genero', 'Comparativo: Dias vs Horas vs Semanas', self._gerar_grafico_setor_genero),
+                    ('horas_perdidas_setor_genero', 'Horas Perdidas por Setor e Gênero', self._gerar_grafico_setor_genero),
+                    ('analise_detalhada_genero', 'Análise Detalhada por Gênero', self._gerar_grafico_genero),  # Replica apresentação
+                ])
             
             # Gera slides para cada gráfico
             timestamp_unique = datetime.now().strftime('%Y%m%d_%H%M%S_%f')

@@ -28,7 +28,7 @@
             </div>
             
             <nav class="sidebar-nav">
-                <a href="/" class="nav-item">
+                <a href="/" class="nav-item" id="navDashboard">
                     <i class="fas fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
@@ -173,17 +173,35 @@
                             </div>
                         </div>
                         
-                        <div class="filter-group" style="margin: 0;">
-                            <button class="btn btn-primary" onclick="aplicarFiltros()" style="width: 100%; padding: 8px 16px; font-size: 13px;">
+                        <div class="filter-group" style="margin: 0; display: flex; gap: 8px;">
+                            <button class="btn btn-primary" onclick="aplicarFiltros()" style="flex: 1; padding: 8px 16px; font-size: 13px;">
                                 <i class="fas fa-filter"></i>
                                 Aplicar
                             </button>
+                            <button class="btn btn-secondary" onclick="salvarFiltroAtual()" style="padding: 8px 12px; font-size: 13px;" title="Salvar Filtro">
+                                <i class="fas fa-bookmark"></i>
+                            </button>
+                            <div class="dropdown" style="position: relative;">
+                                <button class="btn btn-info" onclick="toggleFiltrosSalvos()" style="padding: 8px 12px; font-size: 13px;" title="Filtros Salvos">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <div id="dropdownFiltrosSalvos" class="dropdown-content" style="display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; margin-top: 4px; min-width: 250px; max-height: 400px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                    <div style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: 600; font-size: 13px; color: #495057;">
+                                        <i class="fas fa-bookmark"></i> Filtros Salvos
+                                    </div>
+                                    <div id="listaFiltrosSalvos" style="padding: 8px;">
+                                        <div style="text-align: center; padding: 20px; color: #6c757d;">
+                                            <i class="fas fa-spinner fa-spin"></i> Carregando...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- KPI Cards -->
-                <div class="cards-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
+                <!-- KPI Cards (só aparecem se houver dados) -->
+                <div class="cards-grid" id="cardsGridContainer" style="display: none; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
                     <div class="card">
                         <div class="card-header">
                             <div>
@@ -209,7 +227,8 @@
                     </div>
                 </div>
                 
-                <!-- Charts Grid - Layout Otimizado -->
+                <!-- Charts Grid - Layout Otimizado (APENAS CONVERPLAST) -->
+                <div id="graficosConverplast">
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
                     <!-- TOP CIDs -->
                     <div class="chart-container">
@@ -318,6 +337,30 @@
                 </div>
                 
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Comparativo entre Períodos -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Comparativo Mensal</h3>
+                            <p class="chart-subtitle">Mês atual vs mês anterior</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartComparativoMensal"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Comparativo Trimestral -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Comparativo Trimestral</h3>
+                            <p class="chart-subtitle">Trimestre atual vs anterior</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartComparativoTrimestral"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
                     <!-- Dias Perdidos por Centro de Custo (Setor) -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -419,6 +462,160 @@
                     </div>
                     <div class="chart-wrapper" style="height: 400px;">
                         <canvas id="chartProdutividadeMensalCategoria"></canvas>
+                    </div>
+                </div>
+                </div>
+                <!-- FIM GRÁFICOS CONVERPLAST -->
+                
+                <!-- GRÁFICOS ESPECÍFICOS RODA DE OURO -->
+                <div id="graficosRodaOuro" style="display: none; margin-top: 32px; padding-top: 32px; border-top: 2px solid #e0e0e0;">
+                    <h2 style="font-size: 24px; font-weight: 600; color: #333; margin-bottom: 24px; text-align: center;">
+                        <i class="fas fa-chart-bar" style="margin-right: 8px; color: #1a237e;"></i>
+                        Análises Específicas - Roda de Ouro
+                    </h2>
+                    
+                    <!-- Grid 2x3 para os 6 gráficos -->
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                        <!-- 1. Classificação por Funcionário -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Classificação por Funcionário</h3>
+                                <p class="chart-subtitle">Funcionários com mais atestados</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartClassificacaoFuncionariosRO"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 2. Classificação Por Setor -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Classificação Por Setor</h3>
+                                <p class="chart-subtitle">Setores com mais dias de afastamento</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartClassificacaoSetoresRO"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 3. Dias atestados por Ano -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Dias atestados por Ano</h3>
+                                <p class="chart-subtitle">Coerente vs Sem Coerência</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartDiasAnoCoerencia"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 4. Classificação por Doença -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Classificação por Doença</h3>
+                                <p class="chart-subtitle">Doenças x Dias de Afastamento</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartClassificacaoDoencasRO"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 5. Análise Atestados -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Análise Atestados</h3>
+                                <p class="chart-subtitle">Percentual de coerência</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartAnaliseCoerencia"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 6. Tempo Serviço x Atestados -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Tempo Serviço x Atestados</h3>
+                                <p class="chart-subtitle">Atestados por ano</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartTempoServicoAtestados"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- NOVOS GRÁFICOS DE HORAS PERDIDAS -->
+                    <h3 style="font-size: 20px; font-weight: 600; color: #333; margin-top: 40px; margin-bottom: 24px; text-align: center; padding-top: 24px; border-top: 2px solid #e0e0e0;">
+                        <i class="fas fa-clock" style="margin-right: 8px; color: #1a237e;"></i>
+                        Análises de Horas Perdidas
+                    </h3>
+                    
+                    <!-- Grid 2x3 para os novos gráficos de horas -->
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                        <!-- 1. Horas Perdidas por Gênero -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Horas Perdidas por Gênero</h3>
+                                <p class="chart-subtitle">Distribuição de horas perdidas (44h = 1 semana)</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartHorasPerdidasGenero"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 2. Horas Perdidas por Setor -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">TOP 10 Setores - Horas Perdidas</h3>
+                                <p class="chart-subtitle">Setores com mais horas perdidas</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartHorasPerdidasSetor"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 3. Evolução Mensal de Horas -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Evolução Mensal de Horas Perdidas</h3>
+                                <p class="chart-subtitle">Tendência de horas perdidas ao longo do tempo</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartEvolucaoMensalHoras"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 4. Comparativo Dias vs Horas por Gênero -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Comparativo: Dias vs Horas vs Semanas</h3>
+                                <p class="chart-subtitle">Comparação por gênero</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartComparativoDiasHorasGenero"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 5. Horas Perdidas por Setor e Gênero -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Horas Perdidas por Setor e Gênero</h3>
+                                <p class="chart-subtitle">Cruzamento Setor × Gênero</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartHorasPerdidasSetorGenero"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 6. Análise Detalhada por Gênero -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Análise Detalhada por Gênero</h3>
+                                <p class="chart-subtitle">Percentuais de dias, horas e registros</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 400px;">
+                                <canvas id="chartAnaliseDetalhadaGenero"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

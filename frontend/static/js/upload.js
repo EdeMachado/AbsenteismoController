@@ -388,8 +388,23 @@ async function deleteUpload(id) {
         return;
     }
     
+    // Obtém client_id
+    let clientId = null;
+    if (typeof getClientId === 'function') {
+        clientId = getClientId();
+    } else if (window.currentClient && window.currentClient.id) {
+        clientId = window.currentClient.id;
+    } else if (typeof window.getCurrentClientId === 'function') {
+        clientId = window.getCurrentClientId();
+    }
+    
+    if (!clientId) {
+        alert('Erro: Cliente não selecionado. Selecione um cliente primeiro.');
+        return;
+    }
+    
     try {
-        const response = await fetch(`/api/uploads/${id}`, {
+        const response = await fetch(`/api/uploads/${id}?client_id=${clientId}`, {
             method: 'DELETE'
         });
         
@@ -397,11 +412,12 @@ async function deleteUpload(id) {
             alert('Upload deletado com sucesso');
             loadUploads();
         } else {
-            alert('Erro ao deletar upload');
+            const errorData = await response.json().catch(() => ({ detail: 'Erro desconhecido' }));
+            alert(`Erro ao deletar upload: ${errorData.detail || 'Erro desconhecido'}`);
         }
     } catch (error) {
         console.error('Erro:', error);
-        alert('Erro ao deletar upload');
+        alert('Erro ao deletar upload: ' + error.message);
     }
 }
 

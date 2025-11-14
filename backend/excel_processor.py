@@ -364,13 +364,14 @@ class ExcelProcessor:
                 if not col_normalizada:
                     return default
                 
-                # Tenta match exato primeiro
-                if col_normalizada in self.df.columns:
-                    valor = row.get(col_normalizada)
-                    if valor is not None and pd.notna(valor) and str(valor).strip():
-                        return valor
+                # Tenta match exato primeiro (case-insensitive)
+                for col_df in self.df.columns:
+                    if col_df.upper().strip() == col_normalizada.upper().strip():
+                        valor = row.get(col_df)
+                        if valor is not None and pd.notna(valor) and str(valor).strip():
+                            return valor
                 
-                # Se não encontrou, tenta variações do nome (case-insensitive, sem espaços/underscores)
+                # Se não encontrou, tenta variações do nome (sem espaços/underscores/hífens)
                 col_upper_clean = col_normalizada.upper().replace(' ', '').replace('_', '').replace('-', '')
                 for col_df in self.df.columns:
                     col_df_clean = col_df.upper().replace(' ', '').replace('_', '').replace('-', '')
@@ -379,8 +380,19 @@ class ExcelProcessor:
                         if valor is not None and pd.notna(valor) and str(valor).strip():
                             return valor
                 
+                # Para NOMECOMPLETO, tenta variações específicas
+                if col_normalizada.upper() == 'NOMECOMPLETO':
+                    variacoes = ['NOME COMPLETO', 'NOME_COMPLETO', 'NOMEFUNCIONARIO', 'NOME FUNCIONARIO', 'NOME_FUNCIONARIO', 'FUNCIONARIO', 'FUNCIONÁRIO']
+                    for variacao in variacoes:
+                        for col_df in self.df.columns:
+                            if col_df.upper().strip() == variacao.upper().strip():
+                                valor = row.get(col_df)
+                                if valor is not None and pd.notna(valor) and str(valor).strip():
+                                    print(f"  ✅ Encontrado '{col_df}' como variação de NOMECOMPLETO")
+                                    return valor
+                
                 # Tenta fuzzy matching como último recurso
-                melhor_match = self._encontrar_coluna_similar(col_normalizada, list(self.df.columns), threshold=0.8)
+                melhor_match = self._encontrar_coluna_similar(col_normalizada, list(self.df.columns), threshold=0.75)
                 if melhor_match:
                     valor = row.get(melhor_match[0])
                     if valor is not None and pd.notna(valor) and str(valor).strip():
