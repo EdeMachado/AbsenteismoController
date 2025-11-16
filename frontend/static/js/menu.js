@@ -18,8 +18,21 @@ async function carregarAlertasMenu() {
         if (mesInicio) url += `&mes_inicio=${encodeURIComponent(mesInicio)}`;
         if (mesFim) url += `&mes_fim=${encodeURIComponent(mesFim)}`;
         
-        const response = await fetch(url);
-        if (!response.ok) return;
+        // Obtém token de autenticação
+        const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+            if (response.status === 401) {
+                console.warn('Token expirado ou inválido para alertas - ignorando');
+                return;
+            }
+            return;
+        }
         
         const data = await response.json();
         const total = data.total || 0;
@@ -95,10 +108,7 @@ function renderizarMenu() {
                 <i class="fas fa-balance-scale"></i>
                 <span>⚖️ Comparativos</span>
             </a>
-            <a href="/relatorios" class="nav-item">
-                <i class="fas fa-file-alt"></i>
-                <span>📄 Relatórios</span>
-            </a>
+            <!-- Relatórios removido - exportação agora está na apresentação -->
             <a href="/configuracoes" class="nav-item">
                 <i class="fas fa-cog"></i>
                 <span>⚙️ Configurações</span>

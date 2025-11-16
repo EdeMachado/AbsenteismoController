@@ -24,7 +24,7 @@ const SIDEBAR_MENU_ITEMS = [
     { path: '/produtividade', icon: 'fas fa-chart-line', label: 'Produtividade' },
     { path: '/upload', icon: 'fas fa-cloud-arrow-up', label: 'Upload Mensal' },
     { path: '/apresentacao', icon: 'fas fa-tv', label: 'Apresentação' },
-    { path: '/relatorios', icon: 'fas fa-chart-pie', label: 'Relatórios' },
+    // Relatórios removido - exportação agora está na apresentação
     { path: '/funcionarios', icon: 'fas fa-user-group', label: 'Funcionários' },
     { path: '/comparativos', icon: 'fas fa-chart-column', label: 'Comparativos' },
     { path: '/configuracoes', icon: 'fas fa-gear', label: 'Configurações' }
@@ -59,6 +59,22 @@ function renderSidebar() {
     const clienteCnpj = localStorage.getItem('cliente_cnpj');
     const clienteInicial = gerarIniciais(clienteNome || 'Cliente');
     const theme = applyCurrentClientTheme();
+    
+    // Adiciona classe para Roda de Ouro (client_id = 4) - menu preto
+    if (clientId === 4) {
+        sidebar.classList.add('roda-ouro-sidebar');
+        sidebar.classList.remove('converplast-sidebar');
+    } 
+    // Adiciona classe para Converplast (client_id = 2) - menu azul
+    else if (clientId === 2) {
+        sidebar.classList.add('converplast-sidebar');
+        sidebar.classList.remove('roda-ouro-sidebar');
+    } 
+    // Remove classes especiais para outros clientes
+    else {
+        sidebar.classList.remove('roda-ouro-sidebar');
+        sidebar.classList.remove('converplast-sidebar');
+    }
 
     sidebar.innerHTML = `
         <div class="sidebar-scroll">
@@ -360,4 +376,35 @@ function trocarCliente(event) {
 
 window.applyCurrentClientTheme = applyCurrentClientTheme;
 window.trocarCliente = trocarCliente;
+
+// Listener para atualizar sidebar quando cliente mudar
+if (typeof window !== 'undefined') {
+    // Observa mudanças no localStorage
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'cliente_selecionado') {
+            // Atualiza sidebar quando cliente muda
+            setTimeout(() => {
+                if (typeof renderSidebar === 'function') {
+                    renderSidebar();
+                }
+            }, 100);
+        }
+    });
+    
+    // Intercepta setItem para detectar mudanças na mesma aba
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+        originalSetItem.call(this, key, value);
+        if (key === 'cliente_selecionado') {
+            // Dispara evento customizado
+            window.dispatchEvent(new Event('storage'));
+            // Atualiza sidebar
+            setTimeout(() => {
+                if (typeof renderSidebar === 'function') {
+                    renderSidebar();
+                }
+            }, 100);
+        }
+    };
+}
 

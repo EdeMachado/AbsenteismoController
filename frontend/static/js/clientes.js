@@ -842,7 +842,7 @@ function renderizarHighlights() {
             </li>
             <li>
                 <span class="highlight-title">${formatarNumero(uploads)} uploads processados</span>
-                <span class="highlight-desc">Exportações em PDF, Excel e PowerPoint usam sempre os dados mais atualizados.</span>
+                <span class="highlight-desc">Exportações em Excel e PowerPoint usam sempre os dados mais atualizados.</span>
             </li>
             <li>
                 <span class="highlight-title">${formatarNumero(arquivados)} empresas arquivadas</span>
@@ -872,8 +872,14 @@ async function carregarAlertasHome() {
     }
 
     try {
-        // O interceptor do auth.js já adiciona o token automaticamente
-        const response = await fetch(`/api/alertas?client_id=${clientId}`);
+        // Obtém token de autenticação
+        const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(`/api/alertas?client_id=${clientId}`, { headers });
         if (!response.ok) {
             if (response.status === 401) {
                 console.warn('Token expirado ou inválido para alertas - ignorando');

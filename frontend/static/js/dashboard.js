@@ -294,11 +294,9 @@ async function carregarDashboard() {
     try {
         const clientId = getClientId();
         
-        // Valida client_id antes de continuar
-        try {
-            garantirClientId(clientId, '/api/dashboard');
-        } catch (error) {
-            alert(error.message);
+        // Se não tem cliente selecionado, não carrega (silenciosamente)
+        if (!clientId || clientId <= 0) {
+            console.log('[DASHBOARD] Aguardando seleção de cliente...');
             return;
         }
         
@@ -997,24 +995,51 @@ function renderizarChartEvolucao(dados) {
     chartEvolucao = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: dados.map(d => d.mes),
-            datasets: [{
-                label: 'Dias Perdidos',
-                data: dados.map(d => d.dias_perdidos),
-                borderColor: CORES_EMPRESA.primary,
-                backgroundColor: 'rgba(26, 35, 126, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
+            labels: dados.map(d => d.mes || 'N/A'),
+            datasets: [
+                {
+                    label: 'Dias Perdidos',
+                    data: dados.map(d => d.dias_perdidos || 0),
+                    borderColor: CORES_EMPRESA.primary,
+                    backgroundColor: (CORES_EMPRESA.primaryLight || CORES_EMPRESA.primary) + '40',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Quantidade de Atestados',
+                    data: dados.map(d => d.quantidade || 0),
+                    borderColor: CORES_EMPRESA.secondary,
+                    backgroundColor: (CORES_EMPRESA.secondaryLight || CORES_EMPRESA.secondary) + '40',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, position: 'top' }
             },
             scales: {
-                y: { beginAtZero: true }
+                y: {
+                    beginAtZero: true,
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                },
+                y1: {
+                    beginAtZero: true,
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
             }
         }
     });

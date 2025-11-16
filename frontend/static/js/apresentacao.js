@@ -2355,16 +2355,24 @@ function renderizarProdutividade(slide) {
     
     let html = '';
     
-    // Layout com os dois novos gráficos de produtividade lado a lado
-    html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; height: 100%;">`;
+    // Layout com 3 gráficos: 2 em cima (lado a lado) e 1 embaixo (linha de evolução mensal)
+    html = `<div style="display: flex; flex-direction: column; gap: 24px; height: 100%;">`;
+    // Primeira linha: dois gráficos lado a lado
+    html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex: 1;">`;
     html += `<div><canvas id="chartProdutividadeCategoriaAgendadosFaltas"></canvas></div>`;
     html += `<div><canvas id="chartProdutividadeMensalCategoria"></canvas></div>`;
+    html += `</div>`;
+    // Segunda linha: gráfico de linha de evolução mensal
+    html += `<div style="flex: 1; min-height: 300px;">`;
+    html += `<canvas id="graficoEvolucaoProdutividade"></canvas>`;
+    html += `</div>`;
     html += `</div>`;
     
     // Renderiza gráficos após o HTML ser inserido
     setTimeout(() => {
         renderizarGraficoProdutividadeCategoriaAgendadosFaltas(dados);
         renderizarGraficoProdutividadeMensalCategoria(dados);
+        renderizarGraficoEvolucaoMensal('line'); // Gráfico de linha de evolução mensal
     }, 100);
     
     return html;
@@ -2908,4 +2916,115 @@ function mostrarErro(mensagem) {
         </div>
     `;
 }
+
+// ==================== EXPORTAÇÃO ====================
+
+function toggleExportMenu() {
+    const menu = document.getElementById('exportMenu');
+    if (menu) {
+        menu.classList.toggle('show');
+    }
+}
+
+// Fecha o menu quando clica fora
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('exportMenu');
+    const btn = document.querySelector('.btn-export');
+    if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('show');
+    }
+});
+
+// Função exportarPDF REMOVIDA COMPLETAMENTE
+
+async function exportarPowerPoint() {
+    try {
+        // Fecha o menu
+        const menu = document.getElementById('exportMenu');
+        if (menu) menu.classList.remove('show');
+        
+        // Verifica autenticação
+        if (typeof checkAuth === 'function' && !checkAuth()) {
+            return;
+        }
+        
+        // Obtém client_id
+        let clientId = null;
+        if (typeof window.getCurrentClientId === 'function') {
+            clientId = window.getCurrentClientId(null);
+        } else {
+            const stored = localStorage.getItem('cliente_selecionado');
+            clientId = stored ? Number(stored) : null;
+        }
+        
+        if (!clientId || !Number.isFinite(clientId) || clientId <= 0) {
+            alert('Selecione um cliente para exportar o relatório.');
+            return;
+        }
+        
+        // Mostra loading
+        const btn = document.querySelector('.btn-export');
+        const originalHTML = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Gerando PPTX...</span>';
+            btn.disabled = true;
+        }
+        
+        // Obtém token
+        const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
+        if (!token) {
+            alert('Você precisa estar logado para exportar relatórios.');
+            window.location.href = '/login';
+            return;
+        }
+        
+        // Faz requisição
+        const timestamp = new Date().getTime();
+        const url = `/api/export/pptx?client_id=${clientId}&_t=${timestamp}`;
+        
+        const response = await fetch(url, {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (!response.ok) {
+            if (response.status === 401) {
+                alert('Sessão expirada. Por favor, faça login novamente.');
+                window.location.href = '/login';
+                return;
+            }
+            const errorText = await response.text();
+            throw new Error(`Erro ao gerar PowerPoint: ${response.status} ${response.statusText}`);
+        }
+        
+        // Faz download
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `apresentacao_absenteismo_${new Date().toISOString().split('T')[0]}.pptx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+        
+        // Restaura botão
+        if (btn) {
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        }
+        
+    } catch (error) {
+        console.error('Erro ao exportar PowerPoint:', error);
+        alert(`Erro ao exportar PowerPoint: ${error.message}`);
+        
+        // Restaura botão
+        const btn = document.querySelector('.btn-export');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-download"></i><span>Exportar</span>';
+            btn.disabled = false;
+        }
+    }
+}
+
+// Função de impressão REMOVIDA
 

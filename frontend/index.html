@@ -56,10 +56,6 @@
                     <i class="fas fa-balance-scale"></i>
                     <span>⚖️ Comparativos</span>
                 </a>
-                <a href="/relatorios" class="nav-item">
-                    <i class="fas fa-file-alt"></i>
-                    <span>📄 Relatórios</span>
-                </a>
                 <a href="/configuracoes" class="nav-item">
                     <i class="fas fa-cog"></i>
                     <span>⚙️ Configurações</span>
@@ -83,6 +79,10 @@
             <header class="header">
                 <h1 class="header-title">Dashboard</h1>
                 <div class="header-actions" style="display: flex; align-items: center; gap: 16px; position: relative;">
+                    <button onclick="window.print()" class="btn-print-header" title="Imprimir / Salvar como PDF" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                        <i class="fas fa-print"></i>
+                        <span>Imprimir</span>
+                    </button>
                     <div style="position: relative; cursor: pointer;" onclick="toggleAlertasDropdown(event)">
                         <i class="fas fa-bell" style="color: #666; font-size: 20px;"></i>
                         <span id="alertasBadge" class="alertas-badge" style="display: none; position: absolute; top: -8px; right: -8px; background: #f44336; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;">0</span>
@@ -112,29 +112,70 @@
                 
                 <!-- Filters -->
                 <div class="filters">
-                    <div class="filters-grid" style="display: grid; grid-template-columns: 140px 140px 1fr 1fr 120px; gap: 12px; align-items: end;">
+                    <div class="filters-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--border);">
+                        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-filter" style="color: var(--primary);"></i>
+                            Filtros de Análise
+                        </h3>
+                        <div class="filter-actions" style="display: flex; gap: 10px; align-items: center;">
+                            <button class="btn btn-primary" onclick="aplicarFiltros()" style="padding: 10px 20px; font-size: 14px; font-weight: 500; border-radius: 8px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 4px rgba(26, 35, 126, 0.2); transition: all 0.3s;">
+                                <i class="fas fa-check"></i>
+                                Aplicar Filtros
+                            </button>
+                            <button class="btn btn-secondary" onclick="salvarFiltroAtual()" style="padding: 10px 14px; font-size: 14px; border-radius: 8px; display: flex; align-items: center; gap: 6px; transition: all 0.3s;" title="Salvar Filtro">
+                                <i class="fas fa-bookmark"></i>
+                                <span style="display: none; margin-left: 4px;">Salvar</span>
+                            </button>
+                            <div class="dropdown" style="position: relative;">
+                                <button class="btn btn-info" onclick="toggleFiltrosSalvos()" style="padding: 10px 14px; font-size: 14px; border-radius: 8px; display: flex; align-items: center; gap: 6px; transition: all 0.3s;" title="Filtros Salvos">
+                                    <i class="fas fa-list"></i>
+                                    <span style="display: none; margin-left: 4px;">Salvos</span>
+                                </button>
+                                <div id="dropdownFiltrosSalvos" class="dropdown-content" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: white; border: 1px solid #dee2e6; border-radius: 8px; min-width: 280px; max-height: 400px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                    <div style="padding: 14px 16px; border-bottom: 1px solid #dee2e6; font-weight: 600; font-size: 14px; color: #495057; background: #f8f9fa;">
+                                        <i class="fas fa-bookmark" style="margin-right: 8px; color: var(--primary);"></i> Filtros Salvos
+                                    </div>
+                                    <div id="listaFiltrosSalvos" style="padding: 8px;">
+                                        <div style="text-align: center; padding: 20px; color: #6c757d;">
+                                            <i class="fas fa-spinner fa-spin"></i> Carregando...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="filters-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: end;">
                         <div class="filter-group" style="margin: 0;">
-                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Mês Início</label>
-                            <input type="month" id="mesInicio" class="filter-input" style="padding: 8px 10px;">
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-calendar-alt" style="font-size: 12px; color: var(--primary);"></i>
+                                Mês Início
+                            </label>
+                            <input type="month" id="mesInicio" class="filter-input" style="padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.3s; width: 100%;">
                         </div>
                         <div class="filter-group" style="margin: 0;">
-                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Mês Fim</label>
-                            <input type="month" id="mesFim" class="filter-input" style="padding: 8px 10px;">
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-calendar-check" style="font-size: 12px; color: var(--primary);"></i>
+                                Mês Fim
+                            </label>
+                            <input type="month" id="mesFim" class="filter-input" style="padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.3s; width: 100%;">
                         </div>
                         <!-- Funcionários -->
                         <div class="filter-group" style="margin: 0;">
-                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Funcionários</label>
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-users" style="font-size: 12px; color: var(--primary);"></i>
+                                Funcionários
+                            </label>
                             <div class="multiselect-dropdown" style="position: relative;">
-                                <div class="multiselect-trigger" onclick="toggleDropdown('funcionarios')" style="padding: 8px 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 38px;">
-                                    <span id="funcionariosText" style="color: #6c757d; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">Selecione...</span>
+                                <div class="multiselect-trigger" onclick="toggleDropdown('funcionarios')" style="padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: white; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 42px; transition: all 0.3s;">
+                                    <span id="funcionariosText" style="color: #6c757d; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">Selecione...</span>
                                     <i class="fas fa-chevron-down" style="color: #6c757d; transition: transform 0.3s; margin-left: 8px; flex-shrink: 0;" id="funcionariosIcon"></i>
                                 </div>
-                                <div id="dropdownFuncionarios" class="multiselect-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; margin-top: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                                    <div style="padding: 8px; border-bottom: 1px solid #dee2e6; display: flex; gap: 8px;">
-                                        <button type="button" onclick="selecionarTodos('funcionarios')" style="flex: 1; padding: 6px; border: 1px solid #1a237e; color: #1a237e; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                <div id="dropdownFuncionarios" class="multiselect-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: white; border: 1px solid #dee2e6; border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                    <div style="padding: 10px; border-bottom: 1px solid #dee2e6; display: flex; gap: 8px; background: #f8f9fa;">
+                                        <button type="button" onclick="selecionarTodos('funcionarios')" style="flex: 1; padding: 8px; border: 1px solid #1a237e; color: #1a237e; background: white; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.3s;">
                                             Todos
                                         </button>
-                                        <button type="button" onclick="desselecionarTodos('funcionarios')" style="flex: 1; padding: 6px; border: 1px solid #6c757d; color: #6c757d; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                        <button type="button" onclick="desselecionarTodos('funcionarios')" style="flex: 1; padding: 8px; border: 1px solid #6c757d; color: #6c757d; background: white; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.3s;">
                                             Nenhum
                                         </button>
                                     </div>
@@ -149,47 +190,25 @@
                         
                         <!-- Setores -->
                         <div class="filter-group" style="margin: 0;">
-                            <label class="filter-label" style="font-size: 13px; margin-bottom: 6px;">Setores</label>
+                            <label class="filter-label" style="font-size: 13px; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-building" style="font-size: 12px; color: var(--primary);"></i>
+                                Setores
+                            </label>
                             <div class="multiselect-dropdown" style="position: relative;">
-                                <div class="multiselect-trigger" onclick="toggleDropdown('setores')" style="padding: 8px 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 38px;">
-                                    <span id="setoresText" style="color: #6c757d; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">Selecione...</span>
+                                <div class="multiselect-trigger" onclick="toggleDropdown('setores')" style="padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: white; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 42px; transition: all 0.3s;">
+                                    <span id="setoresText" style="color: #6c757d; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">Selecione...</span>
                                     <i class="fas fa-chevron-down" style="color: #6c757d; transition: transform 0.3s; margin-left: 8px; flex-shrink: 0;" id="setoresIcon"></i>
                                 </div>
-                                <div id="dropdownSetores" class="multiselect-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; margin-top: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                                    <div style="padding: 8px; border-bottom: 1px solid #dee2e6; display: flex; gap: 8px;">
-                                        <button type="button" onclick="selecionarTodos('setores')" style="flex: 1; padding: 6px; border: 1px solid #1a237e; color: #1a237e; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                <div id="dropdownSetores" class="multiselect-dropdown-content" style="display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: white; border: 1px solid #dee2e6; border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                    <div style="padding: 10px; border-bottom: 1px solid #dee2e6; display: flex; gap: 8px; background: #f8f9fa;">
+                                        <button type="button" onclick="selecionarTodos('setores')" style="flex: 1; padding: 8px; border: 1px solid #1a237e; color: #1a237e; background: white; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.3s;">
                                             Todos
                                         </button>
-                                        <button type="button" onclick="desselecionarTodos('setores')" style="flex: 1; padding: 6px; border: 1px solid #6c757d; color: #6c757d; background: white; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                        <button type="button" onclick="desselecionarTodos('setores')" style="flex: 1; padding: 8px; border: 1px solid #6c757d; color: #6c757d; background: white; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.3s;">
                                             Nenhum
                                         </button>
                                     </div>
                                     <div id="checkboxesSetores" style="padding: 8px;">
-                                        <div style="text-align: center; padding: 20px; color: #6c757d;">
-                                            <i class="fas fa-spinner fa-spin"></i> Carregando...
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="filter-group" style="margin: 0; display: flex; gap: 8px;">
-                            <button class="btn btn-primary" onclick="aplicarFiltros()" style="flex: 1; padding: 8px 16px; font-size: 13px;">
-                                <i class="fas fa-filter"></i>
-                                Aplicar
-                            </button>
-                            <button class="btn btn-secondary" onclick="salvarFiltroAtual()" style="padding: 8px 12px; font-size: 13px;" title="Salvar Filtro">
-                                <i class="fas fa-bookmark"></i>
-                            </button>
-                            <div class="dropdown" style="position: relative;">
-                                <button class="btn btn-info" onclick="toggleFiltrosSalvos()" style="padding: 8px 12px; font-size: 13px;" title="Filtros Salvos">
-                                    <i class="fas fa-list"></i>
-                                </button>
-                                <div id="dropdownFiltrosSalvos" class="dropdown-content" style="display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #dee2e6; border-radius: 4px; margin-top: 4px; min-width: 250px; max-height: 400px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                                    <div style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: 600; font-size: 13px; color: #495057;">
-                                        <i class="fas fa-bookmark"></i> Filtros Salvos
-                                    </div>
-                                    <div id="listaFiltrosSalvos" style="padding: 8px;">
                                         <div style="text-align: center; padding: 20px; color: #6c757d;">
                                             <i class="fas fa-spinner fa-spin"></i> Carregando...
                                         </div>
@@ -666,6 +685,12 @@
         async function carregarAlertasMenu() {
             try {
                 const clientId = typeof getCurrentClientId === 'function' ? getCurrentClientId() : 1;
+                
+                // Se não tem cliente, não carrega alertas
+                if (!clientId || clientId <= 0) {
+                    return;
+                }
+                
                 const mesInicio = document.getElementById('mesInicio')?.value || '';
                 const mesFim = document.getElementById('mesFim')?.value || '';
                 
@@ -673,8 +698,21 @@
                 if (mesInicio) url += `&mes_inicio=${encodeURIComponent(mesInicio)}`;
                 if (mesFim) url += `&mes_fim=${encodeURIComponent(mesFim)}`;
                 
-                const response = await fetch(url);
-                if (!response.ok) return;
+                // Obtém token de autenticação
+                const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
+                const headers = {};
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
+                const response = await fetch(url, { headers });
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.warn('Token expirado ou inválido para alertas - ignorando');
+                        return;
+                    }
+                    return;
+                }
                 
                 const data = await response.json();
                 const total = data.total || 0;
