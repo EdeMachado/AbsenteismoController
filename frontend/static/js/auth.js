@@ -19,7 +19,7 @@ const DEFAULT_THEME = {
 };
 
 const SIDEBAR_MENU_ITEMS = [
-    { path: '/', icon: 'fas fa-gauge-high', label: 'Dashboard' },
+    { path: '/dashboard', icon: 'fas fa-gauge-high', label: 'Dashboard' },
     { path: '/dados_powerbi', icon: 'fas fa-table', label: 'Meus Dados' },
     { path: '/produtividade', icon: 'fas fa-chart-line', label: 'Produtividade' },
     { path: '/upload', icon: 'fas fa-cloud-arrow-up', label: 'Upload Mensal' },
@@ -31,7 +31,8 @@ const SIDEBAR_MENU_ITEMS = [
 ];
 
 function normalizePath(path) {
-    if (!path) return '/';
+    if (!path) return '/dashboard';
+    if (path === '/') return '/dashboard';
     if (path.length > 1 && path.endsWith('/')) {
         return path.slice(0, -1);
     }
@@ -184,7 +185,9 @@ async function logout() {
     } finally {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        localStorage.removeItem('cliente_selecionado');
+        localStorage.removeItem('cliente_nome');
+        window.location.href = '/landing';
     }
 }
 
@@ -199,7 +202,7 @@ function getAuthHeaders() {
 // Verifica autenticação e redireciona se necessário
 function checkAuth() {
     if (!isAuthenticated()) {
-        window.location.href = '/login';
+        window.location.href = '/landing';
         return false;
     }
     return true;
@@ -256,7 +259,7 @@ function renderHeaderUser() {
     const user = getCurrentUser();
     if (!user) {
         container.innerHTML = `
-            <a href="/login" class="btn btn-secondary btn-sm header-login-btn">
+            <a href="/landing" class="btn btn-secondary btn-sm header-login-btn">
                 <i class="fas fa-sign-in-alt"></i> Entrar
             </a>
         `;
@@ -286,12 +289,13 @@ function getUserInitials(user) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Verifica autenticação ao carregar página (exceto login e landing)
+// Verifica autenticação ao carregar página (exceto login, landing e raiz)
 if (!window.location.pathname.includes('/login') && 
     !window.location.pathname.includes('/landing') &&
+    window.location.pathname !== '/' &&
     !window.location.pathname.includes('/api/')) {
     if (!checkAuth()) {
-        // Redireciona para login
+        // checkAuth já faz o redirecionamento para /landing quando não autenticado
     } else {
         const boot = () => {
             // Tema escuro desabilitado - sempre remove

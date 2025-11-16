@@ -1,0 +1,36 @@
+[1mdiff --git a/ANALISES_RODA_OURO.md b/ANALISES_RODA_OURO.md[m
+[1mindex e1b8ed1..5b20bc2 100644[m
+[1m--- a/ANALISES_RODA_OURO.md[m
+[1m+++ b/ANALISES_RODA_OURO.md[m
+[36m@@ -297,3 +297,4 @@[m [msemanas_perdidas = horas_perdidas / 44[m
+ [m
+ **Documento gerado automaticamente após implementação das análises**[m
+ [m
+[41m+[m
+[1mdiff --git a/AUTOMATIZACAO_COMPLETA_SISTEMA.md b/AUTOMATIZACAO_COMPLETA_SISTEMA.md[m
+[1mindex deaeb1a..602642a 100644[m
+[1m--- a/AUTOMATIZACAO_COMPLETA_SISTEMA.md[m
+[1m+++ b/AUTOMATIZACAO_COMPLETA_SISTEMA.md[m
+[36m@@ -191,3 +191,4 @@[m [mQuando você faz upload de uma planilha Excel:[m
+ [m
+ **Você só faz upload e o sistema faz o resto!** 🚀[m
+ [m
+[41m+[m
+[1mdiff --git a/RELATORIO_ISOLAMENTO_CLIENTES.md b/RELATORIO_ISOLAMENTO_CLIENTES.md[m
+[1mindex 87b5e05..a812dad 100644[m
+[1m--- a/RELATORIO_ISOLAMENTO_CLIENTES.md[m
+[1m+++ b/RELATORIO_ISOLAMENTO_CLIENTES.md[m
+[36m@@ -219,3 +219,4 @@[m [mdef validar_client_id(db: Session, client_id: int) -> Client:[m
+ [m
+ **Relatório gerado automaticamente pela verificação do sistema**[m
+ [m
+[41m+[m
+[1mdiff --git a/remover_grupobiomed.py b/remover_grupobiomed.py[m
+[1mindex d830d7a..fe6cf66 100644[m
+[1m--- a/remover_grupobiomed.py[m
+[1m+++ b/remover_grupobiomed.py[m
+[36m@@ -97,3 +97,4 @@[m [mexcept Exception as e:[m
+ finally:[m
+     conn.close()[m
+ [m
+[41m+[m

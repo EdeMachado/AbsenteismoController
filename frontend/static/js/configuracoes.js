@@ -11,7 +11,7 @@ async function carregarConfiguracoes() {
         const response = await fetch('/api/config');
         if (!response.ok) {
             if (response.status === 401) {
-                window.location.href = '/login';
+                window.location.href = '/landing';
                 return;
             }
             throw new Error('Erro ao carregar configurações');

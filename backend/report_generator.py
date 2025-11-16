@@ -4,7 +4,7 @@ Gerador de relatórios em PDF e Excel
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
@@ -820,7 +820,16 @@ class ReportGenerator:
                 text = str(text)
                 # Remove caracteres de controle (exceto \n, \r, \t)
                 import re
+                # Remove caracteres de controle
                 text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
+                # Remove emojis e caracteres especiais que podem causar problemas
+                # Mantém apenas caracteres ASCII e caracteres Unicode válidos para PDF
+                try:
+                    # Tenta codificar em UTF-8 e decodificar de volta para garantir validade
+                    text = text.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+                except:
+                    # Se falhar, remove caracteres não-ASCII problemáticos
+                    text = text.encode('ascii', errors='ignore').decode('ascii', errors='ignore')
                 return text
             
             # Cabeçalho
@@ -1043,9 +1052,21 @@ class ReportGenerator:
                                                 height_pdf = 10*cm
                                                 width_pdf = height_pdf * aspect_ratio
                                             
-                                            img = Image(grafico_path, width=width_pdf, height=height_pdf)
-                                            conteudo_grafico.append(img)
-                                            conteudo_grafico.append(Spacer(1, 15))
+                                            # Cria objeto Image com validação adicional
+                                            try:
+                                                img = Image(grafico_path, width=width_pdf, height=height_pdf)
+                                                # Valida se a imagem foi criada corretamente
+                                                if img and img.imageWidth > 0 and img.imageHeight > 0:
+                                                    conteudo_grafico.append(img)
+                                                    conteudo_grafico.append(Spacer(1, 15))
+                                                else:
+                                                    print(f"⚠️ Imagem inválida (dimensões zero): {grafico_path}")
+                                                    conteudo_grafico.append(Paragraph(f"<i>Gráfico não disponível</i>", self.normal_style))
+                                                    conteudo_grafico.append(Spacer(1, 15))
+                                            except Exception as img_create_error:
+                                                print(f"⚠️ Erro ao criar objeto Image: {img_create_error}")
+                                                conteudo_grafico.append(Paragraph(f"<i>Gráfico não disponível</i>", self.normal_style))
+                                                conteudo_grafico.append(Spacer(1, 15))
                                         except Exception as pdf_img_error:
                                             print(f"⚠️ Erro ao adicionar imagem ao PDF: {pdf_img_error}")
                                             import traceback
@@ -1109,27 +1130,15 @@ class ReportGenerator:
                                         recomendacao_style
                                     ))
                             
-                            # Adiciona tudo junto usando KeepTogether para manter título e gráfico na mesma página
-                            # Mas evita KeepTogether se o conteúdo for muito grande (pode causar problemas)
-                            try:
-                                # Conta quantos elementos há no conteúdo
-                                num_elementos = len(conteudo_grafico)
-                                # Se tiver muitos elementos, não usa KeepTogether para evitar problemas
-                                if num_elementos <= 10:
-                                    story.append(KeepTogether(conteudo_grafico))
-                                else:
-                                    # Adiciona sem KeepTogether se for muito grande
-                                    for item in conteudo_grafico:
-                                        story.append(item)
-                            except Exception as e:
-                                # Se KeepTogether falhar, adiciona sem ele
-                                print(f"⚠️ Erro ao usar KeepTogether, adicionando conteúdo normalmente: {e}")
-                                for item in conteudo_grafico:
-                                    try:
-                                        story.append(item)
-                                    except Exception as item_error:
-                                        print(f"⚠️ Erro ao adicionar item ao PDF: {item_error}")
-                                        continue
+                            # Adiciona conteúdo sem KeepTogether (pode causar problemas no Acrobat)
+                            # Adiciona item por item para melhor controle de erros
+                            for item in conteudo_grafico:
+                                try:
+                                    story.append(item)
+                                except Exception as item_error:
+                                    print(f"⚠️ Erro ao adicionar item ao PDF: {item_error}")
+                                    # Continua mesmo se um item falhar
+                                    continue
                             story.append(Spacer(1, 20))
                     except Exception as e:
                         print(f"Erro ao processar gráfico {chave_dados}: {e}")
@@ -1262,25 +1271,36 @@ class ReportGenerator:
                 temp_output = output_path + '.tmp'
                 
                 try:
-                    # Cria SimpleDocTemplate (sem encoding, reportlab usa UTF-8 por padrão)
+                    # Cria SimpleDocTemplate com encoding explícito
                     doc_temp = SimpleDocTemplate(
                         temp_output,
                         pagesize=A4,
                         rightMargin=2*cm,
                         leftMargin=2*cm,
                         topMargin=2*cm,
-                        bottomMargin=2*cm
+                        bottomMargin=2*cm,
+                        title="Relatório de Absenteísmo",
+                        author="AbsenteismoController"
                     )
                     
-                    # Gera PDF no arquivo temporário (sem callbacks de página)
+                    # Gera PDF no arquivo temporário (sem callbacks de página que podem causar problemas)
+                    # Não usa onFirstPage/onLaterPages pois pode causar problemas no Acrobat
                     doc_temp.build(story)
                     
-                    # Fecha explicitamente
+                    # Fecha explicitamente e força flush
+                    # Importante: não deletar doc_temp imediatamente, deixa o Python fazer cleanup
                     del doc_temp
+                    import gc
+                    gc.collect()
                     
-                    # Aguarda um pouco para garantir que o arquivo foi escrito
+                    # Aguarda um pouco para garantir que o arquivo foi escrito completamente
                     import time
-                    time.sleep(0.3)
+                    time.sleep(0.5)  # Aumentado para garantir escrita completa
+                    
+                    # Força flush do sistema de arquivos
+                    import sys
+                    sys.stdout.flush()
+                    sys.stderr.flush()
                     
                     # Valida arquivo temporário
                     if not os.path.exists(temp_output):

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, nullslast
+from sqlalchemy import desc, nullslast, text
 from typing import Optional, List
 import os
 import shutil
@@ -25,6 +25,9 @@ from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping,
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
+from .logger import app_logger, error_logger, security_logger, audit_logger, log_audit, log_security, log_error, log_operation
+from .upload_handler import save_upload_with_timeout, validate_file_upload
+from .validators import validate_business_rules
 # PDF removido
 # ReportGenerator ainda usado para Excel e PPTX
 try:
@@ -99,6 +102,13 @@ rate_limit_store = defaultdict(list)
 RATE_LIMIT_WINDOW = 60  # 1 minuto
 RATE_LIMIT_MAX_REQUESTS = 100  # Máximo de requisições por minuto
 
+# Middleware de Logging de Requisições (primeiro)
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    """Middleware de logging de requisições"""
+    from .middleware_logging import request_logging_middleware
+    return await request_logging_middleware(request, call_next)
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Proteção contra abuso de requisições"""
@@ -113,6 +123,17 @@ async def rate_limit_middleware(request: Request, call_next):
     
     # Verifica limite
     if len(rate_limit_store[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        # Log de segurança - rate limit excedido
+        log_security(
+            'rate_limit_exceeded',
+            level='warning',
+            ip_address=client_ip,
+            details={
+                'requests_count': len(rate_limit_store[client_ip]),
+                'endpoint': str(request.url.path),
+                'method': request.method
+            }
+        )
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             content={"detail": "Muitas requisições. Tente novamente mais tarde."},
@@ -271,9 +292,24 @@ def validar_client_id(db: Session, client_id: int) -> Client:
 # Initialize database
 @app.on_event("startup")
 async def startup_event():
+    """Inicialização do sistema com logging"""
+    app_logger.info("=" * 60)
+    app_logger.info("INICIANDO SISTEMA - AbsenteismoController v2.0")
+    app_logger.info("=" * 60)
+    
+    # Inicializa banco de dados
+    app_logger.info("Inicializando banco de dados...")
     init_db()
     run_migrations()
+    app_logger.info("Banco de dados inicializado com sucesso")
+    
+    # Cria pastas necessárias
     os.makedirs(LOGOS_DIR, exist_ok=True)
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    os.makedirs(EXPORTS_DIR, exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
+    app_logger.info("Pastas do sistema criadas/verificadas")
+    
     db = next(get_db())
     
     # Remove cliente fictício GrupoBiomed se existir (não cria mais automaticamente)
@@ -297,7 +333,7 @@ async def startup_event():
         db.query(SavedFilter).filter(SavedFilter.client_id == client_grupobiomed.id).delete()
         db.delete(client_grupobiomed)
         db.commit()
-        print("✅ Cliente fictício GrupoBiomed removido permanentemente")
+        app_logger.info("Cliente fictício GrupoBiomed removido permanentemente")
     
     # Cria usuário admin padrão se não existir
     admin = db.query(User).filter(User.username == "admin").first()
@@ -312,6 +348,14 @@ async def startup_event():
         )
         db.add(admin)
         db.commit()
+        app_logger.info("Usuário admin padrão criado")
+        security_logger.warning("ATENÇÃO: Usuário admin padrão criado. Altere a senha!", extra={
+            'username': 'admin',
+            'default_password': True
+        })
+    else:
+        app_logger.info("Usuário admin já existe")
+    
     # Configurações padrão
     if not db.query(Config).filter(Config.chave == "nome_sistema").first():
         set_config_value(db, "nome_sistema", "AbsenteismoController", "Nome do sistema", "string")
@@ -319,7 +363,20 @@ async def startup_event():
         set_config_value(db, "email_contato", "contato@grupobiomed.com", "Email de contato", "string")
         set_config_value(db, "tema_escuro", "false", "Tema escuro ativado", "boolean")
         set_config_value(db, "itens_por_pagina", "50", "Itens por página", "number")
+        app_logger.info("Configurações padrão criadas")
+    
     db.close()
+    
+    # Inicia sistema de backup automático
+    try:
+        from .backup_automatico import iniciar_backup_automatico
+        iniciar_backup_automatico()
+    except Exception as e:
+        app_logger.warning(f"Erro ao iniciar backup automático: {e}")
+    
+    app_logger.info("=" * 60)
+    app_logger.info("SISTEMA INICIADO COM SUCESSO")
+    app_logger.info("=" * 60)
 
 # ==================== ROUTES - FRONTEND ====================
 
@@ -346,6 +403,13 @@ async def configuracoes_page():
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
+    """Página principal - Landing page"""
+    file_path = os.path.join(FRONTEND_DIR, "landing.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page():
     """Página principal - Dashboard"""
     file_path = os.path.join(FRONTEND_DIR, "index.html")
     with open(file_path, "r", encoding="utf-8") as f:
@@ -448,37 +512,201 @@ async def auto_processor_page():
 # ==================== ROUTES - API ====================
 
 @app.get("/api/health")
-async def health_check():
-    """Health check"""
-    return {"status": "ok", "version": "2.0.0"}
+async def health_check(db: Session = Depends(get_db)):
+    """
+    Health check completo - verifica saúde do sistema
+    Essencial para monitoramento e auditoria ISO 27001
+    """
+    import psutil
+    import shutil
+    
+    health_status = {
+        "status": "healthy",
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "checks": {}
+    }
+    
+    # Verifica banco de dados
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "ok"
+        health_status["checks"]["database"] = {
+            "status": "ok",
+            "message": "Conexão com banco de dados funcionando"
+        }
+    except Exception as e:
+        db_status = "error"
+        health_status["checks"]["database"] = {
+            "status": "error",
+            "message": f"Erro na conexão com banco: {str(e)}"
+        }
+        health_status["status"] = "unhealthy"
+        log_error(e, {"check": "database"})
+    
+    # Verifica integridade do banco (SQLite)
+    try:
+        result = db.execute(text("PRAGMA integrity_check"))
+        integrity_result = result.scalar()
+        if integrity_result == "ok":
+            health_status["checks"]["database_integrity"] = {
+                "status": "ok",
+                "message": "Integridade do banco verificada"
+            }
+        else:
+            health_status["checks"]["database_integrity"] = {
+                "status": "warning",
+                "message": f"Problemas detectados: {integrity_result}"
+            }
+            health_status["status"] = "degraded"
+            app_logger.warning(f"Integridade do banco: {integrity_result}")
+    except Exception as e:
+        health_status["checks"]["database_integrity"] = {
+            "status": "error",
+            "message": f"Erro ao verificar integridade: {str(e)}"
+        }
+        log_error(e, {"check": "database_integrity"})
+    
+    # Verifica espaço em disco
+    try:
+        disk_usage = shutil.disk_usage(BASE_DIR)
+        total_gb = disk_usage.total / (1024**3)
+        free_gb = disk_usage.free / (1024**3)
+        used_percent = (disk_usage.used / disk_usage.total) * 100
+        
+        disk_status = "ok" if used_percent < 90 else "warning" if used_percent < 95 else "error"
+        if disk_status != "ok":
+            health_status["status"] = "degraded" if disk_status == "warning" else "unhealthy"
+        
+        health_status["checks"]["disk"] = {
+            "status": disk_status,
+            "total_gb": round(total_gb, 2),
+            "free_gb": round(free_gb, 2),
+            "used_percent": round(used_percent, 2),
+            "message": f"{round(used_percent, 1)}% usado"
+        }
+    except Exception as e:
+        health_status["checks"]["disk"] = {
+            "status": "error",
+            "message": f"Erro ao verificar disco: {str(e)}"
+        }
+        log_error(e, {"check": "disk"})
+    
+    # Verifica memória
+    try:
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        memory_status = "ok" if memory_percent < 85 else "warning" if memory_percent < 95 else "error"
+        if memory_status != "ok":
+            health_status["status"] = "degraded" if memory_status == "warning" else "unhealthy"
+        
+        health_status["checks"]["memory"] = {
+            "status": memory_status,
+            "total_gb": round(memory.total / (1024**3), 2),
+            "available_gb": round(memory.available / (1024**3), 2),
+            "used_percent": round(memory_percent, 2),
+            "message": f"{round(memory_percent, 1)}% usado"
+        }
+    except Exception as e:
+        health_status["checks"]["memory"] = {
+            "status": "error",
+            "message": f"Erro ao verificar memória: {str(e)}"
+        }
+        log_error(e, {"check": "memory"})
+    
+    # Verifica pastas críticas
+    try:
+        critical_paths = {
+            "database": os.path.join(BASE_DIR, "database"),
+            "uploads": UPLOADS_DIR,
+            "exports": EXPORTS_DIR,
+            "logs": os.path.join(BASE_DIR, "logs")
+        }
+        
+        paths_status = {}
+        for name, path in critical_paths.items():
+            if os.path.exists(path):
+                paths_status[name] = {"status": "ok", "path": path}
+            else:
+                paths_status[name] = {"status": "error", "path": path, "message": "Pasta não existe"}
+                health_status["status"] = "unhealthy"
+        
+        health_status["checks"]["paths"] = paths_status
+    except Exception as e:
+        health_status["checks"]["paths"] = {
+            "status": "error",
+            "message": f"Erro ao verificar pastas: {str(e)}"
+        }
+        log_error(e, {"check": "paths"})
+    
+    # Log do health check
+    if health_status["status"] != "healthy":
+        app_logger.warning(f"Health check: {health_status['status']}", extra=health_status["checks"])
+    else:
+        app_logger.info("Health check: sistema saudável")
+    
+    return health_status
 
 # ==================== AUTHENTICATION API ====================
 
 @app.post("/api/auth/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db),
+    request: Request = None
+):
     """Login de usuário"""
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Usuário ou senha incorretos",
-            headers={"WWW-Authenticate": "Bearer"},
+    start_time = time.time()
+    client_ip = request.client.host if request and request.client else "unknown"
+    
+    try:
+        user = authenticate_user(db, form_data.username, form_data.password)
+        if not user:
+            # Log de tentativa de login falhada (segurança)
+            log_security(
+                'failed_login',
+                level='warning',
+                ip_address=client_ip,
+                details={'username': form_data.username}
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Usuário ou senha incorretos",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.username}, expires_delta=access_token_expires
         )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "nome_completo": user.nome_completo,
-            "is_admin": user.is_admin
+        
+        # Log de login bem-sucedido (auditoria)
+        duration_ms = (time.time() - start_time) * 1000
+        log_audit(
+            action='login',
+            user_id=user.id,
+            ip_address=client_ip,
+            details={'username': user.username, 'duration_ms': duration_ms}
+        )
+        
+        app_logger.info(f"Login bem-sucedido: {user.username} (IP: {client_ip})")
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "nome_completo": user.nome_completo,
+                "is_admin": user.is_admin
+            }
         }
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(e, {'operation': 'login', 'username': form_data.username, 'ip': client_ip})
+        raise HTTPException(status_code=500, detail="Erro interno ao processar login")
 
 @app.get("/api/auth/me")
 async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
@@ -500,7 +728,10 @@ async def logout(current_user: User = Depends(get_current_active_user)):
 # ==================== CONFIGURATIONS API ====================
 
 @app.get("/api/config")
-async def get_config(db: Session = Depends(get_db)):
+async def get_config(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Retorna todas as configurações"""
     configs = db.query(Config).all()
     result = {}
@@ -513,7 +744,11 @@ async def get_config(db: Session = Depends(get_db)):
     return result
 
 @app.get("/api/config/{chave}")
-async def get_config_value_api(chave: str, db: Session = Depends(get_db)):
+async def get_config_value_api(
+    chave: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Retorna valor de uma configuração específica"""
     valor = get_config_value(db, chave)
     return {"chave": chave, "valor": valor}
@@ -586,12 +821,35 @@ async def upload_file(
     file: UploadFile = File(...),
     client_id: int = Form(...),  # Obrigatório, sem valor padrão
     mes_referencia: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user)
 ):
     """Upload de planilha"""
+    start_time = time.time()
+    client_ip = request.client.host if request and request.client else "unknown"
+    
     try:
+        # Log de início da operação
+        app_logger.info(f"Iniciando upload de planilha para cliente {client_id}", extra={
+            'user_id': current_user.id,
+            'client_id': client_id,
+            'filename': file.filename,
+            'ip_address': client_ip
+        })
+        
         # Valida se o cliente existe
         client = validar_client_id(db, client_id)
+        
+        # Auditoria - upload iniciado
+        log_audit(
+            action='upload_file_start',
+            user_id=current_user.id,
+            client_id=client_id,
+            resource='upload',
+            ip_address=client_ip,
+            details={'filename': file.filename, 'mes_referencia': mes_referencia}
+        )
         
         # Valida se o arquivo foi enviado
         if not file.filename:
@@ -779,6 +1037,39 @@ async def upload_file(
         
         db.commit()
         
+        # Log de sucesso
+        duration_ms = (time.time() - start_time) * 1000
+        log_operation(
+            operation='upload_file',
+            status='success',
+            duration_ms=duration_ms,
+            user_id=current_user.id,
+            client_id=client_id,
+            details={
+                'upload_id': upload.id,
+                'total_registros': len(registros),
+                'mes_referencia': mes_ref,
+                'filename': file.filename
+            }
+        )
+        
+        # Auditoria - upload concluído
+        log_audit(
+            action='upload_file_complete',
+            user_id=current_user.id,
+            client_id=client_id,
+            resource='upload',
+            ip_address=client_ip,
+            details={
+                'upload_id': upload.id,
+                'total_registros': len(registros),
+                'mes_referencia': mes_ref,
+                'duration_ms': duration_ms
+            }
+        )
+        
+        app_logger.info(f"Upload concluído: {len(registros)} registros processados para cliente {client_id} em {duration_ms:.2f}ms")
+        
         return {
             "success": True,
             "upload_id": upload.id,
@@ -786,20 +1077,47 @@ async def upload_file(
             "mes_referencia": mes_ref
         }
     
-    except HTTPException:
+    except HTTPException as e:
         db.rollback()
+        duration_ms = (time.time() - start_time) * 1000
+        log_operation(
+            operation='upload_file',
+            status='failed',
+            duration_ms=duration_ms,
+            user_id=current_user.id if 'current_user' in locals() else None,
+            client_id=client_id,
+            details={'error': str(e.detail), 'status_code': e.status_code}
+        )
         raise
     except Exception as e:
         db.rollback()
-        import traceback
-        error_detail = str(e)
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Erro ao processar upload: {error_detail}")
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Log de erro detalhado
+        log_error(
+            e,
+            context={
+                'operation': 'upload_file',
+                'client_id': client_id,
+                'filename': file.filename if file else None,
+                'duration_ms': duration_ms
+            },
+            user_id=current_user.id if 'current_user' in locals() else None,
+            client_id=client_id
+        )
+        
+        # Não expor detalhes internos ao usuário
+        app_logger.error(f"Erro ao processar upload: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro ao processar planilha. Verifique o formato do arquivo e tente novamente."
+        )
 
 @app.get("/api/uploads")
 async def list_uploads(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Lista uploads"""
     # Valida client_id
@@ -825,12 +1143,20 @@ async def dashboard(
     mes_fim: Optional[str] = None,
     funcionario: Optional[List[str]] = Query(None),
     setor: Optional[List[str]] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user)
 ):
     """Dashboard principal"""
+    start_time = time.time()
+    client_ip = request.client.host if request and request.client else "unknown"
+    
     try:
-        # Valida client_id
-        validar_client_id(db, client_id)
+        # Valida client_id (crítico para LGPD)
+        client = validar_client_id(db, client_id)
+        
+        # Log de acesso ao dashboard (auditoria LGPD)
+        app_logger.info(f"Acesso ao dashboard - Cliente: {client_id}, Usuário: {current_user.id}")
         
         analytics = Analytics(db)
         insights_engine = InsightsEngine(db)
@@ -903,39 +1229,37 @@ async def dashboard(
         try:
             media_cid = analytics.media_dias_por_cid(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
         except Exception as e:
-            print(f"Erro ao calcular média por CID: {e}")
+            app_logger.warning(f"Erro ao calcular média por CID para cliente {client_id}: {e}", extra={'client_id': client_id})
             media_cid = []
         
         try:
             evolucao_setor = analytics.evolucao_por_setor(client_id, 12, mes_inicio, mes_fim, funcionario, setor)
         except Exception as e:
-            print(f"Erro ao calcular evolução por setor: {e}")
+            app_logger.warning(f"Erro ao calcular evolução por setor para cliente {client_id}: {e}", extra={'client_id': client_id})
             evolucao_setor = {}
         
         try:
             comparativo_dias_horas = analytics.comparativo_dias_horas(client_id, mes_inicio, mes_fim, funcionario, setor)
         except Exception as e:
-            print(f"Erro ao calcular comparativo dias/horas: {e}")
+            app_logger.warning(f"Erro ao calcular comparativo dias/horas para cliente {client_id}: {e}", extra={'client_id': client_id})
             comparativo_dias_horas = []
         
         try:
             frequencia_atestados = analytics.frequencia_atestados_por_funcionario(client_id, mes_inicio, mes_fim, funcionario, setor)
         except Exception as e:
-            print(f"Erro ao calcular frequência de atestados: {e}")
+            app_logger.warning(f"Erro ao calcular frequência de atestados para cliente {client_id}: {e}", extra={'client_id': client_id})
             frequencia_atestados = []
         
         try:
             dias_setor_genero = analytics.dias_perdidos_setor_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
         except Exception as e:
-            print(f"Erro ao calcular dias por setor e gênero: {e}")
+            app_logger.warning(f"Erro ao calcular dias por setor e gênero para cliente {client_id}: {e}", extra={'client_id': client_id})
             dias_setor_genero = []
         
         try:
             insights = insights_engine.gerar_insights(client_id)
         except Exception as e:
-            print(f"Erro ao gerar insights: {e}")
-            import traceback
-            traceback.print_exc()
+            app_logger.error(f"Erro ao gerar insights para cliente {client_id}: {e}", exc_info=True, extra={'client_id': client_id})
             insights = []
         
         # Busca alertas
@@ -943,7 +1267,7 @@ async def dashboard(
             alertas_system = AlertasSystem(db)
             alertas = alertas_system.detectar_alertas(client_id, mes_inicio, mes_fim)
         except Exception as e:
-            print(f"Erro ao detectar alertas: {e}")
+            app_logger.warning(f"Erro ao detectar alertas para cliente {client_id}: {e}", extra={'client_id': client_id})
             alertas = []
         
         # Busca dados de produtividade (todos os meses)
@@ -972,7 +1296,7 @@ async def dashboard(
                     for p in produtividade_data
                 ]
         except Exception as e:
-            print(f"Erro ao buscar produtividade: {e}")
+            app_logger.warning(f"Erro ao buscar produtividade para cliente {client_id}: {e}", extra={'client_id': client_id})
             produtividade = []
         
         # Busca campos disponíveis do cliente (mapeamento)
@@ -989,7 +1313,7 @@ async def dashboard(
                 except:
                     pass
         except Exception as e:
-            print(f"Erro ao buscar campos disponíveis: {e}")
+            app_logger.warning(f"Erro ao buscar campos disponíveis para cliente {client_id}: {e}", extra={'client_id': client_id})
         
         # Verifica quais campos realmente têm dados no banco
         campos_com_dados = {}
@@ -1166,7 +1490,8 @@ async def dashboard(
 @app.get("/api/filtros")
 async def obter_filtros(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Retorna lista de funcionários e setores para preencher os filtros"""
     try:
@@ -1201,7 +1526,11 @@ async def obter_filtros(
 
 # Endpoint removido para manter compatibilidade (retorna vazio)
 @app.get("/api/clientes/{client_id}/graficos")
-async def obter_graficos_configurados(client_id: int, db: Session = Depends(get_db)):
+async def obter_graficos_configurados(
+    client_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Endpoint removido - retorna vazio para compatibilidade"""
     return {
         "success": True,
@@ -1210,7 +1539,12 @@ async def obter_graficos_configurados(client_id: int, db: Session = Depends(get_
     }
 
 @app.put("/api/clientes/{client_id}/graficos")
-async def salvar_graficos_configurados(client_id: int, request: Request, db: Session = Depends(get_db)):
+async def salvar_graficos_configurados(
+    client_id: int, 
+    request: Request, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Endpoint removido - não faz nada"""
     return {
         "success": True,
@@ -1220,7 +1554,12 @@ async def salvar_graficos_configurados(client_id: int, request: Request, db: Ses
     }
 
 @app.post("/api/clientes/{client_id}/graficos/gerar-dados")
-async def gerar_dados_grafico_personalizado(client_id: int, request: Request, db: Session = Depends(get_db)):
+async def gerar_dados_grafico_personalizado(
+    client_id: int, 
+    request: Request, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Endpoint removido - retorna vazio para compatibilidade"""
     return {
         "success": True,
@@ -1233,7 +1572,11 @@ async def gerar_dados_grafico_personalizado(client_id: int, request: Request, db
     
 
 @app.get("/api/clientes/{client_id}/campos-disponiveis")
-async def obter_campos_disponiveis(client_id: int, db: Session = Depends(get_db)):
+async def obter_campos_disponiveis(
+    client_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Retorna os campos disponíveis para um cliente (mapeados e com dados)"""
     try:
         client = db.query(Client).filter(Client.id == client_id).first()
@@ -1350,7 +1693,10 @@ class ClienteCreate(BaseModel):
     atividade_principal: Optional[str] = None
 
 @app.get("/api/clientes")
-async def listar_clientes(db: Session = Depends(get_db)):
+async def listar_clientes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Lista todos os clientes"""
     try:
         clientes = db.query(Client).order_by(Client.nome).all()
@@ -1379,7 +1725,11 @@ async def listar_clientes(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Erro ao listar clientes: {str(e)}")
 
 @app.get("/api/clientes/{cliente_id}")
-async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
+async def obter_cliente(
+    cliente_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Obtém um cliente específico"""
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
@@ -1429,7 +1779,8 @@ async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
 async def clonar_dados_cliente(
     cliente_id: int,
     origem_id: int = 1,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Replica dados (uploads + atestados) de um cliente origem para o cliente destino."""
     try:
@@ -1531,7 +1882,11 @@ async def clonar_dados_cliente(
         raise HTTPException(status_code=500, detail=f"Erro ao clonar dados: {str(e)}")
 
 @app.post("/api/clientes")
-async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
+async def criar_cliente(
+    cliente: ClienteCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
     """Cria um novo cliente"""
     try:
         # Verifica se CNPJ já existe
@@ -1593,7 +1948,12 @@ async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Erro ao criar cliente: {str(e)}")
 
 @app.put("/api/clientes/{cliente_id}")
-async def atualizar_cliente(cliente_id: int, cliente: ClienteCreate, db: Session = Depends(get_db)):
+async def atualizar_cliente(
+    cliente_id: int, 
+    cliente: ClienteCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
     """Atualiza um cliente"""
     try:
         cliente_db = db.query(Client).filter(Client.id == cliente_id).first()
@@ -1667,7 +2027,7 @@ async def upload_logo_cliente(
     arquivo: UploadFile = File(...),
     descricao: Optional[str] = Form(None),
     is_principal: Optional[str] = Form("false"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Adiciona um novo logo para um cliente (suporte a múltiplos logos)."""
@@ -1771,7 +2131,8 @@ async def upload_logo_cliente(
 @app.get("/api/clientes/{cliente_id}/logos")
 async def listar_logos_cliente(
     cliente_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Lista todos os logos de um cliente."""
     try:
@@ -1801,7 +2162,7 @@ async def listar_logos_cliente(
 async def definir_logo_principal(
     cliente_id: int,
     logo_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Define um logo como principal."""
@@ -1851,7 +2212,7 @@ async def definir_logo_principal(
 async def deletar_logo_cliente(
     cliente_id: int,
     logo_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Deleta um logo de um cliente."""
@@ -1947,7 +2308,11 @@ async def deletar_cliente(
         raise HTTPException(status_code=500, detail=f"Erro ao deletar cliente: {str(e)}")
 
 @app.post("/api/clientes/{cliente_id}/arquivar")
-async def arquivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
+async def arquivar_cliente(
+    cliente_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
     """Move um cliente para o arquivo morto (mantém dados)"""
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
@@ -1984,7 +2349,8 @@ async def arquivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
 async def salvar_cores_cliente(
     cliente_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Salva as cores personalizadas de um cliente"""
     try:
@@ -2021,7 +2387,11 @@ async def salvar_cores_cliente(
         raise HTTPException(status_code=500, detail=f"Erro ao salvar cores: {str(e)}")
 
 @app.get("/api/clientes/{cliente_id}/cores")
-async def obter_cores_cliente(cliente_id: int, db: Session = Depends(get_db)):
+async def obter_cores_cliente(
+    cliente_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Obtém as cores personalizadas de um cliente"""
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
@@ -2047,7 +2417,11 @@ async def obter_cores_cliente(cliente_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Erro ao obter cores: {str(e)}")
 
 @app.post("/api/clientes/{cliente_id}/ativar")
-async def ativar_cliente(cliente_id: int, db: Session = Depends(get_db)):
+async def ativar_cliente(
+    cliente_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
     """Reativa um cliente anteriormente arquivado"""
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
@@ -2080,7 +2454,11 @@ async def ativar_cliente(cliente_id: int, db: Session = Depends(get_db)):
 # ==================== API - MAPEAMENTO DE COLUNAS ====================
 
 @app.get("/api/clientes/{client_id}/column-mapping")
-async def get_column_mapping(client_id: int, db: Session = Depends(get_db)):
+async def get_column_mapping(
+    client_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Obtém o mapeamento de colunas de um cliente"""
     try:
         client = db.query(Client).filter(Client.id == client_id).first()
@@ -2135,7 +2513,8 @@ async def get_column_mapping(client_id: int, db: Session = Depends(get_db)):
 async def save_column_mapping(
     client_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Salva o mapeamento de colunas de um cliente"""
     try:
@@ -2228,7 +2607,8 @@ async def preview_column_mapping(
     client_id: int,
     file: UploadFile = File(...),
     column_mapping: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Preview do mapeamento de colunas usando uma planilha de exemplo"""
     try:
@@ -2360,7 +2740,8 @@ async def dados_apresentacao(
     mes_fim: Optional[str] = None,
     funcionario: Optional[List[str]] = Query(None),
     setor: Optional[List[str]] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Retorna todos os dados necessários para a apresentação com análises IA"""
     try:
@@ -2998,6 +3379,7 @@ async def preview_data(
     upload_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
     page: int = 1,
+    current_user: User = Depends(get_current_active_user),
     per_page: int = 50,
     db: Session = Depends(get_db)
 ):
@@ -3048,7 +3430,8 @@ async def analise_funcionarios(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Análise por funcionários"""
     # Valida client_id
@@ -3062,7 +3445,8 @@ async def analise_setores(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Análise por setores"""
     # Valida client_id
@@ -3076,7 +3460,8 @@ async def analise_cids(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Análise por CIDs"""
     # Valida client_id
@@ -3088,7 +3473,8 @@ async def analise_cids(
 @app.get("/api/tendencias")
 async def tendencias(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Análise de tendências"""
     # Valida client_id
@@ -3121,7 +3507,8 @@ async def tendencias(
 async def delete_upload(
     upload_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Deleta um upload e seus dados"""
     # Valida client_id
@@ -3596,7 +3983,8 @@ async def comparativo_periodos(
     periodo1_fim: str = Query(...),
     periodo2_inicio: str = Query(...),
     periodo2_fim: str = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Compara dois períodos e retorna métricas e variações"""
     try:
@@ -3679,7 +4067,8 @@ async def perfil_funcionario_page():
 async def perfil_funcionario(
     nome: str = Query(...),
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório - sem valor padrão
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Retorna perfil completo de um funcionário"""
     try:
@@ -3783,7 +4172,8 @@ async def perfil_funcionario(
 async def listar_todos_dados(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     upload_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Lista todos os dados com filtros"""
     try:
@@ -3929,7 +4319,8 @@ async def listar_todos_dados(
 async def obter_dado(
     atestado_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Obtém um registro específico"""
     # Valida client_id
@@ -3968,7 +4359,8 @@ async def obter_dado(
 @app.post("/api/dados")
 async def criar_dado(
     atestado: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Cria um novo registro"""
     try:
@@ -3987,7 +4379,8 @@ async def atualizar_dado(
     atestado_id: int,
     dados: dict,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Atualiza um registro"""
     # Valida client_id
@@ -4019,7 +4412,8 @@ async def atualizar_dado(
 async def obter_produtividade(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_referencia: Optional[str] = Query(None),  # YYYY-MM
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Retorna dados de produtividade do cliente"""
     try:
@@ -4061,7 +4455,8 @@ async def obter_produtividade(
 @app.post("/api/produtividade")
 async def salvar_produtividade(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Salva ou atualiza dados de produtividade"""
     try:
@@ -4137,7 +4532,8 @@ async def atualizar_produtividade(
     produtividade_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
     request: Request = ...,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Atualiza um registro de produtividade"""
     try:
@@ -4208,7 +4604,8 @@ async def atualizar_produtividade(
 async def excluir_produtividade(
     produtividade_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Exclui um registro de produtividade"""
     try:
@@ -4237,7 +4634,8 @@ async def excluir_produtividade(
 async def obter_evolucao_produtividade(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     agrupar_por: str = Query("mes", description="Agrupar por 'mes' ou 'ano'"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Retorna dados agregados de produtividade para gráficos de evolução"""
     try:
@@ -4348,7 +4746,8 @@ async def obter_evolucao_produtividade(
 async def excluir_dado(
     atestado_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Exclui um registro"""
     # Valida client_id
@@ -4377,7 +4776,8 @@ async def atualizar_funcionario(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     genero: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Atualiza todos os registros de um funcionário (em massa)"""
     try:
@@ -4420,7 +4820,8 @@ async def atualizar_funcionarios_massa(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     genero: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
 ):
     """Atualiza múltiplos funcionários em massa"""
     try:

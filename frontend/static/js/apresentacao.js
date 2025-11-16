@@ -2974,7 +2974,7 @@ async function exportarPowerPoint() {
         const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
         if (!token) {
             alert('Você precisa estar logado para exportar relatórios.');
-            window.location.href = '/login';
+            window.location.href = '/landing';
             return;
         }
         
@@ -2989,7 +2989,7 @@ async function exportarPowerPoint() {
         if (!response.ok) {
             if (response.status === 401) {
                 alert('Sessão expirada. Por favor, faça login novamente.');
-                window.location.href = '/login';
+                window.location.href = '/landing';
                 return;
             }
             const errorText = await response.text();

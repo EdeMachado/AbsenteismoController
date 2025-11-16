@@ -10,11 +10,15 @@ import os
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database", "absenteismo.db")
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-# Create engine
+# Create engine com pool de conexões otimizado
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
-    echo=False
+    echo=False,
+    pool_size=10,  # Tamanho do pool de conexões
+    max_overflow=20,  # Máximo de conexões extras
+    pool_pre_ping=True,  # Verifica conexões antes de usar
+    pool_recycle=3600  # Recicla conexões após 1 hora
 )
 
 # Session factory

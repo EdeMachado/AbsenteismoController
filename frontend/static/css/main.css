@@ -1073,6 +1073,8 @@ body {
     flex: 1;
     min-height: 100vh;
     background: var(--background);
+    display: flex;
+    flex-direction: column;
 }
 
 [data-theme="dark"] .main-content {
@@ -1089,6 +1091,7 @@ body {
     padding: 0 32px;
     box-shadow: var(--shadow-sm);
     position: relative;
+    flex-shrink: 0;
 }
 
 .header-title {
@@ -1170,10 +1173,31 @@ body {
 
 .content {
     padding: 32px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 [data-theme="dark"] .content {
     background: var(--background) !important;
+}
+
+/* Footer */
+.main-content footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-top: auto;
+    flex-shrink: 0;
+}
+
+[data-theme="dark"] .main-content footer {
+    background: var(--surface) !important;
+    border-top-color: var(--border) !important;
+    color: var(--text-secondary) !important;
 }
 
 /* ==================== CARDS ==================== */

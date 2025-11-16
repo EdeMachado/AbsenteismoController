@@ -607,12 +607,7 @@ function exportToExcel() {
     alert('Exportação para Excel será implementada em breve!');
 }
 
-function exportToPDF() {
-    console.log('📄 Exportando para PDF...');
-    
-    // Implementar exportação para PDF
-    alert('Exportação para PDF será implementada em breve!');
-}
+// Função exportToPDF REMOVIDA (PDF desabilitado)
 
 // ==================== INICIALIZAÇÃO FINAL ====================
 

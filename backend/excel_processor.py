@@ -293,7 +293,6 @@ class ExcelProcessor:
         
         self.padronizar_colunas()
         
-        # Debug: mostra colunas após padronização
         print(f"📊 Colunas após padronização: {list(self.df.columns)}")
         
         # Após padronizar, cria mapeamento das colunas originais para normalizadas
@@ -409,7 +408,6 @@ class ExcelProcessor:
                         return default
                 return default
             
-            # Debug: verifica se NOMECOMPLETO existe
             if idx == 0:  # Apenas na primeira linha para não poluir logs
                 print(f"🔍 Verificando colunas disponíveis para primeira linha:")
                 print(f"   Colunas no DataFrame: {list(self.df.columns)}")

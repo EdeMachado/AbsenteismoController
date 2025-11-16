@@ -297,3 +297,5 @@ semanas_perdidas = horas_perdidas / 44
 
 **Documento gerado automaticamente após implementação das análises**
 
+
+

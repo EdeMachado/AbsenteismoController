@@ -16,25 +16,20 @@ class InsightsEngine:
     def _verificar_campo_disponivel(self, client_id: int, campo: str) -> bool:
         """Verifica se um campo tem dados disponíveis para o cliente"""
         try:
-            print(f"[INSIGHTS DEBUG] Verificando campo '{campo}' para client_id={client_id}")
             amostra = self.db.query(Atestado).join(Upload).filter(
                 Upload.client_id == client_id
             ).limit(100).all()
             
-            print(f"[INSIGHTS DEBUG] Amostra encontrada: {len(amostra)} registros para client_id={client_id}")
             
             if not amostra:
-                print(f"[INSIGHTS DEBUG] Nenhuma amostra encontrada para client_id={client_id}")
                 return False
             
             tem_campo = any(
                 getattr(reg, campo, None) not in (None, '', 0, 0.0) 
                 for reg in amostra
             )
-            print(f"[INSIGHTS DEBUG] Campo '{campo}' {'disponível' if tem_campo else 'não disponível'} para client_id={client_id}")
             return tem_campo
         except Exception as e:
-            print(f"[INSIGHTS DEBUG] Erro ao verificar campo '{campo}' para client_id={client_id}: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -84,7 +79,6 @@ class InsightsEngine:
             
             # RODA DE OURO: usa classificação por doença (mesma do gráfico)
             if client_id == 4:
-                print(f"[INSIGHTS DEBUG] Gerando insight de doença para RODA DE OURO (client_id={client_id})")
                 doencas_list = analytics.classificacao_doencas_roda_ouro(client_id, limit=1)
                 
                 if doencas_list and len(doencas_list) > 0:
@@ -92,7 +86,6 @@ class InsightsEngine:
                     nome_doenca = top_doenca_data.get('tipo_doenca', 'Não informado')
                     dias_doenca = top_doenca_data.get('quantidade', 0)
                     
-                    print(f"[INSIGHTS DEBUG] TOP Doença RO encontrada: {nome_doenca}, {int(dias_doenca)} dias")
                     
                     # Calcula total de dias para percentual
                     total_dias = self.db.query(
@@ -111,11 +104,8 @@ class InsightsEngine:
                         'descricao': f'{nome_doenca} apresenta {int(dias_doenca)} dias de afastamento ({pct_dias:.1f}% do total de dias perdidos)',
                         'recomendacao': 'Desenvolver programa de prevenção específico para esta condição, incluindo ações educativas e acompanhamento médico especializado'
                     })
-                else:
-                    print(f"[INSIGHTS DEBUG] Nenhuma doença encontrada para RODA DE OURO")
             else:
                 # OUTROS CLIENTES: usa top_cids (por CID)
-                print(f"[INSIGHTS DEBUG] Gerando insight de CID para client_id={client_id}")
                 top_cids_list = analytics.top_cids(client_id, limit=1)
                 
                 if top_cids_list and len(top_cids_list) > 0:
@@ -124,8 +114,6 @@ class InsightsEngine:
                     diagnostico = top_cid_data.get('descricao', '')
                     quantidade = top_cid_data.get('quantidade', 0)
                     dias_perdidos = top_cid_data.get('dias_perdidos', 0)
-                    
-                    print(f"[INSIGHTS DEBUG] TOP CID encontrado: CID={cid}, Qtd={quantidade}, Diagnóstico={diagnostico}")
                     
                     diagnostico_texto = diagnostico
                     if not diagnostico_texto or diagnostico_texto.strip() == '' or diagnostico_texto == 'Não informado':
@@ -140,8 +128,6 @@ class InsightsEngine:
                         'descricao': f'{diagnostico_texto} aparece em {quantidade} atestados ({self._percentual(quantidade, client_id)}% do total){dias_perdidos_texto}',
                         'recomendacao': self._get_recomendacao_cid(cid)
                     })
-                else:
-                    print(f"[INSIGHTS DEBUG] Nenhum CID encontrado para client_id={client_id}")
         except Exception as e:
             print(f"Erro ao gerar insight de doença/CID: {e}")
             import traceback
@@ -672,7 +658,6 @@ Esta concentração pode indicar questões específicas relacionadas a condiçõ
                     pct_item = (dias / total_dias_todas * 100) if total_dias_todas > 0 else 0
                     top3_info.append(f"{i}º: {nome} ({int(dias)} dias, {pct_item:.1f}%)")
                 
-                # LOG DETALHADO PARA DEBUG
                 print(f"[ANALISE DOENÇAS] ===== INÍCIO =====")
                 print(f"[ANALISE DOENÇAS] Total de doenças recebidas: {len(dados_lista)}")
                 print(f"[ANALISE DOENÇAS] Doença TOP 1: {nome_doenca} - {int(dias_doenca)} dias ({percentual:.1f}%)")

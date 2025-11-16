@@ -418,7 +418,6 @@ class Analytics:
         
         results = query.all()
         
-        print(f"🔍 DEBUG dias_perdidos_por_centro_custo - client_id={client_id}, resultados encontrados: {len(results)}")
         
         resultado = []
         for r in results:
@@ -815,7 +814,6 @@ class Analytics:
         
         results = query.all()
         
-        print(f"🔍 DEBUG classificacao_setores_roda_ouro - client_id={client_id}, resultados encontrados: {len(results)}")
         
         resultado = []
         for r in results:
@@ -854,7 +852,6 @@ class Analytics:
         query = aplicar_filtro_setor(query, setor)
         
         registros = query.all()
-        print(f"🔍 DEBUG classificacao_doencas_roda_ouro - client_id={client_id}, registros encontrados: {len(registros)}")
         
         # Agrupa por nome da doença usando coluna "Doença" dos dados originais
         doencas_dict = {}

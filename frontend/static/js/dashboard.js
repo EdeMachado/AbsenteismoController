@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function aplicarCorDashboardRodaOuro() {
     const clientId = getClientId();
     const currentPath = window.location.pathname;
-    const isDashboardPage = currentPath === '/' || currentPath === '/index.html';
+    const isDashboardPage = currentPath === '/dashboard' || currentPath === '/' || currentPath === '/index.html';
     
     if (clientId === 4 && isDashboardPage) {
         // Encontra o item Dashboard no menu

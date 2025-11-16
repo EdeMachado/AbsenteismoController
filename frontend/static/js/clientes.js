@@ -205,7 +205,10 @@ function refreshClientesUI(selectedId) {
 // ==================== CARREGAMENTO ====================
 async function carregarClientes() {
     try {
-        const response = await fetch('/api/clientes');
+        const token = getAccessToken ? getAccessToken() : localStorage.getItem('access_token');
+        const response = await fetch('/api/clientes', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         if (!response.ok) throw new Error('Erro ao carregar clientes');
         
         clientes = await response.json();

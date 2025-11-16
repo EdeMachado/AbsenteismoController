@@ -28,7 +28,7 @@
             </div>
             
             <nav class="sidebar-nav">
-                <a href="/" class="nav-item" id="navDashboard">
+                <a href="/dashboard" class="nav-item" id="navDashboard">
                     <i class="fas fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
@@ -75,7 +75,7 @@
         </aside>
         
         <!-- Main Content -->
-        <main class="main-content">
+        <main class="main-content" style="display: flex; flex-direction: column; min-height: 100vh;">
             <header class="header">
                 <h1 class="header-title">Dashboard</h1>
                 <div class="header-actions" style="display: flex; align-items: center; gap: 16px; position: relative;">
@@ -638,6 +638,13 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- Footer -->
+            <footer style="background: var(--surface); border-top: 1px solid var(--border); padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px; margin-top: auto;">
+                <p style="margin: 0;">
+                    &copy; 2025 GrupoBiomed - Criado por Éde Carlos Viana Machado
+                </p>
+            </footer>
         </main>
     </div>
     
@@ -647,19 +654,23 @@
         // Aguarda cores do cliente carregarem antes de inicializar dashboard
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
+                // Verifica se há cliente selecionado
+                const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+                
+                // Se não há cliente selecionado, redireciona para página de clientes
+                if (!clientId || clientId <= 0) {
+                    console.log('[DASHBOARD] Nenhum cliente selecionado. Redirecionando para /clientes...');
+                    window.location.href = '/clientes';
+                    return;
+                }
+                
+                // Se há cliente, carrega cores e dashboard
                 if (typeof carregarCoresCliente === 'function') {
-                    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
-                    if (clientId) {
-                        carregarCoresCliente(clientId).then(() => {
-                            if (typeof carregarDashboard === 'function') {
-                                carregarDashboard();
-                            }
-                        });
-                    } else {
+                    carregarCoresCliente(clientId).then(() => {
                         if (typeof carregarDashboard === 'function') {
                             carregarDashboard();
                         }
-                    }
+                    });
                 } else {
                     if (typeof carregarDashboard === 'function') {
                         carregarDashboard();
