@@ -42,3 +42,43 @@ desktop.ini
 *.tmp
 *.temp
 planilha_exemplo.xlsx
+
+# Segurança - Arquivos Sensíveis
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+config.ini
+settings.ini
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Package files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Documentation temporária
+*.md.bak
+docs/temp/

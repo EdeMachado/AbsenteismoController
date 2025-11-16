@@ -1,11 +1,12 @@
 """
 FastAPI Main Application - AbsenteismoController v2.0
 """
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Form
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Form, Request, status
 from typing import List
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, nullslast
 from typing import Optional, List
@@ -16,13 +17,20 @@ from datetime import datetime
 import uuid
 from collections import OrderedDict
 import pandas as pd
+import time
+from collections import defaultdict
 
 from .database import get_db, init_db, run_migrations
 from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade, ClientLogo, SavedFilter
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
-from .report_generator import ReportGenerator
+# PDF removido
+# ReportGenerator ainda usado para Excel e PPTX
+try:
+    from .report_generator import ReportGenerator
+except ImportError:
+    ReportGenerator = None
 from .alerts import AlertasSystem
 from .auth import (
     authenticate_user, create_access_token, get_current_active_user,
@@ -70,20 +78,128 @@ def corrigir_encoding_json(dados):
     else:
         return dados
 
-# CORS
+# ==================== SEGURANÇA E PERFORMANCE ====================
+
+# Compressão GZip para melhor performance
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# CORS - Configuração mais restritiva
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Em produção, especificar domínios permitidos
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["Content-Type", "Content-Length"],
+    max_age=3600,
 )
 
-# Middleware para garantir UTF-8
+# Rate Limiting - Proteção contra DDoS
+rate_limit_store = defaultdict(list)
+RATE_LIMIT_WINDOW = 60  # 1 minuto
+RATE_LIMIT_MAX_REQUESTS = 100  # Máximo de requisições por minuto
+
 @app.middleware("http")
-async def add_charset_header(request, call_next):
+async def rate_limit_middleware(request: Request, call_next):
+    """Proteção contra abuso de requisições"""
+    client_ip = request.client.host if request.client else "unknown"
+    current_time = time.time()
+    
+    # Limpa requisições antigas
+    rate_limit_store[client_ip] = [
+        req_time for req_time in rate_limit_store[client_ip]
+        if current_time - req_time < RATE_LIMIT_WINDOW
+    ]
+    
+    # Verifica limite
+    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": "Muitas requisições. Tente novamente mais tarde."},
+            headers={"Retry-After": str(RATE_LIMIT_WINDOW)}
+        )
+    
+    # Registra requisição
+    rate_limit_store[client_ip].append(current_time)
+    
     response = await call_next(request)
-    response.headers["Content-Type"] = response.headers.get("Content-Type", "application/json") + "; charset=utf-8"
+    return response
+
+# Middleware de Headers de Segurança
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Adiciona headers de segurança essenciais"""
+    response = await call_next(request)
+    
+    # Headers de Segurança
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    
+    # Content Security Policy (CSP) - Ajustar conforme necessário
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' https://cdnjs.cloudflare.com data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    )
+    response.headers["Content-Security-Policy"] = csp
+    
+    # HSTS (apenas em HTTPS)
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    
+    # Cache Control para recursos estáticos
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    
+    # UTF-8
+    if "Content-Type" in response.headers:
+        if "charset" not in response.headers["Content-Type"].lower():
+            response.headers["Content-Type"] += "; charset=utf-8"
+    else:
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+    
+    return response
+
+# Proteção contra acesso a arquivos sensíveis
+SENSITIVE_PATTERNS = [
+    ".env", ".git", ".gitignore", ".gitattributes",
+    "__pycache__", ".pyc", ".pyo", ".pyd",
+    ".sql", ".db", ".sqlite", ".sqlite3",
+    "requirements.txt", "package.json", "package-lock.json",
+    "docker-compose.yml", "Dockerfile", ".dockerignore",
+    "README.md", "LICENSE", ".htaccess", ".htpasswd"
+]
+
+@app.middleware("http")
+async def block_sensitive_files(request: Request, call_next):
+    """Bloqueia acesso a arquivos sensíveis"""
+    path = request.url.path.lower()
+    
+    # Verifica padrões sensíveis
+    for pattern in SENSITIVE_PATTERNS:
+        if pattern in path:
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Acesso negado"}
+            )
+    
+    # Bloqueia tentativas de path traversal
+    if ".." in path or "//" in path:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"detail": "Acesso negado"}
+        )
+    
+    response = await call_next(request)
     return response
 
 # Paths
@@ -120,13 +236,24 @@ def validar_client_id(db: Session, client_id: int) -> Client:
     """
     Valida se o client_id existe e retorna o cliente.
     Levanta HTTPException se não encontrar.
+    
+    IMPORTANTE: Esta função é crítica para LGPD - garante isolamento de dados.
+    NUNCA retornar dados sem validar o client_id primeiro.
     """
+    # Validação rigorosa de tipo e valor
+    if not isinstance(client_id, int):
+        raise HTTPException(
+            status_code=400,
+            detail="client_id deve ser um número inteiro"
+        )
+    
     if not client_id or client_id <= 0:
         raise HTTPException(
             status_code=400,
             detail="client_id é obrigatório e deve ser maior que zero"
         )
     
+    # Busca cliente no banco
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         raise HTTPException(
@@ -134,8 +261,10 @@ def validar_client_id(db: Session, client_id: int) -> Client:
             detail=f"Cliente com ID {client_id} não encontrado"
         )
     
-    # Log para debug (temporário)
-    print(f"[DEBUG] client_id validado: {client_id} - Cliente: {client.nome}")
+    # Verifica se cliente está ativo (opcional, mas recomendado)
+    if hasattr(client, 'situacao') and client.situacao and client.situacao.lower() != 'ativo':
+        # Não bloqueia, apenas registra (pode ser necessário para histórico)
+        pass
     
     return client
 
@@ -250,12 +379,13 @@ async def tendencias_page():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
-@app.get("/relatorios", response_class=HTMLResponse)
-async def relatorios_page():
-    """Página de relatórios"""
-    file_path = os.path.join(FRONTEND_DIR, "relatorios.html")
-    with open(file_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+# Rota de relatórios removida - exportação agora está na apresentação
+# @app.get("/relatorios", response_class=HTMLResponse)
+# async def relatorios_page():
+#     """Página de relatórios"""
+#     file_path = os.path.join(FRONTEND_DIR, "relatorios.html")
+#     with open(file_path, "r", encoding="utf-8") as f:
+#         return HTMLResponse(content=f.read())
 
 @app.get("/apresentacao", response_class=HTMLResponse)
 async def apresentacao_page():
@@ -801,12 +931,7 @@ async def dashboard(
             dias_setor_genero = []
         
         try:
-            print(f"[DASHBOARD DEBUG] Gerando insights para client_id={client_id}")
             insights = insights_engine.gerar_insights(client_id)
-            print(f"[DASHBOARD DEBUG] Insights gerados: {len(insights)} insights para client_id={client_id}")
-            if insights:
-                for i, insight in enumerate(insights):
-                    print(f"[DASHBOARD DEBUG] Insight {i+1}: {insight.get('titulo', 'N/A')}")
         except Exception as e:
             print(f"Erro ao gerar insights: {e}")
             import traceback
@@ -1240,11 +1365,11 @@ async def listar_clientes(db: Session = Depends(get_db)):
                 "telefone": c.telefone,
                 "email": c.email,
                 "situacao": c.situacao,
-            "logo_url": c.logo_url,
-            "cores_personalizadas": json.loads(c.cores_personalizadas) if c.cores_personalizadas else None,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-            "total_uploads": len(c.uploads)
+                "logo_url": c.logo_url,
+                "cores_personalizadas": json.loads(c.cores_personalizadas) if c.cores_personalizadas else None,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+                "total_uploads": len(c.uploads)
             }
             for c in clientes
         ]
@@ -1606,7 +1731,6 @@ async def upload_logo_cliente(
             descricao=descricao
         )
         db.add(novo_logo)
-        print(f"[DEBUG] Adicionando novo logo para cliente {cliente_id}: {novo_logo_url}")
 
         # Se não há logo principal definido, define este como principal
         if not is_principal_bool:
@@ -2240,7 +2364,6 @@ async def dados_apresentacao(
 ):
     """Retorna todos os dados necessários para a apresentação com análises IA"""
     try:
-        # Log para debug
         print(f"[APRESENTACAO] ===== INÍCIO - Recebido client_id: {client_id} (tipo: {type(client_id)}) =====")
         import time
         inicio = time.time()
@@ -2853,43 +2976,8 @@ async def dados_apresentacao(
             except Exception as e:
                 print(f"Erro ao calcular análise detalhada gênero para apresentação: {e}")
         
-        # Slide de Ações (comum para todas as empresas)
-        if client_id in [2, 4]:  # Converplast ou Roda de Ouro
-            slides.append({
-                "id": len(slides),
-                "tipo": "acoes_intro",
-                "titulo": "Ações",
-                "subtitulo": "Intervenções junto aos colaboradores",
-                "dados": None,
-                "analise": None
-            })
-            
-            slides.append({
-                "id": len(slides),
-                "tipo": "acoes_saude_fisica",
-                "titulo": "Ações – Saúde Física",
-                "subtitulo": "Promoção da saúde preventiva",
-                "dados": None,
-                "analise": None
-            })
-            
-            slides.append({
-                "id": len(slides),
-                "tipo": "acoes_saude_emocional",
-                "titulo": "Ações – Saúde Emocional",
-                "subtitulo": "Bem-estar psicológico e emocional",
-                "dados": None,
-                "analise": None
-            })
-            
-            slides.append({
-                "id": len(slides),
-                "tipo": "acoes_saude_social",
-                "titulo": "Ações – Saúde Social",
-                "subtitulo": "Integração e relacionamento interpessoal",
-                "dados": None,
-                "analise": None
-            })
+        # REMOVIDO: Slides de Ações vazios causavam páginas em branco no PDF
+        # Se precisar adicionar slides de ações no futuro, devem ter conteúdo real (dados ou análise)
         
         tempo_total = time.time() - inicio
         print(f"[APRESENTACAO] ===== FIM - Total de slides: {len(slides)} - Tempo: {tempo_total:.2f}s =====")
@@ -3369,6 +3457,9 @@ async def export_excel(
         metricas_gerais = dados_completos['metricas']
         dados_relatorio = dados_completos['dados_relatorio']
         
+        # Usa ReportGenerator para Excel (ainda necessário)
+        if ReportGenerator is None:
+            raise HTTPException(status_code=500, detail="ReportGenerator não disponível")
         report_gen = ReportGenerator(db=db, client_id=client_id)
         
         # Busca dados completos para Excel (todos os atestados)
@@ -3431,65 +3522,7 @@ async def export_excel(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao exportar: {str(e)}")
 
-@app.get("/api/export/pdf")
-async def export_pdf(
-    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
-    mes: Optional[str] = None,
-    mes_inicio: Optional[str] = None,
-    mes_fim: Optional[str] = None,
-    upload_id: Optional[int] = None,
-    funcionario: Optional[List[str]] = Query(None),
-    setor: Optional[List[str]] = Query(None),
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Exporta relatório completo para PDF - USA DADOS EXATOS DO DASHBOARD"""
-    try:
-        # Valida client_id
-        print(f"[EXPORT PDF] Recebido client_id: {client_id}")
-        client = validar_client_id(db, client_id)
-        print(f"[EXPORT PDF] Cliente encontrado: {client.nome} (ID: {client.id})")
-        
-        # USA DADOS EXATOS DO DASHBOARD
-        print(f"[EXPORT PDF] Buscando dados do dashboard para replicar nos relatórios...")
-        dados_completos = buscar_dados_dashboard_completo(
-            client_id, mes_inicio, mes_fim, funcionario, setor, db
-        )
-        
-        metricas_gerais = dados_completos['metricas']
-        dados_relatorio = dados_completos['dados_relatorio']
-        insights = dados_completos['insights']
-        insights_engine = dados_completos['insights_engine']
-        
-        report_gen = ReportGenerator(db=db, client_id=client_id)
-        
-        # Gerar arquivo
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"relatorio_absenteismo_{timestamp}.pdf"
-        filepath = os.path.join(EXPORTS_DIR, filename)
-        
-        os.makedirs(EXPORTS_DIR, exist_ok=True)
-        
-        # Gerar período
-        periodo = f"{mes_inicio} a {mes_fim}" if mes_inicio and mes_fim else (mes or "Todos os períodos")
-        
-        # Gerar PDF com gráficos e insights
-        success = report_gen.generate_pdf_report(filepath, dados_relatorio, metricas_gerais, insights, periodo, insights_engine, client_id=client_id)
-        
-        if not success:
-            raise HTTPException(status_code=500, detail="Erro ao gerar relatório PDF")
-        
-        return FileResponse(
-            path=filepath,
-            filename=filename,
-            media_type='application/pdf'
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Erro ao exportar PDF: {str(e)}")
+# Rota de exportação PDF REMOVIDA
 
 @app.get("/api/export/pptx")
 async def export_pptx(
@@ -3521,6 +3554,9 @@ async def export_pptx(
         insights = dados_completos['insights']
         insights_engine = dados_completos['insights_engine']
         
+        # Usa ReportGenerator para PPTX (ainda necessário)
+        if ReportGenerator is None:
+            raise HTTPException(status_code=500, detail="ReportGenerator não disponível")
         report_gen = ReportGenerator(db=db, client_id=client_id)
         
         # Gerar arquivo
