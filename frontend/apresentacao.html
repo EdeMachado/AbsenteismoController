@@ -60,9 +60,143 @@
             gap: 16px;
         }
         
+        .filtros-apresentacao {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        
+        .filtros-apresentacao select {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #333;
+            cursor: pointer;
+        }
+        
+        .filtros-apresentacao button {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .filtros-apresentacao button:hover {
+            background: #45a049;
+        }
+        
         .slide-indicator {
             font-size: 14px;
             opacity: 0.9;
+        }
+        
+        .btn-notas {
+            background: rgba(255, 193, 7, 0.9);
+            border: none;
+            color: #333;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+        }
+        
+        .btn-notas:hover {
+            background: rgba(255, 193, 7, 1);
+        }
+        
+        .painel-notas {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            bottom: 0;
+            width: 400px;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.3);
+            transition: right 0.3s;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .painel-notas.aberto {
+            right: 0;
+        }
+        
+        .painel-notas-header {
+            background: #1a237e;
+            color: white;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .painel-notas-body {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .painel-notas textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+        }
+        
+        .painel-notas-footer {
+            padding: 16px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .painel-notas button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .btn-salvar-nota {
+            background: #4CAF50;
+            color: white;
+            flex: 1;
+        }
+        
+        .btn-salvar-nota:hover {
+            background: #45a049;
+        }
+        
+        .btn-limpar-nota {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-limpar-nota:hover {
+            background: #da190b;
         }
         
         .btn-export, .btn-fullscreen {
@@ -529,6 +663,18 @@
                 Apresentação Executiva - Absenteísmo
             </h1>
             <div class="apresentacao-header-right" style="position: relative;">
+                <div class="filtros-apresentacao">
+                    <i class="fas fa-filter" style="opacity: 0.8;"></i>
+                    <select id="filtroSetorApresentacao">
+                        <option value="">Todos os Setores</option>
+                    </select>
+                    <input type="month" id="filtroPeriodoInicio" style="background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.3); padding: 6px 10px; border-radius: 4px; font-size: 13px; color: #333;">
+                    <span style="opacity: 0.8;">até</span>
+                    <input type="month" id="filtroPeriodoFim" style="background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.3); padding: 6px 10px; border-radius: 4px; font-size: 13px; color: #333;">
+                    <button onclick="aplicarFiltrosApresentacao()">
+                        <i class="fas fa-sync-alt"></i> Aplicar
+                    </button>
+                </div>
                 <div class="slide-indicator">
                     <span id="slideAtual">1</span> / <span id="totalSlides">0</span>
                 </div>

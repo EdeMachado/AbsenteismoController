@@ -1954,3 +1954,327 @@ class Analytics:
             })
         
         return resultado
+    
+    def taxa_absenteismo_mensal(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """
+        Calcula taxa de absenteísmo mensal (%)
+        Taxa = (Dias Perdidos / (Funcionários Únicos * Dias Úteis)) * 100
+        Assume 22 dias úteis por mês como padrão
+        """
+        # Busca evolução mensal (já tem dias perdidos por mês)
+        evolucao = self.evolucao_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+        
+        resultado = []
+        dias_uteis_padrao = 22  # Média de dias úteis por mês
+        
+        for item in evolucao:
+            mes_ref = item.get('mes')
+            dias_perdidos = item.get('dias_perdidos', 0)
+            
+            # Conta funcionários únicos neste mês específico
+            funcionarios_query = self.db.query(
+                func.count(func.distinct(Atestado.nomecompleto))
+            ).join(Upload).filter(
+                Upload.client_id == client_id,
+                Upload.mes_referencia == mes_ref
+            )
+            
+            # Aplica filtros usando helper
+            from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+            funcionarios_query = aplicar_filtro_funcionario(funcionarios_query, funcionario)
+            funcionarios_query = aplicar_filtro_setor(funcionarios_query, setor)
+            
+            num_funcionarios = funcionarios_query.scalar() or 0
+            
+            # Calcula taxa de absenteísmo
+            # Taxa = (Dias Perdidos / (Funcionários * Dias Úteis)) * 100
+            if num_funcionarios > 0:
+                taxa = (dias_perdidos / (num_funcionarios * dias_uteis_padrao)) * 100
+            else:
+                taxa = 0.0
+            
+            resultado.append({
+                'mes': mes_ref,
+                'mes_label': item.get('mes_label'),
+                'dias_perdidos': dias_perdidos,
+                'horas_perdidas': item.get('horas_perdidas', 0),
+                'funcionarios': num_funcionarios,
+                'taxa_absenteismo': round(taxa, 2),
+                'quantidade_atestados': item.get('quantidade', 0)
+            })
+        
+        return resultado
+    
+    def comparativo_ano_anterior(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """
+        Compara período atual com mesmo período do ano anterior
+        Retorna dados mês a mês com valores atuais e do ano anterior
+        """
+        if not mes_inicio or not mes_fim:
+            # Se não fornecidos, usa últimos 12 meses
+            hoje = datetime.now()
+            mes_fim = hoje.strftime('%Y-%m')
+            mes_inicio = (hoje - relativedelta(months=11)).strftime('%Y-%m')
+        
+        # Busca dados do período atual
+        evolucao_atual = self.evolucao_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+        
+        # Calcula período do ano anterior
+        inicio_date = datetime.strptime(mes_inicio + '-01', '%Y-%m-%d')
+        fim_date = datetime.strptime(mes_fim + '-01', '%Y-%m-%d')
+        
+        mes_inicio_anterior = (inicio_date - relativedelta(years=1)).strftime('%Y-%m')
+        mes_fim_anterior = (fim_date - relativedelta(years=1)).strftime('%Y-%m')
+        
+        # Busca dados do ano anterior
+        evolucao_anterior = self.evolucao_mensal(client_id, mes_inicio_anterior, mes_fim_anterior, funcionario, setor)
+        
+        # Cria mapa de dados do ano anterior por mês relativo
+        mapa_anterior = {}
+        for item in evolucao_anterior:
+            mes_date = datetime.strptime(item['mes'] + '-01', '%Y-%m-%d')
+            mes_relativo = mes_date.strftime('%m')  # Apenas o mês (01-12)
+            mapa_anterior[mes_relativo] = item
+        
+        # Combina dados
+        resultado = []
+        for item_atual in evolucao_atual:
+            mes_date = datetime.strptime(item_atual['mes'] + '-01', '%Y-%m-%d')
+            mes_relativo = mes_date.strftime('%m')
+            
+            item_anterior = mapa_anterior.get(mes_relativo, {})
+            
+            dias_atual = item_atual.get('dias_perdidos', 0)
+            dias_anterior = item_anterior.get('dias_perdidos', 0)
+            horas_atual = item_atual.get('horas_perdidas', 0)
+            horas_anterior = item_anterior.get('horas_perdidas', 0)
+            
+            # Calcula variação
+            variacao_dias = ((dias_atual - dias_anterior) / dias_anterior * 100) if dias_anterior > 0 else (100 if dias_atual > 0 else 0)
+            variacao_horas = ((horas_atual - horas_anterior) / horas_anterior * 100) if horas_anterior > 0 else (100 if horas_atual > 0 else 0)
+            
+            resultado.append({
+                'mes': item_atual['mes'],
+                'mes_label': item_atual.get('mes_label', ''),
+                'ano_atual': {
+                    'dias_perdidos': dias_atual,
+                    'horas_perdidas': horas_atual,
+                    'quantidade': item_atual.get('quantidade', 0)
+                },
+                'ano_anterior': {
+                    'dias_perdidos': dias_anterior,
+                    'horas_perdidas': horas_anterior,
+                    'quantidade': item_anterior.get('quantidade', 0),
+                    'mes_referencia': item_anterior.get('mes', '')
+                },
+                'variacao': {
+                    'dias_percentual': round(variacao_dias, 2),
+                    'horas_percentual': round(variacao_horas, 2),
+                    'dias_absoluta': round(dias_atual - dias_anterior, 2),
+                    'horas_absoluta': round(horas_atual - horas_anterior, 2)
+                }
+            })
+        
+        return resultado
+    
+    def analise_sazonalidade(self, client_id: int, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """
+        Analisa sazonalidade calculando médias por mês do ano (Jan, Fev, Mar...)
+        Agrupa todos os anos disponíveis e calcula média para cada mês
+        """
+        # Busca TODOS os dados históricos
+        evolucao = self.evolucao_mensal(client_id, None, None, funcionario, setor)
+        
+        # Agrupa por mês do ano (01-12)
+        mapa_meses = {}
+        for item in evolucao:
+            mes_date = datetime.strptime(item['mes'] + '-01', '%Y-%m-%d')
+            mes_nome = mes_date.strftime('%B')  # Nome do mês em inglês
+            mes_numero = mes_date.strftime('%m')  # 01-12
+            
+            # Traduz nome do mês
+            nomes_pt = {
+                'January': 'Janeiro', 'February': 'Fevereiro', 'March': 'Março',
+                'April': 'Abril', 'May': 'Maio', 'June': 'Junho',
+                'July': 'Julho', 'August': 'Agosto', 'September': 'Setembro',
+                'October': 'Outubro', 'November': 'Novembro', 'December': 'Dezembro'
+            }
+            mes_nome_pt = nomes_pt.get(mes_nome, mes_nome)
+            
+            if mes_numero not in mapa_meses:
+                mapa_meses[mes_numero] = {
+                    'mes': mes_numero,
+                    'mes_nome': mes_nome_pt,
+                    'dias_total': 0,
+                    'horas_total': 0,
+                    'quantidade_total': 0,
+                    'contagem': 0
+                }
+            
+            mapa_meses[mes_numero]['dias_total'] += item.get('dias_perdidos', 0)
+            mapa_meses[mes_numero]['horas_total'] += item.get('horas_perdidas', 0)
+            mapa_meses[mes_numero]['quantidade_total'] += item.get('quantidade', 0)
+            mapa_meses[mes_numero]['contagem'] += 1
+        
+        # Calcula médias
+        resultado = []
+        for mes_numero in sorted(mapa_meses.keys()):
+            dados = mapa_meses[mes_numero]
+            contagem = dados['contagem']
+            
+            if contagem > 0:
+                resultado.append({
+                    'mes': mes_numero,
+                    'mes_nome': dados['mes_nome'],
+                    'media_dias': round(dados['dias_total'] / contagem, 2),
+                    'media_horas': round(dados['horas_total'] / contagem, 2),
+                    'media_quantidade': round(dados['quantidade_total'] / contagem, 2),
+                    'anos_analisados': contagem,
+                    'total_dias': round(dados['dias_total'], 2),
+                    'total_horas': round(dados['horas_total'], 2),
+                    'total_quantidade': dados['quantidade_total']
+                })
+        
+        return resultado
+    
+    def heatmap_setores_meses(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None) -> Dict[str, Any]:
+        """
+        Gera dados para heatmap: Setores (linhas) x Meses (colunas) = Dias Perdidos
+        Retorna estrutura pronta para renderização de matriz de calor
+        """
+        # Query: agrupa por setor e mês
+        query = self.db.query(
+            Atestado.setor,
+            Upload.mes_referencia,
+            func.sum(Atestado.dias_atestados).label('dias_perdidos')
+        ).join(Upload).filter(
+            Upload.client_id == client_id
+        ).group_by(
+            Atestado.setor,
+            Upload.mes_referencia
+        )
+        
+        # Filtros
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario
+        query = aplicar_filtro_funcionario(query, funcionario)
+        
+        resultados = query.all()
+        
+        # Monta estrutura: {setor: {mes: dias}}
+        mapa_setores = {}
+        meses_unicos = set()
+        
+        for r in resultados:
+            setor = r.setor or 'Não informado'
+            mes = r.mes_referencia
+            dias = float(r.dias_perdidos or 0)
+            
+            if setor not in mapa_setores:
+                mapa_setores[setor] = {}
+            
+            mapa_setores[setor][mes] = dias
+            meses_unicos.add(mes)
+        
+        # Ordena meses cronologicamente
+        meses_ordenados = sorted(list(meses_unicos))
+        
+        # Prepara dados para heatmap
+        setores = sorted(list(mapa_setores.keys()))
+        dados_matriz = []
+        
+        for setor in setores:
+            linha = []
+            for mes in meses_ordenados:
+                valor = mapa_setores[setor].get(mes, 0)
+                linha.append(round(valor, 2))
+            dados_matriz.append(linha)
+        
+        # Formata labels dos meses
+        meses_labels = []
+        for mes in meses_ordenados:
+            try:
+                mes_date = datetime.strptime(mes + '-01', '%Y-%m-%d')
+                nomes_meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+                ano = mes_date.strftime('%y')
+                mes_nome = nomes_meses[mes_date.month - 1]
+                meses_labels.append(f"{mes_nome}/{ano}")
+            except:
+                meses_labels.append(mes)
+        
+        return {
+            'setores': setores,
+            'meses': meses_labels,
+            'dados': dados_matriz,  # Lista de listas: [setor][mes]
+            'total_setores': len(setores),
+            'total_meses': len(meses_ordenados)
+        }
+    
+    def top_cids_por_setor(self, client_id: int, top_n: int = 3, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None) -> List[Dict[str, Any]]:
+        """
+        Retorna os top CIDs de cada setor
+        Útil para identificar problemas específicos por área
+        """
+        # Busca todos os setores
+        query_setores = self.db.query(
+            Atestado.setor
+        ).join(Upload).filter(
+            Upload.client_id == client_id
+        ).distinct()
+        
+        if mes_inicio:
+            query_setores = query_setores.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query_setores = query_setores.filter(Upload.mes_referencia <= mes_fim)
+        
+        setores = [r.setor for r in query_setores.all() if r.setor]
+        
+        resultado = []
+        
+        for setor in setores:
+            # Busca top CIDs deste setor
+            query = self.db.query(
+                Atestado.cid,
+                Atestado.doenca,
+                func.sum(Atestado.dias_atestados).label('total_dias'),
+                func.count(Atestado.id).label('quantidade')
+            ).join(Upload).filter(
+                Upload.client_id == client_id,
+                Atestado.setor == setor
+            ).group_by(
+                Atestado.cid,
+                Atestado.doenca
+            ).order_by(
+                func.sum(Atestado.dias_atestados).desc()
+            ).limit(top_n)
+            
+            if mes_inicio:
+                query = query.filter(Upload.mes_referencia >= mes_inicio)
+            if mes_fim:
+                query = query.filter(Upload.mes_referencia <= mes_fim)
+            
+            from .analytics_helper import aplicar_filtro_funcionario
+            query = aplicar_filtro_funcionario(query, funcionario)
+            
+            cids = query.all()
+            
+            cids_lista = []
+            for c in cids:
+                cids_lista.append({
+                    'cid': c.cid or 'N/A',
+                    'doenca': c.doenca or 'Não informado',
+                    'dias_perdidos': round(float(c.total_dias or 0), 2),
+                    'quantidade': c.quantidade or 0
+                })
+            
+            if cids_lista:  # Só adiciona se houver dados
+                resultado.append({
+                    'setor': setor,
+                    'top_cids': cids_lista
+                })
+        
+        return resultado

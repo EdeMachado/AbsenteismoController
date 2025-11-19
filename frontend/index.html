@@ -289,6 +289,41 @@
                             <canvas id="chartQuantidadeAtestados"></canvas>
                         </div>
                     </div>
+                    
+                    <!-- Gráfico Combinado: Atestados vs Taxa de Absenteísmo -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Atestados vs Taxa de Absenteísmo</h3>
+                            <p class="chart-subtitle">Quantidade (barras) e Taxa % (linha)</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 300px;">
+                            <canvas id="chartAtestadosVsTaxa"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Comparativo Ano Anterior -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Comparativo Ano Anterior</h3>
+                            <p class="chart-subtitle">Atual vs Mesmo Período Ano Passado</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 300px;">
+                            <canvas id="chartComparativoAnoAnterior"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Análise de Sazonalidade -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Sazonalidade - Média Histórica</h3>
+                            <p class="chart-subtitle">Média de cada mês ao longo dos anos</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 300px;">
+                            <canvas id="chartSazonalidade"></canvas>
+                        </div>
+                    </div>
                 </div>
                 
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
@@ -310,6 +345,28 @@
                         <div class="chart-wrapper" style="height: 300px;">
                             <canvas id="chartGeneroMensal"></canvas>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- Heatmap Setores x Meses -->
+                <div class="chart-container" style="margin-bottom: 16px;">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Mapa de Calor: Setores x Meses</h3>
+                        <p class="chart-subtitle">Dias perdidos por setor em cada mês (cores mais fortes = mais críticos)</p>
+                    </div>
+                    <div id="heatmapContainer" style="padding: 20px; max-height: 600px; overflow: auto;">
+                        <!-- Heatmap será renderizado aqui via JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Top CIDs por Setor -->
+                <div class="chart-container" style="margin-bottom: 16px;">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Top CIDs por Setor</h3>
+                        <p class="chart-subtitle">Principais causas de afastamento em cada setor</p>
+                    </div>
+                    <div id="topCidsSetorContainer" style="padding: 20px;">
+                        <!-- Será renderizado via JavaScript -->
                     </div>
                 </div>
                 

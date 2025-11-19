@@ -1582,6 +1582,36 @@ async def dashboard(
             dias_setor_genero = []
         
         try:
+            taxa_absenteismo_mensal = analytics.taxa_absenteismo_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular taxa de absenteísmo mensal: {e}")
+            taxa_absenteismo_mensal = []
+        
+        try:
+            comparativo_ano_anterior = analytics.comparativo_ano_anterior(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular comparativo ano anterior: {e}")
+            comparativo_ano_anterior = []
+        
+        try:
+            analise_sazonalidade = analytics.analise_sazonalidade(client_id, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular análise de sazonalidade: {e}")
+            analise_sazonalidade = []
+        
+        try:
+            heatmap_setores_meses = analytics.heatmap_setores_meses(client_id, mes_inicio, mes_fim, funcionario)
+        except Exception as e:
+            print(f"Erro ao calcular heatmap setores x meses: {e}")
+            heatmap_setores_meses = {}
+        
+        try:
+            top_cids_por_setor = analytics.top_cids_por_setor(client_id, 5, mes_inicio, mes_fim, funcionario)
+        except Exception as e:
+            print(f"Erro ao calcular top CIDs por setor: {e}")
+            top_cids_por_setor = []
+        
+        try:
             insights = insights_engine.gerar_insights(client_id)
         except Exception as e:
             app_logger.error(f"Erro ao gerar insights para cliente {client_id}: {e}", exc_info=True, extra={'client_id': client_id})
@@ -1758,6 +1788,11 @@ async def dashboard(
             "top_setores": top_setores,
             "evolucao_mensal": evolucao,
             "variacao_mensal": variacao_mensal,
+            "taxa_absenteismo_mensal": taxa_absenteismo_mensal,
+            "comparativo_ano_anterior": comparativo_ano_anterior,
+            "analise_sazonalidade": analise_sazonalidade,
+            "heatmap_setores_meses": heatmap_setores_meses,
+            "top_cids_por_setor": top_cids_por_setor,
             "distribuicao_genero": distribuicao_genero,
             "genero_mensal": genero_mensal,
             "top_funcionarios": top_funcionarios,
@@ -3318,6 +3353,51 @@ async def dados_apresentacao(
                     "dados": genero_mensal,
                     "analise": "Acompanhamento da distribuição por gênero ao longo dos meses."
                 })
+            
+            # Slide 4.4: Atestados vs Taxa de Absenteísmo (Gráfico Combinado)
+            try:
+                taxa_absenteismo = analytics.taxa_absenteismo_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if taxa_absenteismo:
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "atestados_vs_taxa",
+                        "titulo": "Atestados vs Taxa de Absenteísmo",
+                        "subtitulo": "Quantidade de atestados e taxa percentual mensal",
+                        "dados": taxa_absenteismo,
+                        "analise": "Comparativo entre volume de atestados (barras) e taxa de absenteísmo (linha), permitindo identificar se o aumento de atestados impacta proporcionalmente a taxa ou se há outros fatores."
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular taxa de absenteísmo para apresentação: {e}")
+            
+            # Slide 4.5: Comparativo Ano Anterior
+            try:
+                comp_ano_ant = analytics.comparativo_ano_anterior(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if comp_ano_ant:
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_ano_anterior",
+                        "titulo": "Comparativo com Ano Anterior",
+                        "subtitulo": "Atual vs Mesmo Período do Ano Passado",
+                        "dados": comp_ano_ant,
+                        "analise": "Análise mês a mês comparando o período atual com o mesmo período do ano anterior, revelando tendências de melhoria ou piora ao longo do tempo."
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo ano anterior para apresentação: {e}")
+            
+            # Slide 4.6: Análise de Sazonalidade
+            try:
+                sazonalidade = analytics.analise_sazonalidade(client_id, funcionario, setor)
+                if sazonalidade:
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "sazonalidade",
+                        "titulo": "Análise de Sazonalidade",
+                        "subtitulo": "Média histórica por mês do ano",
+                        "dados": sazonalidade,
+                        "analise": "Identifica padrões sazonais calculando a média de cada mês ao longo de todos os anos disponíveis, permitindo prever períodos críticos e planejar ações preventivas."
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular sazonalidade para apresentação: {e}")
             
             # Slide 5: TOP 5 Setores
             if top_setores:
