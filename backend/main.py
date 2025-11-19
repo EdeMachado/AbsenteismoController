@@ -1408,7 +1408,13 @@ async def list_uploads(
     # Valida client_id
     validar_client_id(db, client_id)
     
-    uploads = db.query(Upload).filter(Upload.client_id == client_id).order_by(Upload.mes_referencia.desc()).all()
+    # Ordena por mes_referencia DESC e data_upload DESC como critério secundário
+    uploads = db.query(Upload).filter(
+        Upload.client_id == client_id
+    ).order_by(
+        Upload.mes_referencia.desc(),
+        Upload.data_upload.desc()
+    ).all()
     
     return [
         {

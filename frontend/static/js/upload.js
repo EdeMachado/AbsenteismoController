@@ -426,13 +426,15 @@ async function loadUploads() {
                 <td><strong>${formatMesReferencia(u.mes_referencia)}</strong></td>
                 <td>${formatDateTime(u.data_upload)}</td>
                 <td><strong>${u.total_registros}</strong></td>
-                <td style="text-align: center;">
-                    <a href="/dados_powerbi?upload_id=${u.id}" class="btn btn-primary btn-icon" title="Ver e editar dados" style="background: #1976d2; border: none;">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    <button onclick="deleteUpload(${u.id})" class="btn btn-danger btn-icon" title="Deletar" style="margin-left: 8px; background: #d32f2f; border: none; color: white;">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                <td style="text-align: center; white-space: nowrap;">
+                    <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                        <a href="/dados_powerbi?upload_id=${u.id}" class="btn btn-primary btn-icon" title="Ver e editar dados" style="background: #1976d2; border: none; padding: 6px 10px; font-size: 13px;">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <button onclick="deleteUpload(${u.id})" class="btn btn-danger btn-icon" title="Deletar" style="background: #d32f2f; border: none; color: white; padding: 6px 10px; font-size: 13px;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `).join('');
