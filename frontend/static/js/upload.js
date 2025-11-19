@@ -402,7 +402,16 @@ async function loadUploads() {
 
     try {
         const response = await fetch(`/api/uploads?client_id=${currentClient.id}`);
-        const uploads = await response.json();
+        let uploads = await response.json();
+        
+        // Ordena os uploads por mes_referencia (YYYY-MM) decrescente
+        uploads.sort((a, b) => {
+            // Compara strings YYYY-MM diretamente (funciona cronologicamente)
+            if (b.mes_referencia > a.mes_referencia) return 1;
+            if (b.mes_referencia < a.mes_referencia) return -1;
+            // Se mesmo mês, ordena por data de upload mais recente
+            return new Date(b.data_upload) - new Date(a.data_upload);
+        });
         
         if (!tbody) return;
         
