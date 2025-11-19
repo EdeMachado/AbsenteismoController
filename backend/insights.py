@@ -380,13 +380,19 @@ Os **5 funcionários com maior incidência** concentram **{pct_top5:.1f}%** do t
             total_cids = sum(d.get('quantidade', 0) for d in dados)
             pct_top = (top.get('quantidade', 0) / total_cids * 100) if total_cids > 0 else 0
             
-            # CORREÇÃO: Usa 'descricao' do dado (já corrigido no analytics.py)
+            # CORREÇÃO: Se descricao = cid (sem diagnóstico), mostra apenas o código
             cid_codigo = top.get('cid', 'N/A')
-            cid_descricao = top.get('descricao', top.get('diagnostico', 'Não informado'))
+            cid_descricao = top.get('descricao', top.get('diagnostico', cid_codigo))
+            
+            # Se descricao é igual ao código, mostra apenas "CID X"
+            if cid_descricao == cid_codigo:
+                texto_cid = f"**CID {cid_codigo}**"
+            else:
+                texto_cid = f"**CID {cid_codigo}** - **{cid_descricao}**"
             
             analise = f"""🩺 **Análise: TOP 10 Doenças mais Frequentes**
 
-O **CID {cid_codigo}** - **{cid_descricao}** é a principal causa de afastamento, com **{top.get('quantidade', 0)} ocorrências**, representando **{pct_top:.1f}%** do total.
+O {texto_cid} é a principal causa de afastamento, com **{top.get('quantidade', 0)} ocorrências**, representando **{pct_top:.1f}%** do total.
 
 As doenças mais frequentes indicam padrões que podem estar relacionados a condições de trabalho, fatores ambientais ou questões de saúde populacional específicas da organização.
 
@@ -450,13 +456,18 @@ Esta distribuição pode refletir características demográficas da organizaçã
             total_dias = sum(d.get('dias_perdidos', 0) for d in dados)
             pct = (top.get('dias_perdidos', 0) / total_dias * 100) if total_dias > 0 else 0
             
-            # CORREÇÃO: Mostra CID + descrição completa
+            # CORREÇÃO: Se descricao = cid (sem diagnóstico), mostra apenas o código
             cid_codigo = top.get('cid', 'N/A')
-            cid_descricao = top.get('descricao', top.get('diagnostico', 'Não informado'))
+            cid_descricao = top.get('descricao', top.get('diagnostico', cid_codigo))
+            
+            if cid_descricao == cid_codigo:
+                texto_cid = f"**CID {cid_codigo}**"
+            else:
+                texto_cid = f"**CID {cid_codigo}** - **{cid_descricao}**"
             
             analise = f"""📊 **Análise: Dias por Doença**
 
-O **CID {cid_codigo}** - **{cid_descricao}** apresenta **{int(top.get('dias_perdidos', 0))} dias perdidos**, representando **{pct:.1f}%** do total.
+O {texto_cid} apresenta **{int(top.get('dias_perdidos', 0))} dias perdidos**, representando **{pct:.1f}%** do total.
 
 Esta análise permite identificar as condições de saúde que geram maior impacto em termos de tempo de afastamento, orientando ações preventivas e de gestão de saúde.
 
@@ -532,13 +543,18 @@ Esta distribuição permite entender o padrão de duração dos afastamentos, or
             
             top = dados[0]
             
-            # CORREÇÃO: Mostra CID + descrição completa
+            # CORREÇÃO: Se descricao = cid (sem diagnóstico), mostra apenas o código
             cid_codigo = top.get('cid', 'N/A')
-            cid_descricao = top.get('descricao', top.get('diagnostico', 'Não informado'))
+            cid_descricao = top.get('descricao', top.get('diagnostico', cid_codigo))
+            
+            if cid_descricao == cid_codigo:
+                texto_cid = f"**CID {cid_codigo}**"
+            else:
+                texto_cid = f"**CID {cid_codigo}** - **{cid_descricao}**"
             
             analise = f"""📊 **Análise: Média de Dias por CID**
 
-O **CID {cid_codigo}** - **{cid_descricao}** apresenta a maior média de dias por ocorrência, com **{top.get('media_dias', 0):.1f} dias** em média.
+O {texto_cid} apresenta a maior média de dias por ocorrência, com **{top.get('media_dias', 0):.1f} dias** em média.
 
 Esta informação permite identificar as condições de saúde que demandam maior tempo de recuperação, orientando estratégias de prevenção e gestão.
 

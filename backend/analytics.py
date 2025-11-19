@@ -122,25 +122,26 @@ class Analytics:
         
         results = query.all()
         
-        # CORREÇÃO: Prioriza diagnostico da planilha, depois descricao_cid oficial, depois 'Não informado'
-        # Evita usar textos genéricos como "Diagnóstico não especificado"
+        # CORREÇÃO: Se diagnóstico é genérico ou vazio, mostra apenas o código do CID
         diagnosticos_genericos = [
             'diagnóstico não especificado', 'não especificado', 'nao especificado',
             'sem diagnóstico', 'sem diagnostico', 's/ diagnóstico', 's/ diagnostico',
-            'não informado', 'nao informado', '', None
+            'não informado', 'nao informado', 'diagnostico nao encontrado', 
+            'diagnóstico não encontrado', '', None
         ]
         
         resultado_final = []
         for r in results:
-            # Normaliza diagnóstico da planilha
-            diag_planilha = (r.diagnostico or '').strip().lower()
+            # Normaliza diagnóstico
+            diag = (r.diagnostico or '').strip()
+            diag_lower = diag.lower()
             
-            # Se diagnóstico da planilha é genérico/vazio, usa descricao_cid oficial
-            if diag_planilha in diagnosticos_genericos:
-                descricao = r.descricao_cid or 'Não informado'
+            # Se diagnóstico é genérico/vazio, usa apenas o código CID
+            if diag_lower in diagnosticos_genericos or not diag:
+                descricao = r.cid  # Apenas o código (ex: "A09")
             else:
-                # Usa diagnóstico da planilha (mais específico)
-                descricao = r.diagnostico or r.descricao_cid or 'Não informado'
+                # Usa diagnóstico da planilha
+                descricao = diag
             
             resultado_final.append({
                 'cid': r.cid,
@@ -714,21 +715,24 @@ class Analytics:
         
         results = query.all()
         
-        # CORREÇÃO: Mesma lógica de priorização de diagnóstico
+        # CORREÇÃO: Se diagnóstico é genérico, mostra apenas código CID
         diagnosticos_genericos = [
             'diagnóstico não especificado', 'não especificado', 'nao especificado',
             'sem diagnóstico', 'sem diagnostico', 's/ diagnóstico', 's/ diagnostico',
-            'não informado', 'nao informado', '', None
+            'não informado', 'nao informado', 'diagnostico nao encontrado',
+            'diagnóstico não encontrado', '', None
         ]
         
         resultado_final = []
         for r in results:
-            diag_planilha = (r.diagnostico or '').strip().lower()
+            diag = (r.diagnostico or '').strip()
+            diag_lower = diag.lower()
             
-            if diag_planilha in diagnosticos_genericos:
-                descricao = r.descricao_cid or 'Não informado'
+            # Se genérico, usa apenas código CID
+            if diag_lower in diagnosticos_genericos or not diag:
+                descricao = r.cid
             else:
-                descricao = r.diagnostico or r.descricao_cid or 'Não informado'
+                descricao = diag
             
             resultado_final.append({
                 'cid': r.cid,
@@ -2302,21 +2306,24 @@ class Analytics:
             
             cids = query.all()
             
-            # CORREÇÃO: Mesma lógica de priorização de diagnóstico
+            # CORREÇÃO: Se diagnóstico é genérico, mostra apenas código CID
             diagnosticos_genericos = [
                 'diagnóstico não especificado', 'não especificado', 'nao especificado',
                 'sem diagnóstico', 'sem diagnostico', 's/ diagnóstico', 's/ diagnostico',
-                'não informado', 'nao informado', '', None
+                'não informado', 'nao informado', 'diagnostico nao encontrado',
+                'diagnóstico não encontrado', '', None
             ]
             
             cids_lista = []
             for c in cids:
-                diag_planilha = (c.diagnostico or '').strip().lower()
+                diag = (c.diagnostico or '').strip()
+                diag_lower = diag.lower()
                 
-                if diag_planilha in diagnosticos_genericos:
-                    descricao = c.descricao_cid or 'Não informado'
+                # Se genérico, usa apenas código CID
+                if diag_lower in diagnosticos_genericos or not diag:
+                    descricao = c.cid or 'N/A'
                 else:
-                    descricao = c.diagnostico or c.descricao_cid or 'Não informado'
+                    descricao = diag
                 
                 cids_lista.append({
                     'cid': c.cid or 'N/A',
