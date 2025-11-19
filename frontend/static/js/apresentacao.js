@@ -1002,8 +1002,12 @@ function renderizarGrafico(slide) {
             });
             const quantidadesAT = dados.map(d => d.quantidade_atestados || 0);
             const taxasAT = dados.map(d => d.taxa_absenteismo || 0);
+            
+            console.log('Atestados vs Taxa - Quantidades:', quantidadesAT);
+            console.log('Atestados vs Taxa - Taxas:', taxasAT);
+            
+            // IMPORTANTE: Para gráficos mistos, não definir type no root
             config = {
-                type: 'bar',
                 data: {
                     labels: labelsAT,
                     datasets: [
@@ -1012,7 +1016,7 @@ function renderizarGrafico(slide) {
                             label: 'Quantidade de Atestados',
                             data: quantidadesAT,
                             backgroundColor: CORES_EMPRESA.primary,
-                            borderRadius: 6,
+                            borderRadius: 4,
                             yAxisID: 'y',
                             order: 2
                         },
@@ -1021,15 +1025,15 @@ function renderizarGrafico(slide) {
                             label: 'Taxa de Absenteísmo (%)',
                             data: taxasAT,
                             borderColor: CORES_EMPRESA.secondary,
-                            backgroundColor: 'rgba(85, 107, 47, 0.1)',
+                            backgroundColor: 'transparent',
                             borderWidth: 3,
                             fill: false,
-                            tension: 0.4,
-                            pointRadius: 5,
+                            tension: 0.3,
+                            pointRadius: 6,
                             pointBackgroundColor: CORES_EMPRESA.secondary,
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
-                            pointHoverRadius: 7,
+                            pointHoverRadius: 8,
                             yAxisID: 'y1',
                             order: 1
                         }
@@ -1091,6 +1095,10 @@ function renderizarGrafico(slide) {
                                 callback: function(value) {
                                     return value.toFixed(1) + '%';
                                 }
+                            },
+                            suggestedMax: function(context) {
+                                const maxTaxa = Math.max(...taxasAT);
+                                return Math.max(maxTaxa * 1.2, 5); // Pelo menos 5% no eixo
                             }
                         },
                         x: {

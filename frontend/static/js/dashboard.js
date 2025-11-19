@@ -2368,21 +2368,56 @@ function renderizarChartFrequenciaAtestados(dados) {
     destruirGraficoSeguro('chartFrequenciaAtestados', chartFrequenciaAtestados);
     chartFrequenciaAtestados = null;
     
+    // Filtra dados com quantidade > 0 para não mostrar fatias vazias
+    const dadosFiltrados = dados.filter(d => d.quantidade > 0);
+    
     chartFrequenciaAtestados = new Chart(ctx, {
-        type: 'doughnut',
+        type: 'bar',
         data: {
-            labels: dados.map(d => d.frequencia),
+            labels: dadosFiltrados.map(d => d.frequencia),
             datasets: [{
-                label: 'Funcionários',
-                data: dados.map(d => d.quantidade),
-                backgroundColor: PALETA_EMPRESA.slice(0, 5)
+                label: 'Quantidade de Funcionários',
+                data: dadosFiltrados.map(d => d.quantidade),
+                backgroundColor: CORES_EMPRESA.primary,
+                borderRadius: 6
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'right', labels: { font: { size: 11 } } }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y} funcionário(s)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    },
+                    title: {
+                        display: true,
+                        text: 'Quantidade de Funcionários',
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Número de Atestados',
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                }
             }
         }
     });
