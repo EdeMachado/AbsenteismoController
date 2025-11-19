@@ -91,6 +91,21 @@ let chartSetorGenero = null;
 let chartProdutividade = null;
 let chartProdutividadeEvolucao = null;
 let chartProdutividadeMensalCategoria = null;
+let chartVariacaoMensal = null;
+let chartGeneroMensal = null;
+let chartQuantidadeAtestados = null;
+
+function formatarMesCurto(mesReferencia) {
+    if (!mesReferencia || typeof mesReferencia !== 'string') return mesReferencia || '';
+    const partes = mesReferencia.split('-');
+    if (partes.length < 2) return mesReferencia;
+    const ano = partes[0];
+    const mes = parseInt(partes[1], 10);
+    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    if (isNaN(mes) || mes < 1 || mes > 12) return mesReferencia;
+    const anoCurto = ano.length === 4 ? ano.slice(-2) : ano;
+    return `${nomesMeses[mes - 1]}/${anoCurto}`;
+}
 
 const getClientId = () => (typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null);
 
@@ -236,6 +251,9 @@ function limparTodosDadosDashboard() {
     chartProdutividade = null;
     chartProdutividadeEvolucao = null;
     chartProdutividadeMensalCategoria = null;
+    chartVariacaoMensal = null;
+    chartGeneroMensal = null;
+    chartQuantidadeAtestados = null;
     
     // Gráficos de horas perdidas (Roda de Ouro)
     if (window.chartHorasPerdidasGenero) {
@@ -425,11 +443,18 @@ async function carregarDashboard() {
         if (data.evolucao_mensal && data.evolucao_mensal.length > 0) {
             console.log('[DEBUG] Renderizando gráfico de Evolução com', data.evolucao_mensal.length, 'itens');
             renderizarChartEvolucao(data.evolucao_mensal);
+            renderizarChartQuantidadeAtestados(data.evolucao_mensal);
+        }
+        if (data.variacao_mensal && data.variacao_mensal.length > 0) {
+            renderizarChartVariacaoMensal(data.variacao_mensal);
         }
         
         // Gráfico de Gênero
         if (data.distribuicao_genero && data.distribuicao_genero.length > 0) {
             renderizarChartGenero(data.distribuicao_genero);
+        }
+        if (data.genero_mensal && data.genero_mensal.length > 0) {
+            renderizarChartGeneroMensal(data.genero_mensal);
         }
         
         // Gráfico de Funcionários
@@ -993,26 +1018,24 @@ function renderizarChartEvolucao(dados) {
     chartEvolucao = null;
     
     chartEvolucao = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: dados.map(d => d.mes || 'N/A'),
             datasets: [
                 {
-                    label: 'Dias Perdidos',
-                    data: dados.map(d => d.dias_perdidos || 0),
-                    borderColor: CORES_EMPRESA.primary,
-                    backgroundColor: (CORES_EMPRESA.primaryLight || CORES_EMPRESA.primary) + '40',
-                    fill: true,
-                    tension: 0.4,
+                    label: 'Horas Perdidas',
+                    data: dados.map(d => d.horas_perdidas || 0),
+                    backgroundColor: CORES_EMPRESA.primary,
+                    borderColor: CORES_EMPRESA.primaryDark || CORES_EMPRESA.primary,
+                    borderWidth: 1,
                     yAxisID: 'y'
                 },
                 {
-                    label: 'Quantidade de Atestados',
-                    data: dados.map(d => d.quantidade || 0),
-                    borderColor: CORES_EMPRESA.secondary,
-                    backgroundColor: (CORES_EMPRESA.secondaryLight || CORES_EMPRESA.secondary) + '40',
-                    fill: true,
-                    tension: 0.4,
+                    label: 'Dias Perdidos',
+                    data: dados.map(d => d.dias_perdidos || 0),
+                    backgroundColor: CORES_EMPRESA.secondary,
+                    borderColor: CORES_EMPRESA.secondaryDark || CORES_EMPRESA.secondary,
+                    borderWidth: 1,
                     yAxisID: 'y1'
                 }
             ]
@@ -1022,7 +1045,20 @@ function renderizarChartEvolucao(dados) {
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { display: true, position: 'top' }
+                legend: { display: true, position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const index = context.dataIndex;
+                            const item = dados[index];
+                            if (context.datasetIndex === 0) {
+                                return `Horas Perdidas: ${(item.horas_perdidas || 0).toFixed(2)}h`;
+                            } else {
+                                return `Dias Perdidos: ${item.dias_perdidos || 0} dias`;
+                            }
+                        }
+                    }
+                }
             },
             scales: {
                 y: {
@@ -1030,6 +1066,11 @@ function renderizarChartEvolucao(dados) {
                     type: 'linear',
                     display: true,
                     position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Horas Perdidas',
+                        color: CORES_EMPRESA.primary
+                    }
                 },
                 y1: {
                     beginAtZero: true,
@@ -1039,6 +1080,11 @@ function renderizarChartEvolucao(dados) {
                     grid: {
                         drawOnChartArea: false,
                     },
+                    title: {
+                        display: true,
+                        text: 'Dias Perdidos',
+                        color: CORES_EMPRESA.secondary
+                    }
                 }
             }
         }
@@ -1052,22 +1098,288 @@ function renderizarChartGenero(dados) {
     destruirGraficoSeguro('chartGenero', chartGenero);
     chartGenero = null;
     
+    // Normaliza e agrupa os dados para evitar duplicações
+    const generosAgrupados = {};
+    dados.forEach(d => {
+        const genero = String(d.genero || '').trim().toUpperCase();
+        let generoNormalizado = null;
+        
+        if (genero.startsWith('M') || genero === 'MASCULINO' || genero === 'MALE') {
+            generoNormalizado = 'M';
+        } else if (genero.startsWith('F') || genero === 'FEMININO' || genero === 'FEMALE') {
+            generoNormalizado = 'F';
+        }
+        
+        if (generoNormalizado) {
+            if (!generosAgrupados[generoNormalizado]) {
+                generosAgrupados[generoNormalizado] = {
+                    quantidade: 0,
+                    dias_perdidos: 0
+                };
+            }
+            generosAgrupados[generoNormalizado].quantidade += parseInt(d.quantidade || 0);
+            generosAgrupados[generoNormalizado].dias_perdidos += parseFloat(d.dias_perdidos || 0);
+        }
+    });
+    
+    // Prepara os dados ordenados: M primeiro, depois F
+    const labels = [];
+    const valores = [];
+    const cores = [];
+    
+    // Define cores explicitamente
+    const corMasculino = '#1a237e'; // Azul marinho
+    const corFeminino = '#556B2F'; // Verde oliva padrão do sistema
+    
+    if (generosAgrupados['M']) {
+        labels.push('Masculino');
+        valores.push(generosAgrupados['M'].quantidade);
+        cores.push(corMasculino);
+    }
+    
+    if (generosAgrupados['F']) {
+        labels.push('Feminino');
+        valores.push(generosAgrupados['F'].quantidade);
+        cores.push(corFeminino); // Verde oliva padrão do sistema
+    }
+    
+    if (labels.length === 0) return;
+    
     chartGenero = new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: dados.map(d => d.genero === 'M' ? 'Masculino' : 'Feminino'),
+            labels: labels,
             datasets: [{
-                data: dados.map(d => d.quantidade),
-                backgroundColor: [CORES_EMPRESA.feminino, CORES_EMPRESA.masculino]
+                data: valores,
+                backgroundColor: cores
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom', labels: { font: { size: 11 } } }
+                legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return 'Funcionários por Gênero';
+                        },
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} funcionários (${percentage}%)`;
+                        },
+                        footer: function(context) {
+                            const total = context[0].dataset.data.reduce((a, b) => a + b, 0);
+                            return `Total: ${total} funcionários`;
+                        }
+                    }
+                }
             }
         }
+    });
+}
+
+function renderizarChartVariacaoMensal(dados) {
+    const ctx = document.getElementById('chartVariacaoMensal');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartVariacaoMensal', chartVariacaoMensal);
+    chartVariacaoMensal = null;
+    
+    const labels = dados.map(d => formatarMesCurto(d.mes));
+    const variacaoDias = dados.map(d => d.variacao_dias || 0);
+    const variacaoHoras = dados.map(d => d.variacao_horas || 0);
+    
+    chartVariacaoMensal = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Variação de Dias',
+                    data: variacaoDias,
+                    backgroundColor: CORES_EMPRESA.primary,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Variação de Horas',
+                    data: variacaoHoras,
+                    backgroundColor: CORES_EMPRESA.secondary,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { stacked: false },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: value => `${value > 0 ? '+' : ''}${value}`
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        afterBody: function(context) {
+                            const index = context[0].dataIndex;
+                            const item = dados[index];
+                            return [
+                                `Dias atuais: ${(item.dias || 0).toFixed(2)}`,
+                                `Horas atuais: ${(item.horas || 0).toFixed(2)}`
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderizarChartGeneroMensal(dados) {
+    const ctx = document.getElementById('chartGeneroMensal');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartGeneroMensal', chartGeneroMensal);
+    chartGeneroMensal = null;
+    
+    const mapaMeses = new Map();
+    dados.forEach(item => {
+        const mes = formatarMesCurto(item.mes);
+        if (!mapaMeses.has(mes)) {
+            mapaMeses.set(mes, { M: 0, F: 0 });
+        }
+        const genero = item.genero;
+        if (genero === 'M' || genero === 'F') {
+            mapaMeses.get(mes)[genero] += item.quantidade || 0;
+        }
+    });
+    
+    const labels = Array.from(mapaMeses.keys());
+    const masculino = labels.map(label => mapaMeses.get(label).M);
+    const feminino = labels.map(label => mapaMeses.get(label).F);
+    
+    chartGeneroMensal = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Masculino',
+                    data: masculino,
+                    backgroundColor: '#1a237e',
+                    stack: 'genero'
+                },
+                {
+                    label: 'Feminino',
+                    data: feminino,
+                    backgroundColor: '#556B2F',
+                    stack: 'genero'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { stacked: true },
+                y: { stacked: true, beginAtZero: true }
+            }
+        }
+    });
+}
+
+function renderizarChartQuantidadeAtestados(dados) {
+    const ctx = document.getElementById('chartQuantidadeAtestados');
+    if (!ctx || !dados || dados.length === 0) return;
+    
+    destruirGraficoSeguro('chartQuantidadeAtestados', chartQuantidadeAtestados);
+    chartQuantidadeAtestados = null;
+    
+    const labels = dados.map(d => formatarMesCurto(d.mes));
+    const quantidades = dados.map(d => d.quantidade || 0);
+    
+    chartQuantidadeAtestados = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Quantidade de Atestados',
+                data: quantidades,
+                backgroundColor: CORES_EMPRESA.primary,
+                borderRadius: 6,
+                barThickness: 30,  // Barras mais finas
+                maxBarThickness: 35
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Atestados: ${context.parsed.y}`;
+                        }
+                    }
+                },
+                datalabels: {
+                    display: true,
+                    color: '#000',
+                    anchor: 'end',
+                    align: 'top',
+                    formatter: function(value) {
+                        return value;
+                    },
+                    font: {
+                        weight: 'bold',
+                        size: 11
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        },
+        plugins: [{
+            afterDatasetsDraw: function(chart) {
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach(function(dataset, i) {
+                    const meta = chart.getDatasetMeta(i);
+                    if (!meta.hidden) {
+                        meta.data.forEach(function(element, index) {
+                            ctx.fillStyle = '#000';
+                            const fontSize = 11;
+                            const fontStyle = 'bold';
+                            const fontFamily = 'Arial';
+                            ctx.font = fontStyle + ' ' + fontSize + 'px ' + fontFamily;
+                            
+                            const dataString = dataset.data[index].toString();
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            
+                            const padding = 5;
+                            const position = element.tooltipPosition();
+                            ctx.fillText(dataString, position.x, position.y - padding);
+                        });
+                    }
+                });
+            }
+        }]
     });
 }
 

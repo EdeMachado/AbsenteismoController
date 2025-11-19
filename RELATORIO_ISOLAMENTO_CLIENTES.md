@@ -221,3 +221,7 @@ def validar_client_id(db: Session, client_id: int) -> Client:
 
 
 
+
+
+
+

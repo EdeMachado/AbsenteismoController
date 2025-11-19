@@ -17,3 +17,4 @@ matplotlib>=3.5.0
 numpy>=1.21.0
 psutil>=5.9.0
 schedule>=1.2.0
+gunicorn>=21.2.0

@@ -412,3 +412,70 @@ if (typeof window !== 'undefined') {
     };
 }
 
+// Função global para baixar o app desktop
+async function downloadApp() {
+    try {
+        // Obter token
+        const token = getAccessToken();
+        if (!token) {
+            alert('Você precisa estar logado para baixar o app. Redirecionando...');
+            window.location.href = '/landing';
+            return;
+        }
+        
+        // Mostrar loading
+        const loadingMsg = document.createElement('div');
+        loadingMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #1a237e; color: white; padding: 15px 25px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px;';
+        loadingMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Preparando download...</span>';
+        document.body.appendChild(loadingMsg);
+        
+        // Tentar baixar via API primeiro
+        try {
+            const response = await fetch('/api/download/app', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                // Obter blob do arquivo
+                const blob = await response.blob();
+                
+                // Criar link de download
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'AbsenteismoController.exe';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                // Sucesso
+                loadingMsg.innerHTML = '<i class="fas fa-check"></i> <span>Download iniciado!</span>';
+                setTimeout(() => {
+                    if (document.body.contains(loadingMsg)) {
+                        document.body.removeChild(loadingMsg);
+                    }
+                }, 2000);
+                return;
+            }
+        } catch (apiError) {
+            console.log('API não disponível, usando arquivo estático');
+        }
+        
+        // Se API não funcionar, mostrar mensagem
+        document.body.removeChild(loadingMsg);
+        alert('Não foi possível baixar o app.\n\nErro: ' + (apiError?.message || 'Desconhecido') + '\n\nEntre em contato com o administrador.');
+        
+    } catch (error) {
+        console.error('Erro ao baixar app:', error);
+        alert('Erro ao baixar o app: ' + error.message);
+        const loadingMsg = document.querySelector('div[style*="position: fixed"]');
+        if (loadingMsg) {
+            document.body.removeChild(loadingMsg);
+        }
+    }
+}
+

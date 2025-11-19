@@ -40,8 +40,25 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
 def ensure_column(table_name: str, column_name: str, column_definition: str):
-    """Ensure a column exists in a table, adding it if missing (SQLite only)."""
+    """
+    Ensure a column exists in a table, adding it if missing (SQLite only).
+    
+    SECURITY: Valida table_name e column_name para prevenir SQL injection.
+    Estes valores são controlados internamente, mas validamos por segurança.
+    """
+    # Validação de segurança - apenas caracteres alfanuméricos e underscore
+    import re
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', table_name):
+        raise ValueError(f"Invalid table name: {table_name}")
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', column_name):
+        raise ValueError(f"Invalid column name: {column_name}")
+    # column_definition deve ser validado também
+    if not re.match(r'^[A-Za-z0-9_()\s,]+$', column_definition):
+        raise ValueError(f"Invalid column definition: {column_definition}")
+    
     with engine.connect() as connection:
+        # Usa text() com validação - SQLite não suporta parâmetros nomeados em DDL
+        # Mas validamos os valores antes
         result = connection.execute(text(f"PRAGMA table_info({table_name})"))
         columns = [row[1] for row in result]
         if column_name not in columns:

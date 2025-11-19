@@ -170,6 +170,8 @@ async function carregarApresentacao(forceClientId = null) {
         console.log('[APRESENTACAO] Resposta completa:', data);
         console.log('[APRESENTACAO] Slides carregados:', slides.length, 'para cliente:', clientId);
         console.log('[APRESENTACAO] Primeiros 3 slides:', slides.slice(0, 3));
+        console.log('[APRESENTACAO] Últimos 5 slides:', slides.slice(-5));
+        console.log('[APRESENTACAO] Slides de ações:', slides.filter(s => s.tipo && s.tipo.startsWith('acoes')));
         
         // Ajusta header para RODA DE OURO (preto-cinza)
         if (clientId === 4) {
@@ -750,29 +752,188 @@ function renderizarGrafico(slide) {
                 }
             };
             break;
+        
+        case 'quantidade_atestados':
+            const labelsQtd = dados.map(d => {
+                const mes = d.mes || '';
+                const partes = mes.split('-');
+                if (partes.length === 2) {
+                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    const anoC = partes[0].slice(-2);
+                    return `${nomesMeses[parseInt(partes[1])-1]}/${anoC}`;
+                }
+                return mes;
+            });
+            config = {
+                type: 'bar',
+                data: {
+                    labels: labelsQtd,
+                    datasets: [{
+                        label: 'Quantidade de Atestados',
+                        data: dados.map(d => d.quantidade || 0),
+                        backgroundColor: CORES_EMPRESA.primary,
+                        borderRadius: 6,
+                        barThickness: 30
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                },
+                plugins: [{
+                    afterDatasetsDraw: function(chart) {
+                        const ctx = chart.ctx;
+                        chart.data.datasets.forEach(function(dataset, i) {
+                            const meta = chart.getDatasetMeta(i);
+                            if (!meta.hidden) {
+                                meta.data.forEach(function(element, index) {
+                                    ctx.fillStyle = '#000';
+                                    ctx.font = 'bold 11px Arial';
+                                    const dataString = dataset.data[index].toString();
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'bottom';
+                                    const position = element.tooltipPosition();
+                                    ctx.fillText(dataString, position.x, position.y - 5);
+                                });
+                            }
+                        });
+                    }
+                }]
+            };
+            break;
+        
+        case 'variacao_mensal':
+            const labelsVar = dados.map(d => {
+                const mes = d.mes || '';
+                const partes = mes.split('-');
+                if (partes.length === 2) {
+                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    const anoC = partes[0].slice(-2);
+                    return `${nomesMeses[parseInt(partes[1])-1]}/${anoC}`;
+                }
+                return mes;
+            });
+            config = {
+                type: 'bar',
+                data: {
+                    labels: labelsVar,
+                    datasets: [
+                        {
+                            label: 'Variação de Dias',
+                            data: dados.map(d => d.variacao_dias || 0),
+                            backgroundColor: CORES_EMPRESA.primary,
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Variação de Horas',
+                            data: dados.map(d => d.variacao_horas || 0),
+                            backgroundColor: CORES_EMPRESA.secondary,
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { font: { size: 10 } } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => `${value > 0 ? '+' : ''}${value}`
+                            }
+                        }
+                    }
+                }
+            };
+            break;
+        
+        case 'genero_mensal':
+            const labelsGen = [];
+            const mapaMeses = new Map();
+            dados.forEach(item => {
+                const mes = item.mes || '';
+                const partes = mes.split('-');
+                let mesFormatado = mes;
+                if (partes.length === 2) {
+                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    const anoC = partes[0].slice(-2);
+                    mesFormatado = `${nomesMeses[parseInt(partes[1])-1]}/${anoC}`;
+                }
+                if (!mapaMeses.has(mesFormatado)) {
+                    mapaMeses.set(mesFormatado, { M: 0, F: 0 });
+                    labelsGen.push(mesFormatado);
+                }
+                const genero = item.genero;
+                if (genero === 'M' || genero === 'F') {
+                    mapaMeses.get(mesFormatado)[genero] += item.quantidade || 0;
+                }
+            });
+            const masculino = labelsGen.map(label => mapaMeses.get(label).M);
+            const feminino = labelsGen.map(label => mapaMeses.get(label).F);
+            config = {
+                type: 'bar',
+                data: {
+                    labels: labelsGen,
+                    datasets: [
+                        {
+                            label: 'Masculino',
+                            data: masculino,
+                            backgroundColor: '#1a237e',
+                            stack: 'genero'
+                        },
+                        {
+                            label: 'Feminino',
+                            data: feminino,
+                            backgroundColor: '#556B2F',
+                            stack: 'genero'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { font: { size: 10 } } }
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true }
+                    }
+                }
+            };
+            break;
             
         case 'evolucao_mensal':
             config = {
-                type: 'line',
+                type: 'bar',
                 data: {
                     labels: dados.map(d => d.mes || 'N/A'),
                     datasets: [
                         {
-                            label: 'Dias Perdidos',
-                            data: dados.map(d => d.dias_perdidos || 0),
-                            borderColor: CORES_EMPRESA.primary,
-                            backgroundColor: CORES_EMPRESA.primaryLight + '40',
-                            fill: true,
-                            tension: 0.4,
+                            label: 'Horas Perdidas',
+                            data: dados.map(d => d.horas_perdidas || 0),
+                            backgroundColor: CORES_EMPRESA.primary,
+                            borderColor: CORES_EMPRESA.primaryDark,
+                            borderWidth: 1,
                             yAxisID: 'y'
                         },
                         {
-                            label: 'Quantidade de Atestados',
-                            data: dados.map(d => d.quantidade || 0),
-                            borderColor: CORES_EMPRESA.secondary,
-                            backgroundColor: CORES_EMPRESA.secondaryLight + '40',
-                            fill: true,
-                            tension: 0.4,
+                            label: 'Dias Perdidos',
+                            data: dados.map(d => d.dias_perdidos || 0),
+                            backgroundColor: CORES_EMPRESA.secondary,
+                            borderColor: CORES_EMPRESA.secondaryDark,
+                            borderWidth: 1,
                             yAxisID: 'y1'
                         }
                     ]
@@ -793,9 +954,9 @@ function renderizarGrafico(slide) {
                                     const index = context.dataIndex;
                                     const item = dados[index];
                                     if (context.datasetIndex === 0) {
-                                        return `Dias Perdidos: ${item.dias_perdidos || 0}`;
+                                        return `Horas Perdidas: ${(item.horas_perdidas || 0).toFixed(2)}h`;
                                     } else {
-                                        return `Atestados: ${item.quantidade || 0}`;
+                                        return `Dias Perdidos: ${item.dias_perdidos || 0} dias`;
                                     }
                                 }
                             }
@@ -809,7 +970,7 @@ function renderizarGrafico(slide) {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Dias Perdidos',
+                                text: 'Horas Perdidas',
                                 color: CORES_EMPRESA.primary
                             }
                         },
@@ -821,7 +982,7 @@ function renderizarGrafico(slide) {
                             grid: { drawOnChartArea: false },
                             title: {
                                 display: true,
-                                text: 'Quantidade de Atestados',
+                                text: 'Dias Perdidos',
                                 color: CORES_EMPRESA.secondary
                             }
                         }
@@ -2196,7 +2357,7 @@ function renderizarAcoesSaudeFisica(tipo) {
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0; position: relative;">
             <!-- Linha decorativa no topo -->
             <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
@@ -2213,8 +2374,8 @@ function renderizarAcoesSaudeFisica(tipo) {
                 </div>
             </div>
             
-            <!-- Conteúdo -->
-            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
+            <!-- Conteúdo - PARAR ANTES DA FAIXA (60px do bottom) -->
+            <div style="position: absolute; top: 120px; left: 40px; right: 40px; bottom: 70px; overflow-y: auto; padding-right: 20px;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeFisica" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeFisica" style="list-style: none; padding: 0; margin: 0;">
@@ -2256,7 +2417,7 @@ function renderizarAcoesSaudeEmocional(tipo) {
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0; position: relative;">
             <!-- Linha decorativa no topo -->
             <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
@@ -2273,8 +2434,8 @@ function renderizarAcoesSaudeEmocional(tipo) {
                 </div>
             </div>
             
-            <!-- Conteúdo -->
-            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
+            <!-- Conteúdo - PARAR ANTES DA FAIXA (60px do bottom) -->
+            <div style="position: absolute; top: 120px; left: 40px; right: 40px; bottom: 70px; overflow-y: auto; padding-right: 20px;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeEmocional" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeEmocional" style="list-style: none; padding: 0; margin: 0;">
@@ -2316,7 +2477,7 @@ function renderizarAcoesSaudeSocial(tipo) {
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0; position: relative;">
             <!-- Linha decorativa no topo -->
             <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
@@ -2333,8 +2494,8 @@ function renderizarAcoesSaudeSocial(tipo) {
                 </div>
             </div>
             
-            <!-- Conteúdo -->
-            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
+            <!-- Conteúdo - PARAR ANTES DA FAIXA (60px do bottom) -->
+            <div style="position: absolute; top: 120px; left: 40px; right: 40px; bottom: 70px; overflow-y: auto; padding-right: 20px;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeSocial" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeSocial" style="list-style: none; padding: 0; margin: 0;">

@@ -1,0 +1,38 @@
+📱 ABSENTEÍSMO CONTROLLER - APP DESKTOP
+========================================
+
+🚀 COMO USAR:
+-------------
+1. Clique duas vezes em: ABRIR_APP_DESKTOP.bat
+2. O app abrirá automaticamente no navegador (modo app)
+3. Faça login normalmente
+
+💡 O QUE É ISSO?
+----------------
+Este arquivo .bat abre o sistema no navegador em "modo app", 
+que é como um aplicativo nativo - sem barra de endereço, 
+parecendo um app instalado.
+
+🎯 CRIAR ATALHO NA ÁREA DE TRABALHO:
+------------------------------------
+1. Clique com botão direito em ABRIR_APP_DESKTOP.bat
+2. Selecione "Criar atalho"
+3. Arraste o atalho para a área de trabalho
+4. Renomeie para "AbsenteismoController"
+5. (Opcional) Clique com botão direito no atalho > Propriedades > Alterar ícone
+
+✅ PRONTO!
+----------
+Agora você tem um "app" na área de trabalho que abre o sistema!
+
+📋 REQUISITOS:
+--------------
+- Windows 10 ou superior
+- Google Chrome (recomendado) ou qualquer navegador
+- Conexão com internet
+
+---
+Desenvolvido por GrupoBiomed
+
+
+

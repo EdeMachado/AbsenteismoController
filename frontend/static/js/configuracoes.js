@@ -271,9 +271,69 @@ async function criarUsuario() {
 // Editar usuário
 function editarUsuario(userId) {
     const user = usersData.find(u => u.id === userId);
-    if (!user) return;
+    if (!user) {
+        mostrarAlert('Usuário não encontrado', 'error');
+        return;
+    }
     
-    mostrarAlert('Funcionalidade de edição em desenvolvimento', 'info');
+    // Preenche o modal com os dados do usuário
+    document.getElementById('editar_user_id').value = user.id;
+    document.getElementById('editar_username').value = user.username;
+    document.getElementById('editar_email').value = user.email;
+    document.getElementById('editar_password').value = '';
+    document.getElementById('editar_nome_completo').value = user.nome_completo || '';
+    document.getElementById('editar_is_admin').checked = user.is_admin || false;
+    document.getElementById('editar_is_active').checked = user.is_active !== false;
+    
+    // Mostra o modal
+    document.getElementById('modalEditarUsuario').style.display = 'flex';
+}
+
+// Fecha modal de edição
+function fecharModalEditarUsuario() {
+    document.getElementById('modalEditarUsuario').style.display = 'none';
+}
+
+// Salva edição do usuário
+async function salvarEdicaoUsuario() {
+    try {
+        const userId = document.getElementById('editar_user_id').value;
+        if (!userId) {
+            mostrarAlert('ID do usuário não encontrado', 'error');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('username', document.getElementById('editar_username').value);
+        formData.append('email', document.getElementById('editar_email').value);
+        
+        const password = document.getElementById('editar_password').value;
+        if (password && password.trim()) {
+            formData.append('password', password);
+        }
+        
+        formData.append('nome_completo', document.getElementById('editar_nome_completo').value);
+        formData.append('is_admin', document.getElementById('editar_is_admin').checked.toString());
+        formData.append('is_active', document.getElementById('editar_is_active').checked.toString());
+        
+        const response = await fetch(`/api/users/${userId}`, {
+            method: 'PUT',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao atualizar usuário');
+        }
+        
+        mostrarAlert('Usuário atualizado com sucesso!', 'success');
+        fecharModalEditarUsuario();
+        carregarUsuarios();
+        
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarAlert(error.message || 'Erro ao atualizar usuário', 'error');
+    }
 }
 
 // Mostra alerta

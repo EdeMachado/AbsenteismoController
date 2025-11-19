@@ -1,0 +1,49 @@
+{
+  "name": "absenteismo-controller",
+  "version": "2.0.0",
+  "description": "AbsenteismoController - App Desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win",
+    "build-all": "electron-builder --win --linux --mac"
+  },
+  "keywords": [
+    "absenteismo",
+    "dashboard",
+    "analytics"
+  ],
+  "author": "GrupoBiomed",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.grupobiomed.absenteismocontroller",
+    "productName": "AbsenteismoController",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "AbsenteismoController-Portable.exe"
+    }
+  }
+}
+
+
+

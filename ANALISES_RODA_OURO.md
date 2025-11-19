@@ -299,3 +299,7 @@ semanas_perdidas = horas_perdidas / 44
 
 
 
+
+
+
+

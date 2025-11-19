@@ -219,8 +219,16 @@ async function uploadFile() {
             }
         }, 200);
         
+        // Obtém token de autenticação
+        const token = localStorage.getItem('access_token');
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch('/api/upload', {
             method: 'POST',
+            headers: headers,
             body: formData
         });
         
@@ -265,29 +273,80 @@ async function uploadFile() {
         } else {
             // Tenta obter a mensagem de erro do servidor
             let errorMessage = 'Erro no upload';
+            let errorDetails = '';
+            let errorData = null;
+            
+            // Clona a resposta para poder ler múltiplas vezes
+            const responseClone = response.clone();
+            
             try {
-                const errorData = await response.json();
-                errorMessage = errorData.detail || errorData.message || errorMessage;
+                // Tenta ler como JSON primeiro
+                errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || errorData.error || errorMessage;
+                errorDetails = JSON.stringify(errorData, null, 2);
+                console.log('Erro do servidor (JSON):', errorData);
             } catch (e) {
-                errorMessage = `Erro ${response.status}: ${response.statusText}`;
+                // Se não conseguir ler JSON, tenta ler como texto
+                try {
+                    const textError = await responseClone.text();
+                    console.log('Erro do servidor (texto):', textError);
+                    errorMessage = textError || `Erro ${response.status}: ${response.statusText}`;
+                    errorDetails = textError;
+                    
+                    // Tenta parsear como JSON se for texto JSON
+                    try {
+                        const parsed = JSON.parse(textError);
+                        errorMessage = parsed.detail || parsed.message || errorMessage;
+                        errorDetails = JSON.stringify(parsed, null, 2);
+                    } catch (parseError) {
+                        // Não é JSON, mantém como texto
+                    }
+                } catch (e2) {
+                    errorMessage = `Erro ${response.status}: ${response.statusText}`;
+                    console.error('Erro ao ler resposta:', e2);
+                }
             }
+            
+            // Log detalhado no console para debug
+            console.error('Erro no upload - Detalhes completos:', {
+                status: response.status,
+                statusText: response.statusText,
+                url: response.url,
+                message: errorMessage,
+                details: errorDetails,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+            
+            // Tenta extrair mensagem mais específica
+            if (errorMessage === 'Erro 500: Internal Server Error' || errorMessage === 'Erro no upload') {
+                errorMessage = 'Erro interno no servidor. Verifique os logs do servidor ou entre em contato com o suporte.';
+            }
+            
             throw new Error(errorMessage);
         }
         
     } catch (error) {
-        console.error('Erro:', error);
+        console.error('Erro completo no upload:', error);
         const errorMessage = error.message || 'Erro ao processar arquivo';
+        
+        // Mostra erro no console com mais detalhes
+        console.error('Detalhes do erro:', {
+            message: errorMessage,
+            stack: error.stack,
+            name: error.name
+        });
+        
         document.getElementById('progressFill').style.width = '100%';
         document.getElementById('progressFill').style.background = 'var(--danger)';
         document.getElementById('progressText').textContent = errorMessage;
         
         // Mostra alerta com detalhes do erro
-        alert(`Erro no upload:\n\n${errorMessage}\n\nVerifique:\n- Se o arquivo é um Excel válido (.xlsx ou .xls)\n- Se o cliente está selecionado\n- Se a planilha tem o formato correto`);
+        alert(`Erro no upload:\n\n${errorMessage}\n\nVerifique:\n- Se o arquivo é um Excel válido (.xlsx ou .xls)\n- Se o cliente está selecionado\n- Se a planilha tem o formato correto\n- Abra o console do navegador (F12) para mais detalhes`);
         
         setTimeout(() => {
             document.getElementById('progressContainer').style.display = 'none';
             document.getElementById('progressFill').style.background = 'var(--success)';
-        }, 5000);
+        }, 8000);
     }
 }
 

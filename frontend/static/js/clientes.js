@@ -1049,7 +1049,8 @@ async function entrarCliente(event, id) {
     try {
         salvarSelecaoCliente(cliente, branding);
         atualizarSelecaoVisual(cliente.id);
-        window.location.href = '/';
+        // Redireciona para index.html ao invés de '/' para evitar redirecionamento duplo
+        window.location.href = '/index.html';
     } catch (error) {
         console.error('Erro ao selecionar cliente:', error);
         mostrarErro(error.message);

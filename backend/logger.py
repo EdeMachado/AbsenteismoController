@@ -118,6 +118,12 @@ def log_audit(action: str, user_id: Optional[int] = None,
         ip_address: IP de origem
         details: Detalhes adicionais da ação
     """
+    # Campos reservados do LogRecord que não podem ser sobrescritos
+    RESERVED_FIELDS = {'name', 'msg', 'args', 'created', 'filename', 'funcName', 
+                      'levelname', 'levelno', 'lineno', 'module', 'msecs', 
+                      'message', 'pathname', 'process', 'processName', 'relativeCreated',
+                      'thread', 'threadName', 'exc_info', 'exc_text', 'stack_info'}
+    
     extra = {
         'action': action,
         'user_id': user_id,
@@ -127,7 +133,13 @@ def log_audit(action: str, user_id: Optional[int] = None,
     }
     
     if details:
-        extra.update(details)
+        # Filtra campos reservados do details
+        for key, value in details.items():
+            if key not in RESERVED_FIELDS:
+                extra[key] = value
+            else:
+                # Renomeia campos reservados adicionando prefixo
+                extra[f'ctx_{key}'] = value
     
     audit_logger.info(f"AUDIT: {action}", extra=extra)
 
@@ -175,13 +187,25 @@ def log_error(error: Exception, context: Optional[Dict[str, Any]] = None,
         user_id: ID do usuário (se aplicável)
         client_id: ID do cliente (se aplicável)
     """
+    # Campos reservados do LogRecord que não podem ser sobrescritos
+    RESERVED_FIELDS = {'name', 'msg', 'args', 'created', 'filename', 'funcName', 
+                      'levelname', 'levelno', 'lineno', 'module', 'msecs', 
+                      'message', 'pathname', 'process', 'processName', 'relativeCreated',
+                      'thread', 'threadName', 'exc_info', 'exc_text', 'stack_info'}
+    
     extra = {}
     if user_id:
         extra['user_id'] = user_id
     if client_id:
         extra['client_id'] = client_id
     if context:
-        extra.update(context)
+        # Filtra campos reservados do context
+        for key, value in context.items():
+            if key not in RESERVED_FIELDS:
+                extra[key] = value
+            else:
+                # Renomeia campos reservados adicionando prefixo
+                extra[f'ctx_{key}'] = value
     
     error_logger.error(
         f"ERROR: {type(error).__name__}: {str(error)}",
@@ -213,6 +237,12 @@ def log_operation(operation: str, status: str = 'success',
     if duration_ms:
         message += f" | DURATION: {duration_ms:.2f}ms"
     
+    # Campos reservados do LogRecord que não podem ser sobrescritos
+    RESERVED_FIELDS = {'name', 'msg', 'args', 'created', 'filename', 'funcName', 
+                      'levelname', 'levelno', 'lineno', 'module', 'msecs', 
+                      'message', 'pathname', 'process', 'processName', 'relativeCreated',
+                      'thread', 'threadName', 'exc_info', 'exc_text', 'stack_info'}
+    
     extra = {
         'operation': operation,
         'status': status,
@@ -223,7 +253,13 @@ def log_operation(operation: str, status: str = 'success',
     if duration_ms:
         extra['duration_ms'] = duration_ms
     if details:
-        extra.update(details)
+        # Filtra campos reservados do details
+        for key, value in details.items():
+            if key not in RESERVED_FIELDS:
+                extra[key] = value
+            else:
+                # Renomeia campos reservados adicionando prefixo
+                extra[f'ctx_{key}'] = value
     
     app_logger.log(level, message, extra=extra)
 

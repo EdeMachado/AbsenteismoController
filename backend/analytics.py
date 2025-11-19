@@ -259,6 +259,18 @@ class Analytics:
     
     def distribuicao_genero(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """Distribuição por gênero"""
+        # Função para normalizar gênero
+        def normalizar_genero(genero_str):
+            if not genero_str:
+                return None
+            genero_str = str(genero_str).strip().upper()
+            # Normaliza para M ou F
+            if genero_str.startswith('M') or genero_str == 'MASCULINO' or genero_str == 'MALE':
+                return 'M'
+            elif genero_str.startswith('F') or genero_str == 'FEMININO' or genero_str == 'FEMALE':
+                return 'F'
+            return None
+        
         query = self.db.query(
             Atestado.genero,
             func.count(Atestado.id).label('quantidade'),
@@ -279,19 +291,184 @@ class Analytics:
         query = aplicar_filtro_funcionario(query, funcionario)
         query = aplicar_filtro_setor(query, setor)
 
+        results = query.all()
         
-        query = query.group_by(Atestado.genero)
+        # Agrupa e normaliza os resultados
+        generos_agrupados = {}
+        for r in results:
+            genero_normalizado = normalizar_genero(r.genero)
+            if genero_normalizado:
+                if genero_normalizado not in generos_agrupados:
+                    generos_agrupados[genero_normalizado] = {
+                        'quantidade': 0,
+                        'dias_perdidos': 0.0
+                    }
+                generos_agrupados[genero_normalizado]['quantidade'] += r.quantidade
+                generos_agrupados[genero_normalizado]['dias_perdidos'] += float(r.dias_perdidos or 0)
+        
+        # Retorna lista ordenada: M primeiro, depois F
+        resultado = []
+        if 'M' in generos_agrupados:
+            resultado.append({
+                'genero': 'M',
+                'quantidade': generos_agrupados['M']['quantidade'],
+                'dias_perdidos': round(generos_agrupados['M']['dias_perdidos'], 2)
+            })
+        if 'F' in generos_agrupados:
+            resultado.append({
+                'genero': 'F',
+                'quantidade': generos_agrupados['F']['quantidade'],
+                'dias_perdidos': round(generos_agrupados['F']['dias_perdidos'], 2)
+            })
+        
+        return resultado
+    
+    def distribuicao_genero_funcionarios(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Distribuição de FUNCIONÁRIOS ÚNICOS por gênero"""
+        # Função para normalizar gênero
+        def normalizar_genero(genero_str):
+            if not genero_str:
+                return None
+            genero_str = str(genero_str).strip().upper()
+            # Normaliza para M ou F
+            if genero_str.startswith('M') or genero_str == 'MASCULINO' or genero_str == 'MALE':
+                return 'M'
+            elif genero_str.startswith('F') or genero_str == 'FEMININO' or genero_str == 'FEMALE':
+                return 'F'
+            return None
+        
+        # Busca TODOS os registros (não agrupa ainda) para processar em Python
+        # Isso garante que pegamos o gênero correto de cada funcionário
+        query = self.db.query(
+            Atestado.nomecompleto,
+            Atestado.genero
+        ).join(Upload).filter(
+            Upload.client_id == client_id,
+            Atestado.nomecompleto != '',
+            Atestado.nomecompleto.isnot(None),
+            Atestado.genero != '',
+            Atestado.genero.isnot(None)
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        # Aplica filtros usando helper
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        # Busca todos os registros
+        results = query.all()
+        
+        # Agrupa funcionários únicos por gênero normalizado
+        # Usa dict para armazenar o gênero de cada funcionário único
+        funcionarios_unicos = {}  # {nome: genero_normalizado}
+        
+        for r in results:
+            nome_func = r.nomecompleto.strip() if r.nomecompleto else None
+            if not nome_func:
+                continue
+                
+            genero_normalizado = normalizar_genero(r.genero)
+            if genero_normalizado:
+                # Se o funcionário já existe, mantém o gênero (assumindo que é o mesmo)
+                # Se não existe, adiciona
+                if nome_func not in funcionarios_unicos:
+                    funcionarios_unicos[nome_func] = genero_normalizado
+        
+        # Conta funcionários por gênero
+        contagem_por_genero = {'M': 0, 'F': 0}
+        generos_nao_normalizados = {}  # Para debug
+        
+        for nome, genero in funcionarios_unicos.items():
+            if genero in contagem_por_genero:
+                contagem_por_genero[genero] += 1
+            else:
+                # Debug: coleta gêneros que não foram normalizados
+                if genero not in generos_nao_normalizados:
+                    generos_nao_normalizados[genero] = 0
+                generos_nao_normalizados[genero] += 1
+        
+        # Log para debug (pode remover depois)
+        if generos_nao_normalizados:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Gêneros não normalizados encontrados: {generos_nao_normalizados}")
+        
+        # Monta resultado
+        resultado = []
+        if contagem_por_genero['M'] > 0:
+            resultado.append({
+                'genero': 'M',
+                'quantidade': contagem_por_genero['M'],
+                'dias_perdidos': 0
+            })
+        if contagem_por_genero['F'] > 0:
+            resultado.append({
+                'genero': 'F',
+                'quantidade': contagem_por_genero['F'],
+                'dias_perdidos': 0
+            })
+        
+        return resultado
+    
+    def distribuicao_genero_mensal(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
+        """Distribuição mensal por gênero (atestados)"""
+        # Função de normalização reaproveitada
+        def normalizar_genero(genero_str):
+            if not genero_str:
+                return None
+            genero_str = str(genero_str).strip().upper()
+            if genero_str.startswith('M') or genero_str == 'MASCULINO' or genero_str == 'MALE':
+                return 'M'
+            if genero_str.startswith('F') or genero_str == 'FEMININO' or genero_str == 'FEMALE':
+                return 'F'
+            return None
+        
+        query = self.db.query(
+            Upload.mes_referencia.label('mes'),
+            Atestado.genero,
+            func.count(Atestado.id).label('quantidade'),
+            func.sum(Atestado.dias_atestados).label('dias_perdidos'),
+            func.sum(Atestado.horas_perdi).label('horas_perdidas')
+        ).join(Upload).filter(
+            Upload.client_id == client_id,
+            Atestado.genero != '',
+            Atestado.genero.isnot(None),
+            Atestado.nomecompleto != '',
+            Atestado.nomecompleto.isnot(None)
+        )
+        
+        if mes_inicio:
+            query = query.filter(Upload.mes_referencia >= mes_inicio)
+        if mes_fim:
+            query = query.filter(Upload.mes_referencia <= mes_fim)
+        
+        from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
+        query = aplicar_filtro_funcionario(query, funcionario)
+        query = aplicar_filtro_setor(query, setor)
+        
+        query = query.group_by(Upload.mes_referencia, Atestado.genero).order_by(Upload.mes_referencia.asc())
         
         results = query.all()
         
-        return [
-            {
-                'genero': r.genero,
-                'quantidade': r.quantidade,
-                'dias_perdidos': round(r.dias_perdidos or 0, 2)
-            }
-            for r in results
-        ]
+        dados = []
+        for r in results:
+            genero_normalizado = normalizar_genero(r.genero)
+            if not genero_normalizado:
+                continue
+            dados.append({
+                'mes': r.mes,
+                'genero': genero_normalizado,
+                'quantidade': int(r.quantidade or 0),
+                'dias_perdidos': round(float(r.dias_perdidos or 0), 2),
+                'horas_perdidas': round(float(r.horas_perdidas or 0), 2)
+            })
+        
+        return dados
     
     def top_escalas(self, client_id: int, limit: int = 10, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """TOP Escalas com mais atestados"""

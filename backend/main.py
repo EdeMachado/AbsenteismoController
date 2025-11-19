@@ -54,6 +54,58 @@ app = FastAPI(
     description="Sistema de Gestão de Absenteísmo"
 )
 
+# Exception handler global para garantir que todos os erros retornem JSON
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handler global para capturar todos os erros não tratados"""
+    import traceback
+    
+    # Se já é HTTPException, retorna como está
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+    
+    # Log do erro
+    error_traceback = traceback.format_exc()
+    error_logger.error(
+        f"Erro não tratado: {str(exc)}",
+        exc_info=True,
+        extra={
+            'path': request.url.path,
+            'method': request.method,
+            'traceback': error_traceback
+        }
+    )
+    
+    # Retorna erro como JSON
+    error_type = type(exc).__name__
+    error_str = str(exc)
+    
+    # Em produção, mostra tipo de erro e mensagem resumida
+    if os.getenv("ENVIRONMENT", "development") != "development":
+        # Mensagens específicas por tipo de erro
+        if "Permission" in error_type or "permission" in error_str.lower():
+            error_message = "Erro de permissão. Verifique as permissões da pasta uploads/ no servidor."
+        elif "FileNotFound" in error_type or "no such file" in error_str.lower():
+            error_message = "Arquivo ou diretório não encontrado. Verifique se a pasta uploads/ existe."
+        elif "Database" in error_type or "database" in error_str.lower() or "sql" in error_str.lower():
+            error_message = "Erro no banco de dados. Verifique a conexão e as tabelas."
+        elif "JSON" in error_type or "json" in error_str.lower():
+            error_message = "Erro ao processar dados JSON. Verifique o formato da planilha."
+        elif "pandas" in error_str.lower() or "excel" in error_str.lower():
+            error_message = "Erro ao processar planilha Excel. Verifique se o arquivo está em formato válido."
+        else:
+            error_message = f"Erro interno: {error_type}. Verifique os logs do servidor para mais detalhes."
+    else:
+        error_message = f"Erro interno no servidor: {error_str} (Tipo: {error_type})"
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": error_message}
+    )
+
 # Configuração para UTF-8
 import sys
 import locale
@@ -87,9 +139,19 @@ def corrigir_encoding_json(dados):
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS - Configuração mais restritiva
+# Em produção, usar variável de ambiente ALLOWED_ORIGINS
+# Exemplo: ALLOWED_ORIGINS=https://www.absenteismocontroller.com.br,https://absenteismocontroller.com.br
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    # Separa por vírgula e remove espaços
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    # Desenvolvimento: permite todos (não usar em produção!)
+    allowed_origins = ["*"] if os.getenv("ENVIRONMENT", "development") == "development" else []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, especificar domínios permitidos
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -337,7 +399,9 @@ async def startup_event():
     
     # Cria usuário admin padrão se não existir
     admin = db.query(User).filter(User.username == "admin").first()
-    if not admin:
+    admin_email = db.query(User).filter(User.email == "admin@grupobiomed.com").first()
+    
+    if not admin and not admin_email:
         admin = User(
             username="admin",
             email="admin@grupobiomed.com",
@@ -400,6 +464,37 @@ async def configuracoes_page():
     file_path = os.path.join(FRONTEND_DIR, "configuracoes.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+@app.get("/download_app", response_class=HTMLResponse)
+async def download_app_page():
+    """Página de download do app desktop"""
+    file_path = os.path.join(FRONTEND_DIR, "download_app.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/api/download/app")
+async def download_app_file(current_user: User = Depends(get_current_active_user)):
+    """Download do executável do app desktop"""
+    app_dir = os.path.join(BASE_DIR, "app-desktop")
+    exe_path = os.path.join(app_dir, "dist", "AbsenteismoController.exe")
+    
+    # Verifica se o executável existe
+    if os.path.exists(exe_path):
+        # Retorna o executável diretamente
+        return FileResponse(
+            exe_path,
+            media_type='application/x-msdownload',
+            filename='AbsenteismoController.exe',
+            headers={
+                'Content-Disposition': 'attachment; filename="AbsenteismoController.exe"'
+            }
+        )
+    else:
+        # Se não encontrar, retorna erro
+        raise HTTPException(
+            status_code=404, 
+            detail="Executável não encontrado. O app ainda não foi compilado. Entre em contato com o administrador."
+        )
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
@@ -816,6 +911,64 @@ async def create_user(
     db.commit()
     return {"message": "Usuário criado com sucesso", "user_id": user.id}
 
+@app.put("/api/users/{user_id}")
+async def update_user(
+    user_id: int,
+    username: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    nome_completo: Optional[str] = Form(None),
+    is_admin: Optional[bool] = Form(None),
+    is_active: Optional[bool] = Form(None),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Atualiza usuário (apenas admin)"""
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Não permite editar a si mesmo (proteção)
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não é possível editar seu próprio usuário")
+    
+    # Atualiza campos se fornecidos
+    if username is not None:
+        # Verifica se username já existe em outro usuário
+        existing = db.query(User).filter(
+            User.username == username,
+            User.id != user_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username já existe")
+        user.username = username
+    
+    if email is not None:
+        # Verifica se email já existe em outro usuário
+        existing = db.query(User).filter(
+            User.email == email,
+            User.id != user_id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email já existe")
+        user.email = email
+    
+    if password is not None and password.strip():
+        user.password_hash = get_password_hash(password)
+    
+    if nome_completo is not None:
+        user.nome_completo = nome_completo
+    
+    if is_admin is not None:
+        user.is_admin = is_admin
+    
+    if is_active is not None:
+        user.is_active = is_active
+    
+    db.commit()
+    return {"message": "Usuário atualizado com sucesso"}
+
 @app.post("/api/upload")
 async def upload_file(
     file: UploadFile = File(...),
@@ -831,10 +984,11 @@ async def upload_file(
     
     try:
         # Log de início da operação
+        # Nota: 'filename' é campo reservado do LogRecord, usar 'file_name' ao invés
         app_logger.info(f"Iniciando upload de planilha para cliente {client_id}", extra={
             'user_id': current_user.id,
             'client_id': client_id,
-            'filename': file.filename,
+            'file_name': file.filename,  # Renomeado de 'filename' para evitar conflito
             'ip_address': client_ip
         })
         
@@ -848,26 +1002,69 @@ async def upload_file(
             client_id=client_id,
             resource='upload',
             ip_address=client_ip,
-            details={'filename': file.filename, 'mes_referencia': mes_referencia}
+            details={'file_name': file.filename, 'mes_referencia': mes_referencia}  # Renomeado de 'filename' para evitar conflito
         )
         
         # Valida se o arquivo foi enviado
-        if not file.filename:
+        if not file or not file.filename:
             raise HTTPException(status_code=400, detail="Nenhum arquivo foi enviado")
         
         # Valida extensão do arquivo
         if not file.filename.lower().endswith(('.xlsx', '.xls')):
             raise HTTPException(status_code=400, detail="Formato de arquivo inválido. Use .xlsx ou .xls")
         
+        # Verifica se o diretório de uploads existe e tem permissão
+        try:
+            os.makedirs(UPLOADS_DIR, exist_ok=True)
+            # Testa se consegue escrever no diretório
+            test_file = os.path.join(UPLOADS_DIR, '.test_write')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erro de permissão no diretório de uploads: {str(e)}"
+                )
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erro ao acessar diretório de uploads: {str(e)}"
+            )
+        
         # Salva arquivo
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         saved_filename = f"{timestamp}_{file.filename}"
         file_path = os.path.join(UPLOADS_DIR, saved_filename)
         
-        os.makedirs(UPLOADS_DIR, exist_ok=True)
+        try:
+            with open(file_path, "wb") as buffer:
+                # Lê o conteúdo do arquivo
+                content = await file.read()
+                buffer.write(content)
+        except Exception as e:
+            # Remove arquivo parcial se existir
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erro ao salvar arquivo: {str(e)}"
+            )
         
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Verifica se o arquivo foi salvo corretamente
+        if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(
+                status_code=500,
+                detail="Arquivo não foi salvo corretamente. Tente novamente."
+            )
         
         # Busca mapeamento customizado do cliente (se existir)
         custom_mapping = None
@@ -1023,6 +1220,36 @@ async def upload_file(
                     except:
                         reg_filtrado['tipo_info_atestado'] = None
                 
+                # Garante que dados_originais é string JSON válida ou None
+                if 'dados_originais' in reg_filtrado:
+                    dados_orig = reg_filtrado['dados_originais']
+                    if dados_orig is not None:
+                        # Se já é string, verifica se é JSON válido
+                        if isinstance(dados_orig, str):
+                            try:
+                                # Valida se é JSON válido
+                                json.loads(dados_orig)
+                                # Se passou, mantém como está
+                            except (json.JSONDecodeError, TypeError):
+                                # Se não for JSON válido, tenta converter dict para JSON
+                                try:
+                                    if isinstance(dados_orig, dict):
+                                        reg_filtrado['dados_originais'] = json.dumps(dados_orig, ensure_ascii=False, default=str)
+                                    else:
+                                        reg_filtrado['dados_originais'] = None
+                                except:
+                                    reg_filtrado['dados_originais'] = None
+                        elif isinstance(dados_orig, dict):
+                            # Se for dict, converte para JSON string
+                            try:
+                                reg_filtrado['dados_originais'] = json.dumps(dados_orig, ensure_ascii=False, default=str)
+                            except:
+                                reg_filtrado['dados_originais'] = None
+                        else:
+                            reg_filtrado['dados_originais'] = None
+                    else:
+                        reg_filtrado['dados_originais'] = None
+                
                 atestado = Atestado(
                     upload_id=upload.id,
                     **reg_filtrado
@@ -1049,7 +1276,7 @@ async def upload_file(
                 'upload_id': upload.id,
                 'total_registros': len(registros),
                 'mes_referencia': mes_ref,
-                'filename': file.filename
+                'file_name': file.filename  # Renomeado de 'filename' para evitar conflito
             }
         )
         
@@ -1093,24 +1320,82 @@ async def upload_file(
         db.rollback()
         duration_ms = (time.time() - start_time) * 1000
         
-        # Log de erro detalhado
-        log_error(
-            e,
-            context={
-                'operation': 'upload_file',
-                'client_id': client_id,
-                'filename': file.filename if file else None,
-                'duration_ms': duration_ms
-            },
-            user_id=current_user.id if 'current_user' in locals() else None,
-            client_id=client_id
-        )
+        # Captura traceback completo para debug
+        import traceback
+        error_traceback = traceback.format_exc()
         
-        # Não expor detalhes internos ao usuário
-        app_logger.error(f"Erro ao processar upload: {str(e)}", exc_info=True)
+        # Log de erro detalhado - com tratamento para evitar erro no logger
+        try:
+            log_error(
+                e,
+                context={
+                    'operation': 'upload_file',
+                    'file_name': file.filename if 'file' in locals() and file else None,
+                    'duration_ms': duration_ms,
+                    'error_traceback': error_traceback  # Renomeado de 'traceback' para evitar conflito
+                },
+                user_id=current_user.id if 'current_user' in locals() else None,
+                client_id=client_id if 'client_id' in locals() else None
+            )
+        except Exception as log_err:
+            # Se o log falhar, pelo menos registra no console
+            print(f"\n{'='*60}")
+            print(f"ERRO AO TENTAR LOGAR (ignorado): {log_err}")
+            print(f"ERRO ORIGINAL NO UPLOAD:")
+            print(f"Tipo: {type(e).__name__}")
+            print(f"Mensagem: {str(e)}")
+            print(f"{'='*60}\n")
+        
+        # Log completo no console para debug (sempre funciona)
+        try:
+            app_logger.error(f"Erro ao processar upload: {str(e)}", exc_info=True)
+        except:
+            pass  # Se falhar, ignora
+        
+        print(f"\n{'='*60}")
+        print(f"ERRO NO UPLOAD:")
+        print(f"Tipo: {type(e).__name__}")
+        print(f"Mensagem: {str(e)}")
+        print(f"Traceback completo:")
+        print(error_traceback)
+        print(f"{'='*60}\n")
+        
+        # Retorna mensagem mais específica baseada no tipo de erro
+        error_message = "Erro ao processar planilha. Verifique o formato do arquivo e tente novamente."
+        
+        error_str = str(e).lower()
+        error_type = type(e).__name__
+        
+        # Mensagens específicas por tipo de erro
+        if "permission" in error_str or "acesso" in error_str or "denied" in error_str or "PermissionError" in error_type:
+            error_message = "Erro de permissão ao acessar o arquivo. Verifique as permissões do sistema."
+        elif "no such file" in error_str or "arquivo não encontrado" in error_str or "FileNotFoundError" in error_type:
+            error_message = "Arquivo não encontrado. Verifique se o arquivo foi enviado corretamente."
+        elif "decode" in error_str or "encoding" in error_str or "codificação" in error_str or "UnicodeDecodeError" in error_type:
+            error_message = "Erro de codificação no arquivo. Certifique-se de que o arquivo está em formato Excel válido."
+        elif "database" in error_str or "sql" in error_str or "banco" in error_str or "IntegrityError" in error_type or "OperationalError" in error_type:
+            error_message = "Erro ao salvar no banco de dados. Tente novamente ou entre em contato com o suporte."
+        elif "authentication" in error_str or "token" in error_str or "login" in error_str:
+            error_message = "Erro de autenticação. Faça login novamente."
+        elif "client" in error_str or "cliente" in error_str or "client_id" in error_str:
+            error_message = f"Erro relacionado ao cliente: {str(e)}"
+        elif "json" in error_str or "JSONDecodeError" in error_type or "serialize" in error_str:
+            error_message = "Erro ao processar dados da planilha. Verifique se o arquivo não está corrompido."
+        elif "pandas" in error_str or "excel" in error_str or "read_excel" in error_str:
+            error_message = "Erro ao ler arquivo Excel. Verifique se o arquivo está em formato .xlsx ou .xls válido."
+        elif "memory" in error_str or "MemoryError" in error_type:
+            error_message = "Arquivo muito grande. Tente dividir a planilha em partes menores."
+        else:
+            # Para debug, inclui mais detalhes
+            if os.getenv("ENVIRONMENT", "development") == "development":
+                error_message = f"Erro ao processar upload: {str(e)} (Tipo: {error_type})"
+            else:
+                error_message = f"Erro ao processar planilha: {str(e)[:100]}"
+        
+        # Garante que a mensagem de erro seja retornada corretamente
         raise HTTPException(
             status_code=500, 
-            detail="Erro ao processar planilha. Verifique o formato do arquivo e tente novamente."
+            detail=error_message
         )
 
 @app.get("/api/uploads")
@@ -1190,11 +1475,51 @@ async def dashboard(
             print(f"Erro ao calcular evolução mensal: {e}")
             evolucao = []
         
+        # Calcula variações mês a mês (dias/horas) para análises comparativas
+        variacao_mensal = []
+        if evolucao:
+            anterior = None
+            for item in evolucao:
+                current_dias = float(item.get('dias_perdidos') or 0)
+                current_horas = float(item.get('horas_perdidas') or 0)
+                registro = {
+                    "mes": item.get('mes'),
+                    "dias": round(current_dias, 2),
+                    "horas": round(current_horas, 2),
+                    "variacao_dias": 0.0,
+                    "variacao_horas": 0.0,
+                    "percentual_dias": None,
+                    "percentual_horas": None
+                }
+                
+                if anterior:
+                    variacao_dias = current_dias - anterior.get('dias_perdidos', 0)
+                    variacao_horas = current_horas - anterior.get('horas_perdidas', 0)
+                    registro["variacao_dias"] = round(variacao_dias, 2)
+                    registro["variacao_horas"] = round(variacao_horas, 2)
+                    registro["percentual_dias"] = round(((variacao_dias / anterior.get('dias_perdidos', 1)) * 100), 2) if anterior.get('dias_perdidos') else None
+                    registro["percentual_horas"] = round(((variacao_horas / anterior.get('horas_perdidas', 1)) * 100), 2) if anterior.get('horas_perdidas') else None
+                else:
+                    registro["variacao_dias"] = 0.0
+                    registro["variacao_horas"] = 0.0
+                
+                variacao_mensal.append(registro)
+                anterior = {
+                    'dias_perdidos': current_dias,
+                    'horas_perdidas': current_horas
+                }
+        
         try:
-            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+            distribuicao_genero = analytics.distribuicao_genero_funcionarios(client_id, mes_inicio, mes_fim, funcionario, setor)
         except Exception as e:
             print(f"Erro ao calcular distribuição de gênero: {e}")
             distribuicao_genero = []
+        
+        try:
+            genero_mensal = analytics.distribuicao_genero_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição mensal por gênero: {e}")
+            genero_mensal = []
         
         try:
             top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
@@ -1432,7 +1757,9 @@ async def dashboard(
             "top_cids": top_cids,
             "top_setores": top_setores,
             "evolucao_mensal": evolucao,
+            "variacao_mensal": variacao_mensal,
             "distribuicao_genero": distribuicao_genero,
+            "genero_mensal": genero_mensal,
             "top_funcionarios": top_funcionarios,
             "top_escalas": top_escalas,
             "top_motivos": top_motivos,
@@ -2785,11 +3112,48 @@ async def dados_apresentacao(
             print(f"Erro ao calcular evolução mensal: {e}")
             evolucao = []
         
+        # Calcula variações mês a mês
+        variacao_mensal = []
+        if evolucao:
+            anterior = None
+            for item in evolucao:
+                current_dias = float(item.get('dias_perdidos') or 0)
+                current_horas = float(item.get('horas_perdidas') or 0)
+                registro = {
+                    "mes": item.get('mes'),
+                    "dias": round(current_dias, 2),
+                    "horas": round(current_horas, 2),
+                    "variacao_dias": 0.0,
+                    "variacao_horas": 0.0,
+                    "percentual_dias": None,
+                    "percentual_horas": None
+                }
+                
+                if anterior:
+                    variacao_dias = current_dias - anterior.get('dias_perdidos', 0)
+                    variacao_horas = current_horas - anterior.get('horas_perdidas', 0)
+                    registro["variacao_dias"] = round(variacao_dias, 2)
+                    registro["variacao_horas"] = round(variacao_horas, 2)
+                    registro["percentual_dias"] = round(((variacao_dias / anterior.get('dias_perdidos', 1)) * 100), 2) if anterior.get('dias_perdidos') else None
+                    registro["percentual_horas"] = round(((variacao_horas / anterior.get('horas_perdidas', 1)) * 100), 2) if anterior.get('horas_perdidas') else None
+                
+                variacao_mensal.append(registro)
+                anterior = {
+                    'dias_perdidos': current_dias,
+                    'horas_perdidas': current_horas
+                }
+        
         try:
-            distribuicao_genero = analytics.distribuicao_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
+            distribuicao_genero = analytics.distribuicao_genero_funcionarios(client_id, mes_inicio, mes_fim, funcionario, setor)
         except Exception as e:
             print(f"Erro ao calcular distribuição de gênero: {e}")
             distribuicao_genero = []
+        
+        try:
+            genero_mensal = analytics.distribuicao_genero_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+        except Exception as e:
+            print(f"Erro ao calcular distribuição mensal por gênero: {e}")
+            genero_mensal = []
         
         try:
             top_funcionarios = analytics.top_funcionarios(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
@@ -2920,6 +3284,39 @@ async def dados_apresentacao(
                     "subtitulo": "Últimos 12 meses",
                     "dados": evolucao,
                     "analise": analise_evol
+                })
+            
+            # Slide 4.1: Quantidade de Atestados por Mês
+            if evolucao:
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "quantidade_atestados",
+                    "titulo": "Quantidade de Atestados por Mês",
+                    "subtitulo": "Total de atestados registrados mensalmente",
+                    "dados": evolucao,
+                    "analise": "Acompanhamento da quantidade total de atestados ao longo dos meses."
+                })
+            
+            # Slide 4.2: Variação Mensal
+            if variacao_mensal:
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "variacao_mensal",
+                    "titulo": "Variação Mensal",
+                    "subtitulo": "Diferença mês a mês (dias x horas)",
+                    "dados": variacao_mensal,
+                    "analise": "Análise das variações mensais para identificar tendências de aumento ou redução."
+                })
+            
+            # Slide 4.3: Distribuição Mensal por Gênero
+            if genero_mensal:
+                slides.append({
+                    "id": len(slides),
+                    "tipo": "genero_mensal",
+                    "titulo": "Distribuição Mensal por Gênero",
+                    "subtitulo": "Participação mensal de Masculino x Feminino",
+                    "dados": genero_mensal,
+                    "analise": "Acompanhamento da distribuição por gênero ao longo dos meses."
                 })
             
             # Slide 5: TOP 5 Setores
@@ -3357,8 +3754,46 @@ async def dados_apresentacao(
             except Exception as e:
                 print(f"Erro ao calcular análise detalhada gênero para apresentação: {e}")
         
-        # REMOVIDO: Slides de Ações vazios causavam páginas em branco no PDF
-        # Se precisar adicionar slides de ações no futuro, devem ter conteúdo real (dados ou análise)
+        # Slides de Ações (Intervenção Colaboradores)
+        # Slide de introdução
+        slides.append({
+            "id": len(slides),
+            "tipo": "acoes_intro",
+            "titulo": "Intervenções Junto aos Colaboradores",
+            "subtitulo": "Ações de Promoção de Saúde",
+            "dados": {},
+            "analise": ""
+        })
+        
+        # Slide de Saúde Física
+        slides.append({
+            "id": len(slides),
+            "tipo": "acoes_saude_fisica",
+            "titulo": "Saúde Física",
+            "subtitulo": "Promoção da saúde preventiva e autocuidado",
+            "dados": {},
+            "analise": ""
+        })
+        
+        # Slide de Saúde Emocional
+        slides.append({
+            "id": len(slides),
+            "tipo": "acoes_saude_emocional",
+            "titulo": "Saúde Emocional",
+            "subtitulo": "Bem-estar emocional e resiliência",
+            "dados": {},
+            "analise": ""
+        })
+        
+        # Slide de Saúde Social
+        slides.append({
+            "id": len(slides),
+            "tipo": "acoes_saude_social",
+            "titulo": "Saúde Social",
+            "subtitulo": "Relações interpessoais e clima organizacional",
+            "dados": {},
+            "analise": ""
+        })
         
         tempo_total = time.time() - inicio
         print(f"[APRESENTACAO] ===== FIM - Total de slides: {len(slides)} - Tempo: {tempo_total:.2f}s =====")

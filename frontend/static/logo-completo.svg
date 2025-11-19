@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 150">
+  <defs>
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a237e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3949ab;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  
+  <!-- Fundo do ícone com sombra -->
+  <rect x="20" y="25" width="100" height="100" rx="20" fill="url(#logoGrad)" filter="url(#shadow)"/>
+  
+  <!-- Letra A estilizada -->
+  <path d="M 70 40 L 40 115 L 50 115 L 55 95 L 85 95 L 90 115 L 100 115 Z M 67 75 L 73 75 L 70 60 Z" 
+        fill="white" 
+        stroke="white" 
+        stroke-width="3" 
+        stroke-linejoin="round"/>
+  
+  <!-- Linha decorativa -->
+  <rect x="35" y="120" width="70" height="4" rx="2" fill="white" opacity="0.8"/>
+  
+  <!-- Texto principal -->
+  <text x="140" y="65" font-family="'Segoe UI', Arial, sans-serif" font-size="42" font-weight="700" fill="#1a237e" letter-spacing="-1">
+    Absenteismo
+  </text>
+  <text x="140" y="100" font-family="'Segoe UI', Arial, sans-serif" font-size="32" font-weight="600" fill="#3949ab" letter-spacing="2">
+    CONTROLLER
+  </text>
+  
+  <!-- Linha decorativa abaixo do texto -->
+  <line x1="140" y1="110" x2="480" y2="110" stroke="#3949ab" stroke-width="2" opacity="0.3"/>
+</svg>
+
+
+

@@ -8,12 +8,33 @@ import bcrypt
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from typing import Optional
+import os
+import secrets
 from .database import get_db
 from .models import User, Config
-import secrets
+
+# Carrega variáveis de ambiente do arquivo .env se existir
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv não instalado, continua sem carregar .env
+    pass
 
 # Configuração de segurança
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"  # Em produção, usar variável de ambiente
+# SECRET_KEY deve ser definida via variável de ambiente SECRET_KEY
+# Se não estiver definida, gera uma nova (apenas para desenvolvimento)
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    # Gera uma chave aleatória para desenvolvimento (NÃO usar em produção)
+    SECRET_KEY = secrets.token_urlsafe(32)
+    import warnings
+    warnings.warn(
+        "SECRET_KEY não definida em variável de ambiente! "
+        "Usando chave gerada automaticamente. "
+        "IMPORTANTE: Defina SECRET_KEY como variável de ambiente em produção.",
+        UserWarning
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 horas
 
