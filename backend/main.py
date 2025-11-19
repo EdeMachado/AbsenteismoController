@@ -1404,11 +1404,11 @@ async def list_uploads(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Lista uploads"""
+    """Lista uploads ordenados por mês de referência (mais recente primeiro)"""
     # Valida client_id
     validar_client_id(db, client_id)
     
-    uploads = db.query(Upload).filter(Upload.client_id == client_id).order_by(Upload.data_upload.desc()).all()
+    uploads = db.query(Upload).filter(Upload.client_id == client_id).order_by(Upload.mes_referencia.desc()).all()
     
     return [
         {
