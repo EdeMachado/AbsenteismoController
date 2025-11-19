@@ -99,6 +99,7 @@ class Analytics:
         query = self.db.query(
             Atestado.cid,
             Atestado.diagnostico,
+            Atestado.descricao_cid,
             func.count(Atestado.id).label('quantidade'),
             func.sum(Atestado.dias_atestados).label('dias_perdidos')
         ).join(Upload).filter(
@@ -117,19 +118,39 @@ class Analytics:
         query = aplicar_filtro_funcionario(query, funcionario)
         query = aplicar_filtro_setor(query, setor)
         
-        query = query.group_by(Atestado.cid, Atestado.diagnostico).order_by(func.count(Atestado.id).desc()).limit(limit)
+        query = query.group_by(Atestado.cid, Atestado.diagnostico, Atestado.descricao_cid).order_by(func.count(Atestado.id).desc()).limit(limit)
         
         results = query.all()
         
-        return [
-            {
+        # CORREÇÃO: Prioriza diagnostico da planilha, depois descricao_cid oficial, depois 'Não informado'
+        # Evita usar textos genéricos como "Diagnóstico não especificado"
+        diagnosticos_genericos = [
+            'diagnóstico não especificado', 'não especificado', 'nao especificado',
+            'sem diagnóstico', 'sem diagnostico', 's/ diagnóstico', 's/ diagnostico',
+            'não informado', 'nao informado', '', None
+        ]
+        
+        resultado_final = []
+        for r in results:
+            # Normaliza diagnóstico da planilha
+            diag_planilha = (r.diagnostico or '').strip().lower()
+            
+            # Se diagnóstico da planilha é genérico/vazio, usa descricao_cid oficial
+            if diag_planilha in diagnosticos_genericos:
+                descricao = r.descricao_cid or 'Não informado'
+            else:
+                # Usa diagnóstico da planilha (mais específico)
+                descricao = r.diagnostico or r.descricao_cid or 'Não informado'
+            
+            resultado_final.append({
                 'cid': r.cid,
-                'descricao': r.diagnostico or 'Não informado',
+                'descricao': descricao,
+                'diagnostico': descricao,  # Alias para compatibilidade
                 'quantidade': r.quantidade,
                 'dias_perdidos': round(r.dias_perdidos or 0, 2)
-            }
-            for r in results
-        ]
+            })
+        
+        return resultado_final
     
     def top_setores(self, client_id: int, limit: int = 5, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """TOP Setores"""
@@ -667,6 +688,7 @@ class Analytics:
         query = self.db.query(
             Atestado.cid,
             Atestado.diagnostico,
+            Atestado.descricao_cid,
             func.count(Atestado.id).label('quantidade'),
             func.sum(Atestado.dias_atestados).label('total_dias'),
             func.avg(Atestado.dias_atestados).label('media_dias')
@@ -688,20 +710,36 @@ class Analytics:
         query = aplicar_filtro_setor(query, setor)
 
         
-        query = query.group_by(Atestado.cid, Atestado.diagnostico).order_by(func.avg(Atestado.dias_atestados).desc()).limit(limit)
+        query = query.group_by(Atestado.cid, Atestado.diagnostico, Atestado.descricao_cid).order_by(func.avg(Atestado.dias_atestados).desc()).limit(limit)
         
         results = query.all()
         
-        return [
-            {
+        # CORREÇÃO: Mesma lógica de priorização de diagnóstico
+        diagnosticos_genericos = [
+            'diagnóstico não especificado', 'não especificado', 'nao especificado',
+            'sem diagnóstico', 'sem diagnostico', 's/ diagnóstico', 's/ diagnostico',
+            'não informado', 'nao informado', '', None
+        ]
+        
+        resultado_final = []
+        for r in results:
+            diag_planilha = (r.diagnostico or '').strip().lower()
+            
+            if diag_planilha in diagnosticos_genericos:
+                descricao = r.descricao_cid or 'Não informado'
+            else:
+                descricao = r.diagnostico or r.descricao_cid or 'Não informado'
+            
+            resultado_final.append({
                 'cid': r.cid,
-                'diagnostico': r.diagnostico or 'Não informado',
+                'diagnostico': descricao,
+                'descricao': descricao,  # Alias para compatibilidade
                 'quantidade': r.quantidade,
                 'total_dias': round(r.total_dias or 0, 2),
                 'media_dias': round(r.media_dias or 0, 2)
-            }
-            for r in results
-        ]
+            })
+        
+        return resultado_final
     
     def dias_perdidos_por_motivo(self, client_id: int, limit: int = 10, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """Dias perdidos por motivo de atestado"""
@@ -2239,7 +2277,8 @@ class Analytics:
             # Busca top CIDs deste setor
             query = self.db.query(
                 Atestado.cid,
-                Atestado.doenca,
+                Atestado.diagnostico,
+                Atestado.descricao_cid,
                 func.sum(Atestado.dias_atestados).label('total_dias'),
                 func.count(Atestado.id).label('quantidade')
             ).join(Upload).filter(
@@ -2247,7 +2286,8 @@ class Analytics:
                 Atestado.setor == setor
             ).group_by(
                 Atestado.cid,
-                Atestado.doenca
+                Atestado.diagnostico,
+                Atestado.descricao_cid
             ).order_by(
                 func.sum(Atestado.dias_atestados).desc()
             ).limit(top_n)
@@ -2262,11 +2302,26 @@ class Analytics:
             
             cids = query.all()
             
+            # CORREÇÃO: Mesma lógica de priorização de diagnóstico
+            diagnosticos_genericos = [
+                'diagnóstico não especificado', 'não especificado', 'nao especificado',
+                'sem diagnóstico', 'sem diagnostico', 's/ diagnóstico', 's/ diagnostico',
+                'não informado', 'nao informado', '', None
+            ]
+            
             cids_lista = []
             for c in cids:
+                diag_planilha = (c.diagnostico or '').strip().lower()
+                
+                if diag_planilha in diagnosticos_genericos:
+                    descricao = c.descricao_cid or 'Não informado'
+                else:
+                    descricao = c.diagnostico or c.descricao_cid or 'Não informado'
+                
                 cids_lista.append({
                     'cid': c.cid or 'N/A',
-                    'doenca': c.doenca or 'Não informado',
+                    'doenca': descricao,
+                    'descricao': descricao,  # Alias
                     'dias_perdidos': round(float(c.total_dias or 0), 2),
                     'quantidade': c.quantidade or 0
                 })
