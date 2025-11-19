@@ -780,7 +780,15 @@ function renderizarGrafico(slide) {
             config = {
                 type: 'bar',
                 data: {
-                    labels: cidsOrdenados.map(d => truncate(d.descricao || d.cid, 28)),
+                    // CORREÇÃO: Se descricao == cid, mostra só o código
+                    labels: cidsOrdenados.map(d => {
+                        const desc = d.descricao || d.diagnostico || d.cid;
+                        // Se descrição é igual ao CID, mostra apenas o CID
+                        if (desc === d.cid) {
+                            return truncate(d.cid, 28);
+                        }
+                        return truncate(desc, 28);
+                    }),
                     datasets: [{
                         label: 'Atestados',
                         data: cidsOrdenados.map(d => d.quantidade),
@@ -804,7 +812,9 @@ function renderizarGrafico(slide) {
                                 label: function(context) {
                                     const index = context.dataIndex;
                                     const item = cidsOrdenados[index];
-                                    const diagnostico = item.descricao || item.diagnostico || 'Não especificado';
+                                    const desc = item.descricao || item.diagnostico || item.cid;
+                                    // Se descrição é igual ao CID, não repete
+                                    const diagnostico = (desc === item.cid) ? 'Sem diagnóstico específico' : desc;
                                     return [
                                         `Diagnóstico: ${diagnostico}`,
                                         `Quantidade: ${item.quantidade || 0} atestados`
@@ -1600,7 +1610,15 @@ function renderizarGrafico(slide) {
             config = {
                 type: 'bar',
                 data: {
-                    labels: top10MediaCid.map(d => truncate(d.cid + ' - ' + (d.diagnostico || d.descricao || ''), 30)),
+                    // CORREÇÃO: Se descricao == cid, mostra apenas o código
+                    labels: top10MediaCid.map(d => {
+                        const desc = d.diagnostico || d.descricao || d.cid;
+                        // Se descrição é igual ao CID, mostra apenas o CID
+                        if (desc === d.cid) {
+                            return truncate(d.cid, 30);
+                        }
+                        return truncate(d.cid + ' - ' + desc, 30);
+                    }),
                     datasets: [{
                         label: 'Média de Dias',
                         data: top10MediaCid.map(d => d.media_dias || 0),
@@ -1619,11 +1637,13 @@ function renderizarGrafico(slide) {
                                 label: function(context) {
                                     const index = context.dataIndex;
                                     const item = top10MediaCid[index];
+                                    const desc = item.diagnostico || item.descricao || item.cid;
+                                    const diagnostico = (desc === item.cid) ? 'Sem diagnóstico específico' : desc;
                                     return [
                                         `Média: ${item.media_dias || 0} dias`,
                                         `Total de dias: ${item.total_dias || 0}`,
                                         `Quantidade: ${item.quantidade || 0} atestados`,
-                                        `Diagnóstico: ${item.diagnostico || item.descricao || 'N/A'}`
+                                        `Diagnóstico: ${diagnostico}`
                                     ];
                                 }
                             }
