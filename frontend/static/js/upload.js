@@ -423,14 +423,14 @@ async function loadUploads() {
                     <i class="fas fa-file-excel" style="color: var(--success); margin-right: 8px;"></i>
                     ${u.filename}
                 </td>
-                <td>${formatMesReferencia(u.mes_referencia)}</td>
+                <td><strong>${formatMesReferencia(u.mes_referencia)}</strong></td>
                 <td>${formatDateTime(u.data_upload)}</td>
-                <td>${u.total_registros}</td>
-                <td>
-                    <a href="/dados_powerbi?upload_id=${u.id}" class="btn btn-secondary btn-icon" title="Ver e editar dados">
+                <td><strong>${u.total_registros}</strong></td>
+                <td style="text-align: center;">
+                    <a href="/dados_powerbi?upload_id=${u.id}" class="btn btn-primary btn-icon" title="Ver e editar dados" style="background: #1976d2; border: none;">
                         <i class="fas fa-eye"></i>
                     </a>
-                    <button onclick="deleteUpload(${u.id})" class="btn btn-secondary btn-icon" title="Deletar" style="margin-left: 8px;">
+                    <button onclick="deleteUpload(${u.id})" class="btn btn-danger btn-icon" title="Deletar" style="margin-left: 8px; background: #d32f2f; border: none; color: white;">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
