@@ -97,6 +97,7 @@ let chartQuantidadeAtestados = null;
 let chartAtestadosVsTaxa = null;
 let chartComparativoAnoAnterior = null;
 let chartSazonalidade = null;
+let chartTopCidsSetor = null;
 
 // Função para exportar gráfico individual como PNG
 function exportarGraficoIndividual(chartInstance, nomeArquivo) {
@@ -542,10 +543,8 @@ async function carregarDashboard() {
             renderizarHeatmap(data.heatmap_setores_meses);
         }
         
-        // Top CIDs por Setor
-        if (data.top_cids_por_setor && data.top_cids_por_setor.length > 0) {
-            renderizarTopCidsSetor(data.top_cids_por_setor);
-        }
+        // Top CIDs por Setor - sempre renderiza (mesmo sem dados para limpar container)
+        renderizarTopCidsSetor(data.top_cids_por_setor || []);
         
         // Gráfico de Funcionários
         if (data.top_funcionarios && data.top_funcionarios.length > 0) {
@@ -1831,42 +1830,173 @@ function renderizarHeatmap(dados) {
 }
 
 function renderizarTopCidsSetor(dados) {
-    const container = document.getElementById('topCidsSetorContainer');
-    if (!container || !dados || dados.length === 0) {
-        if (container) container.innerHTML = '<p style="text-align: center; color: #999;">Sem dados para exibir</p>';
+    const ctx = document.getElementById('chartTopCidsSetor');
+    if (!ctx || !dados || !Array.isArray(dados) || dados.length === 0) {
+        if (ctx) {
+            // Limpa gráfico anterior se existir
+            destruirGraficoSeguro('chartTopCidsSetor', chartTopCidsSetor);
+        }
         return;
     }
     
-    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">';
+    // Destrói gráfico anterior se existir
+    destruirGraficoSeguro('chartTopCidsSetor', chartTopCidsSetor);
+    chartTopCidsSetor = null;
     
-    dados.forEach(setorData => {
-        const setor = setorData.setor || 'Não informado';
-        const cids = setorData.top_cids || [];
+    try {
+        // Organiza dados: pega top 3 CIDs de cada setor
+        const setores = [];
+        const datasets = [];
+        const coresPaleta = PALETA_EMPRESA || ['#1a237e', '#3949ab', '#5c6bc0', '#7986cb', '#9fa8da'];
         
-        html += '<div style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; background: #fafafa;">';
-        html += `<div style="font-weight: bold; font-size: 14px; margin-bottom: 12px; color: #333; border-bottom: 2px solid ${CORES_EMPRESA.primary}; padding-bottom: 8px;">${setor}</div>`;
+        // Filtra e valida setores com dados
+        const setoresValidos = dados.filter(setorData => 
+            setorData && 
+            setorData.setor && 
+            Array.isArray(setorData.top_cids) && 
+            setorData.top_cids.length > 0
+        );
         
-        if (cids.length === 0) {
-            html += '<p style="color: #999; font-size: 12px;">Sem dados</p>';
-        } else {
-            cids.forEach((cid, idx) => {
-                html += '<div style="margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 6px; border-left: 3px solid ' + CORES_EMPRESA.primary + ';">';
-                html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">`;
-                html += `<span style="font-weight: 600; font-size: 13px; color: ${CORES_EMPRESA.primary};">${idx + 1}º - ${cid.cid}</span>`;
-                html += `<span style="font-weight: bold; font-size: 13px; color: #d32f2f;">${cid.dias_perdidos} dias</span>`;
-                html += `</div>`;
-                html += `<div style="font-size: 11px; color: #666; margin-bottom: 4px;">${cid.doenca}</div>`;
-                html += `<div style="font-size: 10px; color: #999;">${cid.quantidade} atestado(s)</div>`;
-                html += '</div>';
-            });
+        if (setoresValidos.length === 0) {
+            return;
         }
         
-        html += '</div>';
-    });
-    
-    html += '</div>';
-    
-    container.innerHTML = html;
+        // Limita a 10 setores para não poluir o gráfico
+        const setoresLimitados = setoresValidos.slice(0, 10);
+        
+        // Pega todos os setores
+        setoresLimitados.forEach(setorData => {
+            setores.push(setorData.setor || 'Não informado');
+        });
+        
+        // Identifica quantos CIDs únicos existem no máximo (top 3 por setor)
+        const maxCids = 3;
+        
+        // Cria datasets: um para cada posição de CID (1º, 2º, 3º)
+        for (let pos = 0; pos < maxCids; pos++) {
+            const dadosPosicao = [];
+            const labelCids = [];
+            
+            setoresLimitados.forEach(setorData => {
+                const cid = setorData.top_cids[pos];
+                if (cid) {
+                    dadosPosicao.push(cid.dias_perdidos || 0);
+                    labelCids.push(cid.cid || 'N/A');
+                } else {
+                    dadosPosicao.push(0);
+                    labelCids.push('');
+                }
+            });
+            
+            // Só adiciona dataset se houver pelo menos um valor > 0
+            if (dadosPosicao.some(val => val > 0)) {
+                datasets.push({
+                    label: pos === 0 ? '1º CID' : pos === 1 ? '2º CID' : '3º CID',
+                    data: dadosPosicao,
+                    backgroundColor: coresPaleta[pos % coresPaleta.length],
+                    borderRadius: 6,
+                    barThickness: 'flex',
+                    maxBarThickness: 40
+                });
+            }
+        }
+        
+        if (datasets.length === 0) {
+            return;
+        }
+        
+        // Cria o gráfico
+        chartTopCidsSetor = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: setores.map(s => truncate(s, 20)),
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15,
+                            font: { size: 12 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                const setorIndex = context[0].dataIndex;
+                                return setores[setorIndex] || '';
+                            },
+                            label: function(context) {
+                                const setorIndex = context.dataIndex;
+                                const datasetIndex = context.datasetIndex;
+                                const setorData = setoresLimitados[setorIndex];
+                                
+                                if (!setorData || !setorData.top_cids[datasetIndex]) {
+                                    return '';
+                                }
+                                
+                                const cid = setorData.top_cids[datasetIndex];
+                                const cidCodigo = cid.cid || 'N/A';
+                                const doenca = cid.doenca || cid.descricao || '';
+                                const dias = context.parsed.x || 0;
+                                const quantidade = cid.quantidade || 0;
+                                
+                                const labels = [
+                                    `CID ${cidCodigo}: ${dias.toFixed(1)} dias`,
+                                    `Atestados: ${quantidade}`
+                                ];
+                                
+                                if (doenca && doenca !== cidCodigo) {
+                                    labels.splice(1, 0, doenca);
+                                }
+                                
+                                return labels;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Dias Perdidos',
+                            font: { size: 12, weight: 'bold' }
+                        },
+                        ticks: {
+                            font: { size: 11 }
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            font: { size: 11 }
+                        },
+                        grid: {
+                            display: true
+                        }
+                    }
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error('[Top CIDs por Setor] Erro ao renderizar gráfico:', error);
+        chartTopCidsSetor = null;
+    }
+}
+
+// Função helper para escape HTML
+function escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function renderizarChartMediaCid(dados) {
