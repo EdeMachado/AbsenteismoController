@@ -1,0 +1,57 @@
+========================================
+  COMANDOS PARA FAZER DEPLOY NO SERVIDOR
+========================================
+
+PASSO 1: Conectar ao servidor
+------------------------------
+Execute este comando (substitua SEU_USUARIO pelo seu usuário SSH):
+
+ssh -p 65002 SEU_USUARIO@72.60.166.55
+
+Quando pedir a senha, digite a senha SSH do servidor.
+
+
+PASSO 2: Navegar até a pasta do sistema
+----------------------------------------
+Depois de conectar, execute:
+
+cd ~/domains/absenteismocontroller.com.br/public_html/absenteismo
+
+OU se esse caminho não funcionar, tente:
+
+cd ~/public_html/absenteismo
+
+
+PASSO 3: Atualizar o sistema
+-----------------------------
+Execute:
+
+git pull origin main
+
+
+PASSO 4: Sair do servidor
+--------------------------
+Execute:
+
+exit
+
+
+========================================
+  RESUMO DOS COMANDOS (copie e cole)
+========================================
+
+ssh -p 65002 SEU_USUARIO@72.60.166.55
+cd ~/domains/absenteismocontroller.com.br/public_html/absenteismo
+git pull origin main
+exit
+
+
+========================================
+  ALTERNATIVA: Via Terminal da Hostinger
+========================================
+
+1. Acesse o hPanel da Hostinger
+2. Vá em "Avançado" → "Terminal"
+3. Clique em "Abrir Terminal"
+4. Execute os comandos do PASSO 2 e PASSO 3 acima
+

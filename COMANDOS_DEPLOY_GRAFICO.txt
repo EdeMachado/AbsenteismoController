@@ -1,0 +1,20 @@
+========================================
+COMANDOS PARA DEPLOY DA CORREÇÃO
+Caminho: /var/www/absenteismo
+========================================
+
+COPIE E COLE NO POWERSHELL (um comando por vez):
+
+cd "C:\Users\Ede Machado\AbsenteismoConverplast"
+
+scp frontend/index.html root@72.60.166.55:/var/www/absenteismo/frontend/index.html
+
+scp frontend/static/js/dashboard.js root@72.60.166.55:/var/www/absenteismo/frontend/static/js/dashboard.js
+
+========================================
+OU EXECUTE O SCRIPT:
+.\DEPLOY_GRAFICO_CORRIGIDO.ps1
+========================================
+
+
+

@@ -1,0 +1,22 @@
+# COMANDOS PARA DESCOBRIR ONDE ESTÁ O SISTEMA NO SERVIDOR
+
+# 1. Ver onde você está agora:
+pwd
+
+# 2. Listar o que tem na home:
+ls -la
+
+# 3. Procurar pela pasta absenteismo:
+find ~ -name "absenteismo" -type d 2>/dev/null
+
+# 4. Procurar por arquivos do sistema (main.py, index.html):
+find ~ -name "main.py" -path "*/backend/*" 2>/dev/null | head -1
+
+# 5. Ou procurar por index.html:
+find ~ -name "index.html" -path "*/frontend/*" 2>/dev/null | head -1
+
+# 6. Ver se tem git configurado em algum lugar:
+find ~ -name ".git" -type d 2>/dev/null
+
+
+

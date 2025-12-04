@@ -1,0 +1,35 @@
+========================================
+COMANDO PARA DEPLOY NO SERVIDOR
+========================================
+
+SERVIDOR: 72.60.166.55
+PORTA: 65002
+
+OPÇÃO 1 - Executar o script (MAIS FÁCIL):
+   Clique duas vezes em: DEPLOY_SIMPLES.bat
+   Digite o usuário SSH quando solicitado
+   Digite a senha quando solicitado
+
+OPÇÃO 2 - Comando direto (copie e cole no PowerShell):
+
+   Substitua USUARIO_SSH pelo seu usuário SSH e execute:
+
+   ssh -p 65002 USUARIO_SSH@72.60.166.55 "cd ~/domains/absenteismocontroller.com.br/public_html/absenteismo && git pull origin main"
+
+   OU se o caminho for diferente:
+
+   ssh -p 65002 USUARIO_SSH@72.60.166.55 "cd ~/public_html/absenteismo && git pull origin main"
+
+========================================
+APÓS O DEPLOY:
+========================================
+
+1. Acesse: https://www.absenteismocontroller.com.br
+2. Faça login
+3. Vá para Dashboard
+4. Verifique o gráfico "TOP CIDs por Setor" (agora é um gráfico de barras!)
+
+========================================
+
+
+

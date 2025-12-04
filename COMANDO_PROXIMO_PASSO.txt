@@ -1,0 +1,14 @@
+COMANDO PARA COLAR NO TERMINAL SSH:
+
+find ~ -name "main.py" -path "*/backend/*" 2>/dev/null
+
+OU
+
+find ~ -name "index.html" -path "*/frontend/*" 2>/dev/null
+
+OU simplesmente:
+
+ls -la
+
+
+
