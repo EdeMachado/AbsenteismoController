@@ -66,7 +66,17 @@ async function carregarDados() {
             return;
         }
         
-        const response = await fetch(`/api/produtividade?client_id=${clientId}`);
+        // Adiciona timestamp para evitar cache
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/api/produtividade?client_id=${clientId}&_t=${timestamp}`, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
+        
         if (!response.ok) {
             throw new Error(`Erro ${response.status}: ${await response.text()}`);
         }
@@ -87,6 +97,12 @@ async function carregarDados() {
         
         console.log('allData após processamento:', allData);
         console.log('Quantidade de registros:', allData.length);
+        
+        // Limpa a tabela antes de renderizar
+        const tableBodySalvos = document.getElementById('tableBodySalvos');
+        if (tableBodySalvos) {
+            tableBodySalvos.innerHTML = '';
+        }
         
         renderTable();
     } catch (error) {
@@ -403,51 +419,69 @@ async function salvarRegistro() {
                 throw new Error('Registro de Compareceram não encontrado para atualização');
             }
             
+            // Prepara dados para atualização
+            const dadosAgendados = {
+                mes_referencia: mesRefOriginal,
+                numero_tipo: agendadosReg.numero_tipo || '',
+                tipo_consulta: 'Agendados',
+                ocupacionais: agendados.ocupacionais || 0,
+                assistenciais: agendados.assistenciais || 0,
+                acidente_trabalho: agendados.acidente_trabalho || 0,
+                inss: agendados.inss || 0,
+                sinistralidade: agendados.sinistralidade || 0,
+                absenteismo: agendados.absenteismo || 0,
+                pericia_indireta: agendados.pericia_indireta || 0
+            };
+            
+            console.log('Atualizando Agendados:', dadosAgendados);
+            
             // Atualiza registro de Agendados
             const responseAgendados = await fetch(`/api/produtividade/${agendadosReg.id}?client_id=${clientId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    mes_referencia: mesRefOriginal,
-                    numero_tipo: agendadosReg.numero_tipo || '',
-                    tipo_consulta: 'Agendados',
-                    ocupacionais: agendados.ocupacionais,
-                    assistenciais: agendados.assistenciais,
-                    acidente_trabalho: agendados.acidente_trabalho,
-                    inss: agendados.inss,
-                    sinistralidade: agendados.sinistralidade,
-                    absenteismo: agendados.absenteismo,
-                    pericia_indireta: agendados.pericia_indireta
-                })
+                body: JSON.stringify(dadosAgendados)
             });
             
             if (!responseAgendados.ok) {
                 const errorData = await responseAgendados.json();
+                console.error('Erro ao atualizar Agendados:', errorData);
                 throw new Error(errorData.detail || 'Erro ao atualizar registro de Agendados');
             }
+            
+            const resultAgendados = await responseAgendados.json();
+            console.log('Resposta Agendados:', resultAgendados);
+            
+            // Prepara dados para atualização
+            const dadosCompareceram = {
+                mes_referencia: mesRefOriginal,
+                numero_tipo: compareceramReg.numero_tipo || '',
+                tipo_consulta: 'Compareceram',
+                ocupacionais: compareceram.ocupacionais || 0,
+                assistenciais: compareceram.assistenciais || 0,
+                acidente_trabalho: compareceram.acidente_trabalho || 0,
+                inss: compareceram.inss || 0,
+                sinistralidade: compareceram.sinistralidade || 0,
+                absenteismo: compareceram.absenteismo || 0,
+                pericia_indireta: compareceram.pericia_indireta || 0
+            };
+            
+            console.log('Atualizando Compareceram:', dadosCompareceram);
             
             // Atualiza registro de Compareceram
             const responseCompareceram = await fetch(`/api/produtividade/${compareceramReg.id}?client_id=${clientId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    mes_referencia: mesRefOriginal,
-                    numero_tipo: compareceramReg.numero_tipo || '',
-                    tipo_consulta: 'Compareceram',
-                    ocupacionais: compareceram.ocupacionais,
-                    assistenciais: compareceram.assistenciais,
-                    acidente_trabalho: compareceram.acidente_trabalho,
-                    inss: compareceram.inss,
-                    sinistralidade: compareceram.sinistralidade,
-                    absenteismo: compareceram.absenteismo,
-                    pericia_indireta: compareceram.pericia_indireta
-                })
+                body: JSON.stringify(dadosCompareceram)
             });
             
             if (!responseCompareceram.ok) {
                 const errorData = await responseCompareceram.json();
+                console.error('Erro ao atualizar Compareceram:', errorData);
                 throw new Error(errorData.detail || 'Erro ao atualizar registro de Compareceram');
             }
+            
+            const resultCompareceram = await responseCompareceram.json();
+            console.log('Resposta Compareceram:', resultCompareceram);
         } else {
             // Criar novo registro
         const response = await fetch('/api/produtividade', {
@@ -477,14 +511,18 @@ async function salvarRegistro() {
             }
         }
         
-        // Recarrega os dados do servidor
-        await carregarDados();
-        
-        // Fecha o modal
+        // Fecha o modal primeiro
         fecharModal();
         
         // Mostra mensagem de sucesso
         alert('Registro salvo com sucesso!');
+        
+        // Recarrega os dados do servidor (com delay para garantir que o banco foi atualizado)
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Força recarregamento limpando allData primeiro
+        allData = [];
+        await carregarDados();
     } catch (error) {
         console.error('Erro ao salvar:', error);
         alert('Erro ao salvar registro: ' + error.message);

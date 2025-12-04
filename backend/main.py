@@ -4953,7 +4953,10 @@ async def obter_produtividade(
         if mes_referencia:
             query = query.filter(Produtividade.mes_referencia == mes_referencia)
         
-        registros = query.order_by(Produtividade.numero_tipo).all()
+        # Expira cache da sessão para garantir dados atualizados
+        db.expire_all()
+        
+        registros = query.order_by(Produtividade.mes_referencia.desc(), Produtividade.numero_tipo).all()
         
         return {
             "success": True,
@@ -5109,14 +5112,22 @@ async def atualizar_produtividade(
         # Atualiza timestamp
         registro.updated_at = datetime.now()
         
+        # Força flush antes do commit para garantir que as mudanças sejam aplicadas
+        db.flush()
         db.commit()
-        db.refresh(registro)  # Recarrega do banco para garantir que está atualizado
+        
+        # Recarrega do banco para garantir que está atualizado
+        db.refresh(registro)
+        
+        # Log para debug
+        app_logger.info(f"Produtividade atualizada: ID={registro.id}, client_id={client_id}, tipo={registro.tipo_consulta}, mes={registro.mes_referencia}, ocupacionais={registro.ocupacionais}, assistenciais={registro.assistenciais}")
         
         return {
             "success": True,
             "message": "Registro atualizado com sucesso",
             "data": {
                 "id": registro.id,
+                "mes_referencia": registro.mes_referencia,
                 "numero_tipo": registro.numero_tipo,
                 "tipo_consulta": registro.tipo_consulta,
                 "ocupacionais": registro.ocupacionais,
