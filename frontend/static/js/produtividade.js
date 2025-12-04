@@ -384,46 +384,69 @@ async function salvarRegistro() {
         
         if (registroEditando) {
             // Atualizar registro existente
+            // Usa o mes_referencia original do registro sendo editado
+            const mesRefOriginal = registroEditando;
+            
             // Busca os IDs dos registros de Agendados e Compareceram
             if (!Array.isArray(allData)) {
                 allData = [];
             }
-            const dadosMes = allData.filter(d => d.mes_referencia === mesRef);
+            const dadosMes = allData.filter(d => d.mes_referencia === mesRefOriginal);
             const agendadosReg = dadosMes.find(d => d.tipo_consulta === 'Agendados');
             const compareceramReg = dadosMes.find(d => d.tipo_consulta === 'Compareceram');
             
-            if (agendadosReg && agendadosReg.id) {
-                const response = await fetch(`/api/produtividade/${agendadosReg.id}?client_id=${clientId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        numero_tipo: agendadosReg.numero_tipo || '',
-                        tipo_consulta: 'Agendados',
-                        ...agendados
-                    })
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Erro ao atualizar registro de Agendados');
-                }
+            if (!agendadosReg || !agendadosReg.id) {
+                throw new Error('Registro de Agendados não encontrado para atualização');
             }
             
-            if (compareceramReg && compareceramReg.id) {
-                const response = await fetch(`/api/produtividade/${compareceramReg.id}?client_id=${clientId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        numero_tipo: compareceramReg.numero_tipo || '',
-                        tipo_consulta: 'Compareceram',
-                        ...compareceram
-                    })
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Erro ao atualizar registro de Compareceram');
-                }
+            if (!compareceramReg || !compareceramReg.id) {
+                throw new Error('Registro de Compareceram não encontrado para atualização');
+            }
+            
+            // Atualiza registro de Agendados
+            const responseAgendados = await fetch(`/api/produtividade/${agendadosReg.id}?client_id=${clientId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mes_referencia: mesRefOriginal,
+                    numero_tipo: agendadosReg.numero_tipo || '',
+                    tipo_consulta: 'Agendados',
+                    ocupacionais: agendados.ocupacionais,
+                    assistenciais: agendados.assistenciais,
+                    acidente_trabalho: agendados.acidente_trabalho,
+                    inss: agendados.inss,
+                    sinistralidade: agendados.sinistralidade,
+                    absenteismo: agendados.absenteismo,
+                    pericia_indireta: agendados.pericia_indireta
+                })
+            });
+            
+            if (!responseAgendados.ok) {
+                const errorData = await responseAgendados.json();
+                throw new Error(errorData.detail || 'Erro ao atualizar registro de Agendados');
+            }
+            
+            // Atualiza registro de Compareceram
+            const responseCompareceram = await fetch(`/api/produtividade/${compareceramReg.id}?client_id=${clientId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mes_referencia: mesRefOriginal,
+                    numero_tipo: compareceramReg.numero_tipo || '',
+                    tipo_consulta: 'Compareceram',
+                    ocupacionais: compareceram.ocupacionais,
+                    assistenciais: compareceram.assistenciais,
+                    acidente_trabalho: compareceram.acidente_trabalho,
+                    inss: compareceram.inss,
+                    sinistralidade: compareceram.sinistralidade,
+                    absenteismo: compareceram.absenteismo,
+                    pericia_indireta: compareceram.pericia_indireta
+                })
+            });
+            
+            if (!responseCompareceram.ok) {
+                const errorData = await responseCompareceram.json();
+                throw new Error(errorData.detail || 'Erro ao atualizar registro de Compareceram');
             }
         } else {
             // Criar novo registro

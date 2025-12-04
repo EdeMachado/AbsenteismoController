@@ -5081,13 +5081,19 @@ async def atualizar_produtividade(
         # Atualiza campos
         registro.numero_tipo = data.get("numero_tipo", registro.numero_tipo)
         registro.tipo_consulta = data.get("tipo_consulta", registro.tipo_consulta)
-        registro.ocupacionais = int(data.get("ocupacionais", registro.ocupacionais) or 0)
-        registro.assistenciais = int(data.get("assistenciais", registro.assistenciais) or 0)
-        registro.acidente_trabalho = int(data.get("acidente_trabalho", registro.acidente_trabalho) or 0)
-        registro.inss = int(data.get("inss", registro.inss) or 0)
-        registro.sinistralidade = int(data.get("sinistralidade", registro.sinistralidade) or 0)
-        registro.absenteismo = int(data.get("absenteismo", registro.absenteismo) or 0)
-        registro.pericia_indireta = int(data.get("pericia_indireta", registro.pericia_indireta) or 0)
+        
+        # Atualiza valores numéricos - força atualização mesmo se for 0
+        registro.ocupacionais = int(data.get("ocupacionais", 0) or 0)
+        registro.assistenciais = int(data.get("assistenciais", 0) or 0)
+        registro.acidente_trabalho = int(data.get("acidente_trabalho", 0) or 0)
+        registro.inss = int(data.get("inss", 0) or 0)
+        registro.sinistralidade = int(data.get("sinistralidade", 0) or 0)
+        registro.absenteismo = int(data.get("absenteismo", 0) or 0)
+        registro.pericia_indireta = int(data.get("pericia_indireta", 0) or 0)
+        
+        # Preserva mes_referencia se fornecido (caso precise atualizar)
+        if "mes_referencia" in data:
+            registro.mes_referencia = data.get("mes_referencia")
         
         # Recalcula total
         registro.total = (
@@ -5100,7 +5106,11 @@ async def atualizar_produtividade(
             registro.pericia_indireta
         )
         
+        # Atualiza timestamp
+        registro.updated_at = datetime.now()
+        
         db.commit()
+        db.refresh(registro)  # Recarrega do banco para garantir que está atualizado
         
         return {
             "success": True,
