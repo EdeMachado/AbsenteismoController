@@ -179,8 +179,6 @@ async function carregarFuncionarios(clientIdParam) {
     }
 }
 
-let dadosFiltrados = [];
-
 function aplicarOrdenacaoFuncionarios() {
     const campo = document.getElementById('ordenacaoCampo')?.value;
     const direcao = document.getElementById('ordenacaoDirecao')?.value || 'asc';
