@@ -3,6 +3,9 @@
  */
 
 let funcionariosData = [];
+let dadosFiltrados = [];
+let ordenacaoCampo = null;
+let ordenacaoDirecao = 'asc';
 
 document.addEventListener('DOMContentLoaded', async () => {
     const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
@@ -178,6 +181,67 @@ async function carregarFuncionarios(clientIdParam) {
 
 let dadosFiltrados = [];
 
+function aplicarOrdenacaoFuncionarios() {
+    const campo = document.getElementById('ordenacaoCampo')?.value;
+    const direcao = document.getElementById('ordenacaoDirecao')?.value || 'asc';
+    
+    ordenacaoCampo = campo;
+    ordenacaoDirecao = direcao;
+    
+    if (!campo || dadosFiltrados.length === 0) {
+        renderizarFuncionarios(dadosFiltrados);
+        return;
+    }
+    
+    // Cria uma cópia para ordenar
+    const dadosOrdenados = [...dadosFiltrados];
+    
+    dadosOrdenados.sort((a, b) => {
+        let valA, valB;
+        
+        switch(campo) {
+            case 'nome':
+                valA = (a.nome || '').toLowerCase();
+                valB = (b.nome || '').toLowerCase();
+                break;
+            case 'setor':
+                valA = (a.setor || '').toLowerCase();
+                valB = (b.setor || '').toLowerCase();
+                break;
+            case 'genero':
+                valA = (a.genero || '').toLowerCase();
+                valB = (b.genero || '').toLowerCase();
+                break;
+            case 'total_atestados':
+                valA = a.quantidade || 0;
+                valB = b.quantidade || 0;
+                break;
+            case 'total_dias':
+                valA = a.dias_perdidos || 0;
+                valB = b.dias_perdidos || 0;
+                break;
+            case 'total_horas':
+                valA = a.horas_perdidas || 0;
+                valB = b.horas_perdidas || 0;
+                break;
+            default:
+                return 0;
+        }
+        
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            return direcao === 'asc' ? valA.localeCompare(valB, 'pt-BR') : valB.localeCompare(valA, 'pt-BR');
+        }
+        
+        if (typeof valA === 'number' && typeof valB === 'number') {
+            return direcao === 'asc' ? valA - valB : valB - valA;
+        }
+        
+        return 0;
+    });
+    
+    renderizarFuncionarios(dadosOrdenados);
+}
+
 function renderizarFuncionarios(dados) {
     const tbody = document.getElementById('funcionariosTableBody');
     
@@ -200,6 +264,12 @@ function renderizarFuncionarios(dados) {
     }
     
     dadosFiltrados = dados;
+    
+    // Aplica ordenação se houver
+    if (ordenacaoCampo) {
+        aplicarOrdenacaoFuncionarios();
+        return;
+    }
     
     tbody.innerHTML = dados.map((f, index) => {
         const generoDisplay = f.genero === 'M' ? 'Masculino' : (f.genero === 'F' ? 'Feminino' : '<span style="color: var(--warning);">Vazio</span>');

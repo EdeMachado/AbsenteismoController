@@ -244,6 +244,29 @@
                             </button>
                         </div>
                     </div>
+                    
+                    <!-- Ordenação -->
+                    <div class="filters-grid" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                        <div class="filter-group">
+                            <label class="filter-label">Ordenar por</label>
+                            <select id="ordenacaoCampo" class="filter-input" onchange="aplicarOrdenacaoFuncionarios()">
+                                <option value="">Nenhum</option>
+                                <option value="nome">Funcionário</option>
+                                <option value="setor">Setor</option>
+                                <option value="genero">Gênero</option>
+                                <option value="total_atestados">Atestados</option>
+                                <option value="total_dias">Dias</option>
+                                <option value="total_horas">Horas</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Direção</label>
+                            <select id="ordenacaoDirecao" class="filter-input" onchange="aplicarOrdenacaoFuncionarios()">
+                                <option value="asc">Crescente ↑</option>
+                                <option value="desc">Decrescente ↓</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Resumo -->
