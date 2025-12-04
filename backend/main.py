@@ -503,6 +503,13 @@ async def index():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+@app.get("/index.html", response_class=HTMLResponse)
+async def index_html():
+    """Rota para index.html - redireciona para dashboard"""
+    file_path = os.path.join(FRONTEND_DIR, "index.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page():
     """Página principal - Dashboard"""
