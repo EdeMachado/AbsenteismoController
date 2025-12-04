@@ -11,6 +11,8 @@ let chartTendenciaMensal = null;
 let chartTendenciaAcumulado = null;
 let anoSelecionado = null;
 let mesSelecionado = null;
+let ordenacaoCampo = null;
+let ordenacaoDirecao = 'asc';
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -136,6 +138,7 @@ async function loadData(clientId) {
         }
         
         updateStats();
+        popularSeletorOrdenacao();
         renderTable();
         carregarAnosDisponiveis();
         
@@ -233,8 +236,13 @@ function filtrarPorPeriodo() {
         return true;
     });
     
-    updateStats();
-    renderTable();
+    // Reaplica ordenação se houver
+    if (ordenacaoCampo) {
+        aplicarOrdenacao();
+    } else {
+        updateStats();
+        renderTable();
+    }
 }
 
 // Mostrar tendência anual
@@ -587,6 +595,74 @@ function setupEventListeners() {
     });
 }
 
+// Popular seletor de ordenação
+function popularSeletorOrdenacao() {
+    const select = document.getElementById('ordenacaoCampo');
+    if (!select || todasColunas.length === 0) return;
+    
+    // Limpa opções existentes (exceto "Ordenar por...")
+    while (select.children.length > 1) {
+        select.removeChild(select.lastChild);
+    }
+    
+    // Adiciona todas as colunas como opções
+    todasColunas.forEach(col => {
+        const option = document.createElement('option');
+        option.value = col;
+        option.textContent = formatColumnName(col);
+        select.appendChild(option);
+    });
+}
+
+// Aplicar ordenação
+function aplicarOrdenacao() {
+    const campoSelect = document.getElementById('ordenacaoCampo');
+    const direcaoSelect = document.getElementById('ordenacaoDirecao');
+    
+    if (!campoSelect || !direcaoSelect) return;
+    
+    ordenacaoCampo = campoSelect.value;
+    ordenacaoDirecao = direcaoSelect.value;
+    
+    if (ordenacaoCampo) {
+        // Aplica ordenação
+        filteredData.sort((a, b) => {
+            let valorA = a[ordenacaoCampo];
+            let valorB = b[ordenacaoCampo];
+            
+            // Trata valores nulos/undefined
+            if (valorA === null || valorA === undefined || valorA === '') {
+                valorA = '';
+            }
+            if (valorB === null || valorB === undefined || valorB === '') {
+                valorB = '';
+            }
+            
+            // Converte para string para comparação
+            const strA = String(valorA).toLowerCase();
+            const strB = String(valorB).toLowerCase();
+            
+            // Tenta converter para número se ambos forem numéricos
+            const numA = parseFloat(valorA);
+            const numB = parseFloat(valorB);
+            const isNumeric = !isNaN(numA) && !isNaN(numB) && isFinite(numA) && isFinite(numB);
+            
+            let comparacao;
+            if (isNumeric) {
+                comparacao = numA - numB;
+            } else {
+                comparacao = strA.localeCompare(strB, 'pt-BR', { numeric: true, sensitivity: 'base' });
+            }
+            
+            // Aplica direção
+            return ordenacaoDirecao === 'asc' ? comparacao : -comparacao;
+        });
+    }
+    
+    updateStats();
+    renderTable();
+}
+
 // Renderizar tabela
 function renderTable() {
     const thead = document.getElementById('tableHead');
@@ -907,8 +983,13 @@ function searchData(term) {
         });
     }
     
-    updateStats();
-    renderTable();
+    // Reaplica ordenação se houver
+    if (ordenacaoCampo) {
+        aplicarOrdenacao();
+    } else {
+        updateStats();
+        renderTable();
+    }
 }
 
 // Limpar filtros
@@ -924,6 +1005,14 @@ function clearFilters() {
     
     anoSelecionado = null;
     mesSelecionado = null;
+    
+    // Limpa ordenação
+    const ordenacaoCampoSelect = document.getElementById('ordenacaoCampo');
+    const ordenacaoDirecaoSelect = document.getElementById('ordenacaoDirecao');
+    if (ordenacaoCampoSelect) ordenacaoCampoSelect.value = '';
+    if (ordenacaoDirecaoSelect) ordenacaoDirecaoSelect.value = 'asc';
+    ordenacaoCampo = null;
+    ordenacaoDirecao = 'asc';
     
     // Remove destaque das abas
     document.querySelectorAll('.mes-tab').forEach(tab => {
@@ -965,8 +1054,13 @@ function applyFilters() {
         return true;
     });
     
-    updateStats();
-    renderTable();
+    // Reaplica ordenação se houver
+    if (ordenacaoCampo) {
+        aplicarOrdenacao();
+    } else {
+        updateStats();
+        renderTable();
+    }
 }
 
 // Exportar dados

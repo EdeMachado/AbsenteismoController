@@ -563,6 +563,13 @@
             <div class="toolbar">
                 <div>
                     <input type="text" id="searchBox" class="search-box" placeholder="🔍 Buscar dados...">
+                    <select id="ordenacaoCampo" class="search-box" style="width: 180px; margin-left: 8px;" onchange="aplicarOrdenacao()">
+                        <option value="">Ordenar por...</option>
+                    </select>
+                    <select id="ordenacaoDirecao" class="search-box" style="width: 150px; margin-left: 8px;" onchange="aplicarOrdenacao()">
+                        <option value="asc">Crescente ↑</option>
+                        <option value="desc">Decrescente ↓</option>
+                    </select>
                     <button class="btn btn-secondary" onclick="clearFilters()">
                         <i class="fas fa-times"></i> Limpar Filtros
                     </button>

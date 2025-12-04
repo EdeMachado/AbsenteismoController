@@ -384,16 +384,16 @@ async function salvarRegistro() {
         
         if (registroEditando) {
             // Atualizar registro existente
-        // Busca os IDs dos registros de Agendados e Compareceram
-        if (!Array.isArray(allData)) {
-            allData = [];
-        }
-        const dadosMes = allData.filter(d => d.mes_referencia === mesRef);
+            // Busca os IDs dos registros de Agendados e Compareceram
+            if (!Array.isArray(allData)) {
+                allData = [];
+            }
+            const dadosMes = allData.filter(d => d.mes_referencia === mesRef);
             const agendadosReg = dadosMes.find(d => d.tipo_consulta === 'Agendados');
             const compareceramReg = dadosMes.find(d => d.tipo_consulta === 'Compareceram');
             
             if (agendadosReg && agendadosReg.id) {
-                await fetch(`/api/produtividade/${agendadosReg.id}`, {
+                const response = await fetch(`/api/produtividade/${agendadosReg.id}?client_id=${clientId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -402,10 +402,15 @@ async function salvarRegistro() {
                         ...agendados
                     })
                 });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Erro ao atualizar registro de Agendados');
+                }
             }
             
             if (compareceramReg && compareceramReg.id) {
-                await fetch(`/api/produtividade/${compareceramReg.id}`, {
+                const response = await fetch(`/api/produtividade/${compareceramReg.id}?client_id=${clientId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -414,6 +419,11 @@ async function salvarRegistro() {
                         ...compareceram
                     })
                 });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Erro ao atualizar registro de Compareceram');
+                }
             }
         } else {
             // Criar novo registro
@@ -524,6 +534,12 @@ async function excluirRegistro() {
     }
     
     try {
+        const clientId = getCurrentClientId();
+        if (!clientId) {
+            alert('Selecione um cliente primeiro.');
+            return;
+        }
+        
         if (!Array.isArray(allData)) {
             allData = [];
         }
@@ -532,9 +548,14 @@ async function excluirRegistro() {
         // Exclui todos os registros do mês
         for (const reg of dadosMes) {
             if (reg.id) {
-                await fetch(`/api/produtividade/${reg.id}`, {
+                const response = await fetch(`/api/produtividade/${reg.id}?client_id=${clientId}`, {
                     method: 'DELETE'
                 });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Erro ao excluir registro');
+                }
             }
         }
         
@@ -554,6 +575,12 @@ async function excluirRegistroModal(mesRef) {
     }
     
     try {
+        const clientId = getCurrentClientId();
+        if (!clientId) {
+            alert('Selecione um cliente primeiro.');
+            return;
+        }
+        
         if (!Array.isArray(allData)) {
             allData = [];
         }
@@ -562,9 +589,14 @@ async function excluirRegistroModal(mesRef) {
         // Exclui todos os registros do mês
         for (const reg of dadosMes) {
             if (reg.id) {
-                await fetch(`/api/produtividade/${reg.id}`, {
+                const response = await fetch(`/api/produtividade/${reg.id}?client_id=${clientId}`, {
                     method: 'DELETE'
                 });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Erro ao excluir registro');
+                }
             }
         }
         
