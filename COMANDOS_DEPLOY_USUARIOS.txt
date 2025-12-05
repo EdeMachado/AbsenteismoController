@@ -1,0 +1,52 @@
+========================================
+COMANDOS PARA DEPLOY - USUÁRIOS E EMPRESA
+========================================
+
+PASSO 1: COMMIT E PUSH (Execute no PowerShell)
+========================================
+
+git add backend/models.py
+git add backend/main.py
+git add backend/database.py
+git add frontend/configuracoes.html
+git add frontend/static/js/configuracoes.js
+git add DEPLOY_USUARIOS_EMPRESA.md
+
+git commit -m "Adicionar exclusão de usuários e limitação de acesso por empresa
+
+- Adicionado botão de excluir usuário no módulo Configurações
+- Adicionado campo client_id no modelo User para limitar acesso por empresa
+- Adicionada rota DELETE /api/users/{user_id}
+- Atualizadas rotas POST e PUT para incluir client_id
+- Adicionada migração automática para coluna client_id
+- Atualizado frontend com seleção de empresa nos modais de usuário"
+
+git push origin main
+
+========================================
+PASSO 2: DEPLOY NO SERVIDOR (SSH)
+========================================
+
+Conecte-se ao servidor:
+ssh -p 65002 SEU_USUARIO@72.60.166.55
+
+Depois de conectar, execute:
+cd ~/domains/absenteismocontroller.com.br/public_html/absenteismo
+git pull origin main
+source venv/bin/activate
+python3 -c "from backend.database import run_migrations; run_migrations(); print('Migração concluída!')"
+
+========================================
+PASSO 3: VERIFICAR
+========================================
+
+1. Acesse: https://www.absenteismocontroller.com.br
+2. Faça login como admin
+3. Vá em Configurações
+4. Verifique:
+   - Botão de excluir (lixeira) ao lado de cada usuário
+   - Campo "Empresa" na tabela
+   - Campo "Empresa (Acesso Limitado)" nos modais
+
+========================================
+

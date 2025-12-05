@@ -882,6 +882,8 @@ async def list_users(current_user: User = Depends(get_current_admin_user), db: S
             "nome_completo": u.nome_completo,
             "is_active": u.is_active,
             "is_admin": u.is_admin,
+            "client_id": u.client_id,
+            "client_nome": u.client.nome if u.client else None,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "last_login": u.last_login.isoformat() if u.last_login else None
         }
@@ -895,6 +897,7 @@ async def create_user(
     password: str = Form(...),
     nome_completo: str = Form(None),
     is_admin: bool = Form(False),
+    client_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -906,12 +909,19 @@ async def create_user(
     if existing:
         raise HTTPException(status_code=400, detail="Usuário ou email já existe")
     
+    # Valida se client_id existe (se fornecido)
+    if client_id is not None:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=400, detail="Empresa não encontrada")
+    
     user = User(
         username=username,
         email=email,
         password_hash=get_password_hash(password),
         nome_completo=nome_completo,
         is_admin=is_admin,
+        client_id=client_id,
         is_active=True
     )
     db.add(user)
@@ -927,6 +937,7 @@ async def update_user(
     nome_completo: Optional[str] = Form(None),
     is_admin: Optional[bool] = Form(None),
     is_active: Optional[bool] = Form(None),
+    client_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -973,8 +984,39 @@ async def update_user(
     if is_active is not None:
         user.is_active = is_active
     
+    # Atualiza client_id se fornecido
+    if client_id is not None:
+        if client_id == 0 or client_id == "":  # Permite remover associação
+            user.client_id = None
+        else:
+            # Valida se client_id existe
+            client = db.query(Client).filter(Client.id == client_id).first()
+            if not client:
+                raise HTTPException(status_code=400, detail="Empresa não encontrada")
+            user.client_id = client_id
+    
     db.commit()
     return {"message": "Usuário atualizado com sucesso"}
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Exclui usuário (apenas admin)"""
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Não permite excluir a si mesmo
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não é possível excluir seu próprio usuário")
+    
+    db.delete(user)
+    db.commit()
+    return {"message": "Usuário excluído com sucesso"}
 
 @app.post("/api/upload")
 async def upload_file(

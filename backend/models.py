@@ -108,8 +108,12 @@ class User(Base):
     nome_completo = Column(String(200), nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)  # Empresa associada ao usuário
     created_at = Column(DateTime, default=datetime.now)
     last_login = Column(DateTime, nullable=True)
+    
+    # Relationships
+    client = relationship("Client")
     
 class Config(Base):
     """Configurações do sistema"""

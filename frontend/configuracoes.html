@@ -131,6 +131,7 @@
                                         <th>Usuário</th>
                                         <th>Email</th>
                                         <th>Nome</th>
+                                        <th>Empresa</th>
                                         <th>Admin</th>
                                         <th>Status</th>
                                         <th>Ações</th>
@@ -138,7 +139,7 @@
                                 </thead>
                                 <tbody id="usersTableBody">
                                     <tr>
-                                        <td colspan="6" class="text-center">
+                                        <td colspan="7" class="text-center">
                                             <i class="fas fa-spinner fa-spin"></i> Carregando...
                                         </td>
                                     </tr>
@@ -180,6 +181,13 @@
                     <input type="text" id="novo_nome_completo" class="form-control">
                 </div>
                 <div class="form-group">
+                    <label>Empresa (Acesso Limitado)</label>
+                    <select id="novo_client_id" class="form-control">
+                        <option value="">Nenhuma (Acesso a todas)</option>
+                    </select>
+                    <small style="color: #666;">Selecione uma empresa para limitar o acesso do usuário apenas a ela</small>
+                </div>
+                <div class="form-group">
                     <label>
                         <input type="checkbox" id="novo_is_admin"> Administrador
                     </label>
@@ -216,6 +224,13 @@
                 <div class="form-group">
                     <label>Nome Completo</label>
                     <input type="text" id="editar_nome_completo" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Empresa (Acesso Limitado)</label>
+                    <select id="editar_client_id" class="form-control">
+                        <option value="">Nenhuma (Acesso a todas)</option>
+                    </select>
+                    <small style="color: #666;">Selecione uma empresa para limitar o acesso do usuário apenas a ela</small>
                 </div>
                 <div class="form-group">
                     <label>
