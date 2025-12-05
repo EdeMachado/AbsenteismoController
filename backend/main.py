@@ -1945,7 +1945,7 @@ async def obter_filtros(
     """Retorna lista de funcionários e setores para preencher os filtros"""
     try:
         # Valida client_id
-        validar_client_id(db, client_id)
+        validar_client_id(db, client_id, current_user)
         
         # Busca funcionários únicos
         funcionarios = db.query(Atestado.nomecompleto).join(Upload).filter(
@@ -2101,7 +2101,7 @@ async def obter_alertas(
     """Retorna alertas automáticos do sistema"""
     try:
         # Valida client_id
-        validar_client_id(db, client_id)
+        validar_client_id(db, client_id, current_user)
         
         alertas_system = AlertasSystem(db)
         alertas = alertas_system.detectar_alertas(client_id, mes_inicio, mes_fim)
@@ -3204,7 +3204,7 @@ async def dados_apresentacao(
         inicio = time.time()
         
         # Valida client_id
-        client = validar_client_id(db, client_id)
+        client = validar_client_id(db, client_id, current_user)
         print(f"[APRESENTACAO] Cliente validado: {client.nome}")
         
         analytics = Analytics(db)
