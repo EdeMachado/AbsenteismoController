@@ -315,13 +315,15 @@ app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static"))
 
 # ==================== HELPER FUNCTIONS ====================
 
-def validar_client_id(db: Session, client_id: int) -> Client:
+def validar_client_id(db: Session, client_id: int, current_user: Optional[User] = None) -> Client:
     """
     Valida se o client_id existe e retorna o cliente.
     Levanta HTTPException se não encontrar.
     
     IMPORTANTE: Esta função é crítica para LGPD - garante isolamento de dados.
     NUNCA retornar dados sem validar o client_id primeiro.
+    
+    Se current_user for fornecido e não for admin, verifica se o usuário tem acesso à empresa.
     """
     # Validação rigorosa de tipo e valor
     if not isinstance(client_id, int):
@@ -343,6 +345,16 @@ def validar_client_id(db: Session, client_id: int) -> Client:
             status_code=404,
             detail=f"Cliente com ID {client_id} não encontrado"
         )
+    
+    # Verifica acesso do usuário à empresa (se não for admin)
+    if current_user and not current_user.is_admin:
+        # Se usuário tem client_id definido, só pode acessar sua empresa
+        if current_user.client_id is not None:
+            if current_user.client_id != client_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Acesso negado. Você só tem permissão para acessar dados da sua empresa."
+                )
     
     # Verifica se cliente está ativo (opcional, mas recomendado)
     if hasattr(client, 'situacao') and client.situacao and client.situacao.lower() != 'ativo':
@@ -1062,7 +1074,7 @@ async def upload_file(
         })
         
         # Valida se o cliente existe
-        client = validar_client_id(db, client_id)
+        client = validar_client_id(db, client_id, current_user)
         
         # Auditoria - upload iniciado
         log_audit(
@@ -1475,7 +1487,7 @@ async def list_uploads(
 ):
     """Lista uploads ordenados por mês de referência (mais recente primeiro)"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     # Ordena por mes_referencia DESC e data_upload DESC como critério secundário
     uploads = db.query(Upload).filter(
@@ -1513,7 +1525,7 @@ async def dashboard(
     
     try:
         # Valida client_id (crítico para LGPD)
-        client = validar_client_id(db, client_id)
+        client = validar_client_id(db, client_id, current_user)
         
         # Log de acesso ao dashboard (auditoria LGPD)
         app_logger.info(f"Acesso ao dashboard - Cliente: {client_id}, Usuário: {current_user.id}")
@@ -2134,9 +2146,14 @@ async def listar_clientes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Lista todos os clientes"""
+    """Lista todos os clientes (ou apenas a empresa do usuário se não for admin)"""
     try:
-        clientes = db.query(Client).order_by(Client.nome).all()
+        # Se usuário não é admin e tem client_id definido, mostra apenas sua empresa
+        if not current_user.is_admin and current_user.client_id is not None:
+            clientes = db.query(Client).filter(Client.id == current_user.client_id).order_by(Client.nome).all()
+        else:
+            # Admin ou usuário sem restrição vê todos
+            clientes = db.query(Client).order_by(Client.nome).all()
         return [
             {
                 "id": c.id,
@@ -3975,7 +3992,7 @@ async def preview_data(
 ):
     """Preview dos dados do upload"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     # Valida se o upload pertence ao cliente
     upload = db.query(Upload).filter(
@@ -4025,7 +4042,7 @@ async def analise_funcionarios(
 ):
     """Análise por funcionários"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     analytics = Analytics(db)
     return analytics.top_funcionarios(client_id, 1000, mes_inicio, mes_fim)
@@ -4040,7 +4057,7 @@ async def analise_setores(
 ):
     """Análise por setores"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     analytics = Analytics(db)
     return analytics.top_setores(client_id, 20, mes_inicio, mes_fim)
@@ -4055,7 +4072,7 @@ async def analise_cids(
 ):
     """Análise por CIDs"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     analytics = Analytics(db)
     return analytics.top_cids(client_id, 20, mes_inicio, mes_fim)
@@ -4068,7 +4085,7 @@ async def tendencias(
 ):
     """Análise de tendências"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     analytics = Analytics(db)
     evolucao = analytics.evolucao_mensal(client_id, 12)
@@ -4102,7 +4119,7 @@ async def delete_upload(
 ):
     """Deleta um upload e seus dados"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     # Valida se o upload pertence ao cliente
     upload = db.query(Upload).filter(
@@ -4914,7 +4931,7 @@ async def obter_dado(
 ):
     """Obtém um registro específico"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     # Busca atestado e valida que pertence ao cliente
     atestado = db.query(Atestado).join(Upload).filter(
@@ -4974,7 +4991,7 @@ async def atualizar_dado(
 ):
     """Atualiza um registro"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     # Busca atestado e valida que pertence ao cliente
     atestado = db.query(Atestado).join(Upload).filter(
@@ -5362,7 +5379,7 @@ async def excluir_dado(
 ):
     """Exclui um registro"""
     # Valida client_id
-    validar_client_id(db, client_id)
+    validar_client_id(db, client_id, current_user)
     
     # Busca atestado e valida que pertence ao cliente
     atestado = db.query(Atestado).join(Upload).filter(
