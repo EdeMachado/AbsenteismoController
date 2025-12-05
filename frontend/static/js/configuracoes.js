@@ -390,9 +390,18 @@ async function excluirUsuario(userId) {
     }
     
     try {
-        const response = await fetch(`/api/users/${userId}`, {
+        // Tenta DELETE primeiro, se falhar usa POST
+        let response = await fetch(`/api/users/${userId}`, {
             method: 'DELETE'
         });
+        
+        // Se DELETE retornar 405, tenta POST como alternativa
+        if (response.status === 405) {
+            console.log('DELETE bloqueado, tentando POST...');
+            response = await fetch(`/api/users/${userId}/delete`, {
+                method: 'POST'
+            });
+        }
         
         if (!response.ok) {
             const error = await response.json();

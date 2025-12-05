@@ -1018,6 +1018,26 @@ async def delete_user(
     db.commit()
     return {"message": "Usuário excluído com sucesso"}
 
+@app.post("/api/users/{user_id}/delete")
+async def delete_user_post(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Exclui usuário via POST (alternativa caso DELETE seja bloqueado)"""
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Não permite excluir a si mesmo
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não é possível excluir seu próprio usuário")
+    
+    db.delete(user)
+    db.commit()
+    return {"message": "Usuário excluído com sucesso"}
+
 @app.post("/api/upload")
 async def upload_file(
     file: UploadFile = File(...),
