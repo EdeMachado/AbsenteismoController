@@ -18,10 +18,15 @@ import uuid
 from collections import OrderedDict
 import pandas as pd
 import time
+import asyncio
 from collections import defaultdict
 
 from .database import get_db, init_db, run_migrations
-from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade, ClientLogo, SavedFilter
+from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade, ClientLogo, SavedFilter, AuditLog, ReportSchedule, Alert, AlertRule
+from .audit_service import AuditService
+from .alert_service import AlertService
+from .email_service import EmailService
+from .report_scheduler import ReportScheduler
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
@@ -285,6 +290,9 @@ async def block_sensitive_files(request: Request, call_next):
     response = await call_next(request)
     return response
 
+# Middleware de Auditoria (simplificado - será melhorado)
+# A auditoria será feita diretamente nas rotas importantes
+
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
@@ -449,6 +457,14 @@ async def startup_event():
         iniciar_backup_automatico()
     except Exception as e:
         app_logger.warning(f"Erro ao iniciar backup automático: {e}")
+    
+    # Inicia tarefas em background (relatórios e alertas)
+    try:
+        from .background_tasks import background_manager
+        asyncio.create_task(background_manager.start())
+        app_logger.info("Tarefas em background iniciadas (relatórios automáticos e alertas)")
+    except Exception as e:
+        app_logger.warning(f"Erro ao iniciar tarefas em background: {e}")
     
     app_logger.info("=" * 60)
     app_logger.info("SISTEMA INICIADO COM SUCESSO")
@@ -5908,6 +5924,155 @@ async def aplicar_filtro_salvo(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao obter filtro: {str(e)}")
+
+# ==================== AUDITORIA API ====================
+
+@app.get("/api/audit/logs")
+async def get_audit_logs(
+    user_id: Optional[int] = Query(None),
+    client_id: Optional[int] = Query(None),
+    action: Optional[str] = Query(None),
+    resource_type: Optional[str] = Query(None),
+    limit: int = Query(100, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Lista logs de auditoria (apenas admin)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Apenas administradores podem ver logs de auditoria")
+    
+    audit_service = AuditService(db)
+    logs = audit_service.get_logs(user_id, client_id, action, resource_type, limit, offset)
+    return logs
+
+# ==================== RELATÓRIOS AUTOMÁTICOS API ====================
+
+@app.get("/api/report-schedules")
+async def list_report_schedules(
+    client_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Lista agendamentos de relatórios"""
+    query = db.query(ReportSchedule)
+    
+    # Se não for admin, filtra por empresa do usuário
+    if not current_user.is_admin and current_user.client_id:
+        query = query.filter(ReportSchedule.client_id == current_user.client_id)
+    elif client_id:
+        query = query.filter(ReportSchedule.client_id == client_id)
+    
+    schedules = query.all()
+    return [
+        {
+            "id": s.id,
+            "client_id": s.client_id,
+            "nome": s.nome,
+            "frequencia": s.frequencia,
+            "dia_semana": s.dia_semana,
+            "dia_mes": s.dia_mes,
+            "hora_envio": s.hora_envio,
+            "emails_destinatarios": json.loads(s.emails_destinatarios) if s.emails_destinatarios else [],
+            "formato": s.formato,
+            "incluir_graficos": s.incluir_graficos,
+            "periodo": s.periodo,
+            "is_active": s.is_active,
+            "ultimo_envio": s.ultimo_envio.isoformat() if s.ultimo_envio else None,
+            "proximo_envio": s.proximo_envio.isoformat() if s.proximo_envio else None
+        }
+        for s in schedules
+    ]
+
+@app.post("/api/report-schedules")
+async def create_report_schedule(
+    client_id: int = Form(...),
+    nome: str = Form(...),
+    frequencia: str = Form(...),
+    hora_envio: str = Form(...),
+    emails_destinatarios: str = Form(...),  # JSON array
+    formato: str = Form("excel"),
+    periodo: str = Form("ultimo_mes"),
+    dia_semana: Optional[int] = Form(None),
+    dia_mes: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Cria agendamento de relatório"""
+    validar_client_id(db, client_id, current_user)
+    
+    schedule = ReportSchedule(
+        client_id=client_id,
+        nome=nome,
+        frequencia=frequencia,
+        dia_semana=dia_semana,
+        dia_mes=dia_mes,
+        hora_envio=hora_envio,
+        emails_destinatarios=emails_destinatarios,
+        formato=formato,
+        periodo=periodo
+    )
+    db.add(schedule)
+    db.commit()
+    return {"message": "Agendamento criado com sucesso", "id": schedule.id}
+
+# ==================== ALERTAS API ====================
+
+@app.get("/api/alerts")
+async def list_alerts(
+    client_id: Optional[int] = Query(None),
+    is_lido: Optional[bool] = Query(None),
+    is_resolvido: Optional[bool] = Query(None),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Lista alertas"""
+    # Se não for admin, filtra por empresa do usuário
+    if not current_user.is_admin and current_user.client_id:
+        client_id = current_user.client_id
+    
+    alert_service = AlertService(db)
+    alerts = alert_service.get_alerts(client_id, is_lido, is_resolvido, limit)
+    return alerts
+
+@app.post("/api/alerts/{alert_id}/read")
+async def mark_alert_read(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Marca alerta como lido"""
+    alert_service = AlertService(db)
+    success = alert_service.mark_as_read(alert_id)
+    if success:
+        return {"message": "Alerta marcado como lido"}
+    raise HTTPException(status_code=404, detail="Alerta não encontrado")
+
+@app.post("/api/alerts/{alert_id}/resolve")
+async def mark_alert_resolved(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Marca alerta como resolvido"""
+    alert_service = AlertService(db)
+    success = alert_service.mark_as_resolved(alert_id)
+    if success:
+        return {"message": "Alerta marcado como resolvido"}
+    raise HTTPException(status_code=404, detail="Alerta não encontrado")
+
+# ==================== TAREFA BACKGROUND - PROCESSAR RELATÓRIOS ====================
+
+@app.post("/api/reports/process-scheduled")
+async def process_scheduled_reports(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Processa relatórios agendados (apenas admin)"""
+    scheduler = ReportScheduler(db)
+    results = scheduler.process_scheduled_reports()
+    return {"processed": len(results), "results": results}
 
 if __name__ == "__main__":
     import uvicorn

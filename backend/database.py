@@ -68,3 +68,4 @@ def run_migrations():
     """Apply lightweight schema adjustments not covered by Base metadata."""
     ensure_column("clients", "logo_url", "VARCHAR(500)")
     ensure_column("users", "client_id", "INTEGER")
+    # Novas tabelas serão criadas automaticamente pelo Base.metadata.create_all

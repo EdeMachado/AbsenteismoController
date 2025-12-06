@@ -208,3 +208,89 @@ class SavedFilter(Base):
     # Relationships
     user = relationship("User")
     client = relationship("Client")
+
+class AuditLog(Base):
+    """Log de auditoria - histórico de alterações"""
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Usuário que fez a ação
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)  # Empresa afetada
+    action = Column(String(50), nullable=False)  # CREATE, UPDATE, DELETE, VIEW, etc.
+    resource_type = Column(String(50), nullable=False)  # user, client, upload, atestado, etc.
+    resource_id = Column(Integer, nullable=True)  # ID do recurso afetado
+    details = Column(Text, nullable=True)  # JSON com detalhes da alteração
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    
+    # Relationships
+    user = relationship("User")
+    client = relationship("Client")
+
+class ReportSchedule(Base):
+    """Agendamento de relatórios automáticos por email"""
+    __tablename__ = "report_schedules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    nome = Column(String(200), nullable=False)  # Nome do relatório
+    frequencia = Column(String(20), nullable=False)  # daily, weekly, monthly
+    dia_semana = Column(Integer, nullable=True)  # 0-6 (domingo-sábado) para weekly
+    dia_mes = Column(Integer, nullable=True)  # 1-31 para monthly
+    hora_envio = Column(String(5), nullable=False, default="08:00")  # HH:MM
+    emails_destinatarios = Column(Text, nullable=False)  # JSON array de emails
+    formato = Column(String(20), default="excel")  # excel, pdf, ambos
+    incluir_graficos = Column(Boolean, default=True)
+    periodo = Column(String(20), default="ultimo_mes")  # ultimo_mes, ultimos_3_meses, custom
+    mes_inicio_custom = Column(String(7), nullable=True)  # YYYY-MM
+    mes_fim_custom = Column(String(7), nullable=True)  # YYYY-MM
+    is_active = Column(Boolean, default=True)
+    ultimo_envio = Column(DateTime, nullable=True)
+    proximo_envio = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    client = relationship("Client")
+
+class Alert(Base):
+    """Alertas e notificações do sistema"""
+    __tablename__ = "alerts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    tipo = Column(String(50), nullable=False)  # limite_excedido, tendencia_alta, anomalia, etc.
+    severidade = Column(String(20), default="medium")  # low, medium, high, critical
+    titulo = Column(String(200), nullable=False)
+    mensagem = Column(Text, nullable=False)
+    dados = Column(Text, nullable=True)  # JSON com dados do alerta
+    is_lido = Column(Boolean, default=False)
+    is_resolvido = Column(Boolean, default=False)
+    enviado_email = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    lido_em = Column(DateTime, nullable=True)
+    resolvido_em = Column(DateTime, nullable=True)
+    
+    # Relationships
+    client = relationship("Client")
+
+class AlertRule(Base):
+    """Regras de alertas configuráveis"""
+    __tablename__ = "alert_rules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    nome = Column(String(200), nullable=False)
+    tipo = Column(String(50), nullable=False)  # dias_perdidos, taxa_absenteismo, cid_frequente, etc.
+    condicao = Column(String(20), nullable=False)  # maior_que, menor_que, igual, diferente
+    valor_limite = Column(Float, nullable=False)
+    periodo = Column(String(20), default="mensal")  # mensal, trimestral, anual
+    enviar_email = Column(Boolean, default=True)
+    emails_destinatarios = Column(Text, nullable=True)  # JSON array de emails
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    client = relationship("Client")
