@@ -1,0 +1,41 @@
+========================================
+CONFIGURAR EMAIL - MODO FÁCIL
+========================================
+
+OPÇÃO 1: Se você NÃO quer configurar email agora
+----------------------------------------
+✅ O sistema funciona SEM email!
+✅ Só não vai enviar relatórios automáticos
+✅ Só não vai enviar alertas por email
+✅ Mas tudo mais funciona normalmente
+
+Você pode deixar o .env como está e usar o sistema normalmente!
+
+
+OPÇÃO 2: Se você QUER configurar email (mais tarde)
+----------------------------------------
+Quando quiser, é só:
+1. Abrir o arquivo .env
+2. Adicionar essas linhas no final:
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=seu-email@gmail.com
+SMTP_PASSWORD=senha-de-app
+SMTP_FROM=seu-email@gmail.com
+SMTP_USE_TLS=true
+
+3. Preencher com seu email e senha de app do Gmail
+
+
+========================================
+RESUMO:
+========================================
+
+✅ Sistema funciona SEM email configurado
+✅ Você pode usar tudo normalmente
+✅ Só relatórios automáticos e alertas por email que não vão funcionar
+✅ Pode configurar depois quando quiser
+
+========================================
+
