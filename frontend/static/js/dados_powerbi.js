@@ -1074,8 +1074,8 @@ function exportData() {
         return exportRow;
     });
     
-    const csv = convertToCSV(data);
-    downloadCSV(csv, 'dados_atestados.csv');
+    // Exporta como XLSX usando SheetJS
+    exportToXLSX(data, 'dados_atestados.xlsx');
 }
 
 // Função melhorada para detectar gênero
@@ -1248,6 +1248,35 @@ function downloadCSV(csv, filename) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+// Exportar para XLSX usando SheetJS
+function exportToXLSX(data, filename) {
+    try {
+        // Verifica se a biblioteca XLSX está disponível
+        if (typeof XLSX === 'undefined') {
+            console.error('Biblioteca XLSX não encontrada. Usando fallback para CSV.');
+            const csv = convertToCSV(data);
+            downloadCSV(csv, filename.replace('.xlsx', '.csv'));
+            return;
+        }
+        
+        // Converte os dados para formato de worksheet
+        const ws = XLSX.utils.json_to_sheet(data);
+        
+        // Cria um workbook e adiciona a worksheet
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+        
+        // Gera o arquivo XLSX e faz o download
+        XLSX.writeFile(wb, filename);
+    } catch (error) {
+        console.error('Erro ao exportar XLSX:', error);
+        // Fallback para CSV em caso de erro
+        const csv = convertToCSV(data);
+        downloadCSV(csv, filename.replace('.xlsx', '.csv'));
+        alert('Erro ao exportar como Excel. Exportando como CSV...');
+    }
 }
 
 function showError(message) {
