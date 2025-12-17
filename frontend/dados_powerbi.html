@@ -9,6 +9,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        // Verifica se XLSX foi carregado
+        window.addEventListener('load', function() {
+            if (typeof XLSX !== 'undefined' || typeof window.XLSX !== 'undefined') {
+                console.log('✅ Biblioteca XLSX carregada com sucesso');
+            } else {
+                console.error('❌ Biblioteca XLSX não foi carregada');
+            }
+        });
+    </script>
     
     <style>
         body {

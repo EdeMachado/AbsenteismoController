@@ -1252,30 +1252,62 @@ function downloadCSV(csv, filename) {
 
 // Exportar para XLSX usando SheetJS
 function exportToXLSX(data, filename) {
+    console.log('🚀 Iniciando exportação XLSX...');
+    console.log('Dados para exportar:', data.length, 'registros');
+    
+    // Verifica se há dados
+    if (!data || data.length === 0) {
+        alert('Não há dados para exportar.');
+        return;
+    }
+    
     try {
-        // Verifica se a biblioteca XLSX está disponível
-        if (typeof XLSX === 'undefined') {
-            console.error('Biblioteca XLSX não encontrada. Usando fallback para CSV.');
-            const csv = convertToCSV(data);
-            downloadCSV(csv, filename.replace('.xlsx', '.csv'));
+        // Verifica se a biblioteca XLSX está disponível (múltiplas verificações)
+        if (typeof XLSX === 'undefined' && typeof window.XLSX === 'undefined') {
+            console.error('❌ Biblioteca XLSX não encontrada. Tentando carregar...');
+            
+            // Tenta carregar a biblioteca dinamicamente
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+            script.onload = function() {
+                console.log('✅ Biblioteca XLSX carregada. Tentando exportar novamente...');
+                exportToXLSX(data, filename); // Tenta novamente
+            };
+            script.onerror = function() {
+                console.error('❌ Erro ao carregar biblioteca XLSX. Usando fallback CSV.');
+                const csv = convertToCSV(data);
+                downloadCSV(csv, filename.replace('.xlsx', '.csv'));
+                alert('Erro ao carregar biblioteca Excel. Exportando como CSV...');
+            };
+            document.head.appendChild(script);
             return;
         }
         
+        // Usa XLSX disponível (window.XLSX ou XLSX)
+        const XLSXLib = typeof window.XLSX !== 'undefined' ? window.XLSX : XLSX;
+        
+        console.log('✅ Biblioteca XLSX disponível. Convertendo dados...');
+        
         // Converte os dados para formato de worksheet
-        const ws = XLSX.utils.json_to_sheet(data);
+        const ws = XLSXLib.utils.json_to_sheet(data);
         
         // Cria um workbook e adiciona a worksheet
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+        const wb = XLSXLib.utils.book_new();
+        XLSXLib.utils.book_append_sheet(wb, ws, 'Dados');
+        
+        console.log('✅ Dados convertidos. Gerando arquivo...');
         
         // Gera o arquivo XLSX e faz o download
-        XLSX.writeFile(wb, filename);
+        XLSXLib.writeFile(wb, filename);
+        
+        console.log('✅ Arquivo XLSX gerado com sucesso:', filename);
     } catch (error) {
-        console.error('Erro ao exportar XLSX:', error);
+        console.error('❌ Erro ao exportar XLSX:', error);
+        console.error('Stack trace:', error.stack);
         // Fallback para CSV em caso de erro
         const csv = convertToCSV(data);
         downloadCSV(csv, filename.replace('.xlsx', '.csv'));
-        alert('Erro ao exportar como Excel. Exportando como CSV...');
+        alert('Erro ao exportar como Excel. Exportando como CSV...\n\nDetalhes: ' + error.message);
     }
 }
 
