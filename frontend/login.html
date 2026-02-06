@@ -319,9 +319,9 @@
                     
                     showAlert('Login realizado com sucesso!', 'success');
                     
-                    // Redireciona após 1 segundo
+                    // Redireciona para página de clientes (seleção de empresas)
                     setTimeout(() => {
-                        window.location.href = '/';
+                        window.location.href = '/clientes';
                     }, 1000);
                 } else {
                     showAlert(data.detail || 'Erro ao fazer login');
@@ -360,7 +360,13 @@
         
         // Verifica se já está logado
         if (localStorage.getItem('access_token')) {
-            window.location.href = '/';
+            // Se já tem cliente selecionado, vai para dashboard, senão vai para clientes
+            const clienteSelecionado = localStorage.getItem('cliente_selecionado');
+            if (clienteSelecionado) {
+                window.location.href = '/';
+            } else {
+                window.location.href = '/clientes';
+            }
         }
     </script>
 </body>
