@@ -1414,6 +1414,13 @@ async def dashboard(
         except Exception as e:
             print(f"Erro ao calcular comparativo ano anterior: {e}")
         
+        # Calcula heatmap de setores por meses
+        try:
+            resultado["heatmap_setores_meses"] = analytics.heatmap_setores_meses(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario)
+        except Exception as e:
+            print(f"Erro ao calcular heatmap: {e}")
+            resultado["heatmap_setores_meses"] = {}
+        
         # Corrige encoding antes de retornar
         return corrigir_encoding_json(resultado)
         

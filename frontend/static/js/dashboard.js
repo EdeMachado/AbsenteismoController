@@ -529,6 +529,11 @@ async function carregarDashboard() {
             renderizarChartComparativoAnoAnterior(data.comparativo_ano_anterior);
         }
         
+        // Heatmap de Setores x Meses
+        if (data.heatmap_setores_meses && data.heatmap_setores_meses.setores && data.heatmap_setores_meses.setores.length > 0) {
+            renderizarChartHeatmap(data.heatmap_setores_meses);
+        }
+        
         // Carrega e renderiza gráficos personalizados configurados pelo usuário
         await carregarERenderizarGraficosPersonalizados(clientId);
         
@@ -4085,6 +4090,130 @@ function renderizarChartComparativoAnoAnterior(dados) {
             },
             scales: {
                 y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+let chartHeatmap = null;
+
+function renderizarChartHeatmap(dados) {
+    const ctx = document.getElementById('chartHeatmap');
+    if (!ctx || !dados || !dados.setores || dados.setores.length === 0) {
+        if (ctx) {
+            ctx.style.display = 'none';
+        }
+        return;
+    }
+    
+    destruirGraficoSeguro('chartHeatmap', chartHeatmap);
+    chartHeatmap = null;
+    
+    const cores = getCores();
+    
+    // Prepara dados para o heatmap
+    // Chart.js não tem tipo 'heatmap' nativo, então vamos usar um gráfico de barras agrupadas
+    // Encontra o valor máximo para normalizar as cores
+    let maxValor = 0;
+    for (let i = 0; i < dados.dados.length; i++) {
+        for (let j = 0; j < dados.dados[i].length; j++) {
+            if (dados.dados[i][j] > maxValor) {
+                maxValor = dados.dados[i][j];
+            }
+        }
+    }
+    
+    // Cria função para gerar cor baseada no valor
+    function getColorForValue(valor) {
+        if (maxValor === 0) return 'rgba(200, 200, 200, 0.3)';
+        const intensity = Math.min(valor / maxValor, 1);
+        // Gradiente de azul claro para azul escuro
+        const r = Math.floor(33 + (26 - 33) * intensity);
+        const g = Math.floor(150 + (58 - 150) * intensity);
+        const b = Math.floor(243 + (118 - 243) * intensity);
+        const alpha = 0.6 + (0.9 - 0.6) * intensity;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    
+    // Se há muitos meses, agrupa em trimestres para melhor visualização
+    let datasets = [];
+    let labels = dados.meses;
+    
+    if (dados.meses.length > 12) {
+        // Agrupa meses em trimestres
+        const mesesPorTrimestre = Math.ceil(dados.meses.length / 4);
+        labels = [];
+        
+        for (let t = 0; t < 4; t++) {
+            const inicio = t * mesesPorTrimestre;
+            const fim = Math.min((t + 1) * mesesPorTrimestre, dados.meses.length);
+            const mesesTrimestre = dados.meses.slice(inicio, fim);
+            
+            const dadosTrimestre = [];
+            for (let i = 0; i < dados.setores.length; i++) {
+                let soma = 0;
+                for (let j = inicio; j < fim; j++) {
+                    soma += (dados.dados[i][j] || 0);
+                }
+                dadosTrimestre.push(soma);
+            }
+            
+            labels.push(`${mesesTrimestre[0]} - ${mesesTrimestre[mesesTrimestre.length - 1]}`);
+            datasets.push({
+                label: labels[labels.length - 1],
+                data: dadosTrimestre,
+                backgroundColor: dadosTrimestre.map(v => getColorForValue(v)),
+                borderColor: dadosTrimestre.map(v => getColorForValue(v)),
+                borderWidth: 1
+            });
+        }
+    } else {
+        // Usa todos os meses
+        for (let j = 0; j < dados.meses.length; j++) {
+            const mesData = dados.dados.map((linha) => linha[j] || 0);
+            datasets.push({
+                label: dados.meses[j],
+                data: mesData,
+                backgroundColor: mesData.map(v => getColorForValue(v)),
+                borderColor: mesData.map(v => getColorForValue(v)),
+                borderWidth: 1
+            });
+        }
+    }
+    
+    chartHeatmap = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dados.setores.map(s => truncate(s, 20)),
+            datasets: datasets
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { font: { size: 10 }, maxWidth: 100 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const valor = context.parsed.x;
+                            return `${context.dataset.label}: ${valor.toFixed(2)} dias`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { 
+                    beginAtZero: true,
+                    stacked: true
+                },
+                y: { 
+                    stacked: true,
+                    ticks: { font: { size: 10 } }
+                }
             }
         }
     });
