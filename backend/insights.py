@@ -564,27 +564,38 @@ Esta informação permite identificar as condições de saúde que demandam maio
             if not dados or len(dados) == 0:
                 return "Não há dados suficientes para análise."
             
-            # Encontra setor com maior diferença
-            maior_diferenca = 0
-            setor_analise = None
+            # Dados vêm como: [{setor, genero, dias_perdidos}, ...]
+            # Agrupa por setor
+            setores_map = {}
             for item in dados:
-                masculino = item.get('masculino', 0)
-                feminino = item.get('feminino', 0)
-                diferenca = abs(masculino - feminino)
-                if diferenca > maior_diferenca:
-                    maior_diferenca = diferenca
-                    setor_analise = item
+                setor = item.get('setor', 'Não informado')
+                genero = item.get('genero', 'N/A')
+                dias = item.get('dias_perdidos', 0)
+                
+                if setor not in setores_map:
+                    setores_map[setor] = {'M': 0, 'F': 0, 'total': 0}
+                
+                if genero == 'M':
+                    setores_map[setor]['M'] += dias
+                elif genero == 'F':
+                    setores_map[setor]['F'] += dias
+                setores_map[setor]['total'] += dias
             
-            if setor_analise:
-                analise = f"""👥 **Análise: Dias Perdidos por Setor e Gênero**
+            # Encontra setor com maior total
+            setor_maior = max(setores_map.items(), key=lambda x: x[1]['total'])
+            setor_nome = setor_maior[0]
+            valores = setor_maior[1]
+            
+            total_geral = sum(s['total'] for s in setores_map.values())
+            pct_setor = (valores['total'] / total_geral * 100) if total_geral > 0 else 0
+            
+            analise = f"""👥 **Análise: Dias Perdidos por Setor e Gênero**
 
-O setor **{setor_analise.get('setor', 'N/A')}** apresenta diferença significativa entre gêneros: **{int(setor_analise.get('masculino', 0))} dias (M)** vs **{int(setor_analise.get('feminino', 0))} dias (F)**.
+O setor **{setor_nome}** apresenta o maior impacto total, com **{int(valores['total'])} dias perdidos ({pct_setor:.1f}% do total)**, distribuídos em **{int(valores['M'])} dias (Masculino)** e **{int(valores['F'])} dias (Feminino)**.
 
-Esta análise permite identificar padrões específicos por setor e gênero, orientando ações preventivas direcionadas.
+Esta análise permite identificar padrões específicos por setor e gênero, orientando ações preventivas direcionadas considerando as particularidades de cada grupo.
 
-💡 **Recomendação**: Investigar causas específicas da diferença observada e desenvolver ações preventivas considerando as particularidades de cada grupo."""
-            else:
-                analise = "Não foi possível identificar padrões significativos na distribuição por setor e gênero."
+💡 **Recomendação**: Investigar causas específicas observadas no setor e desenvolver ações preventivas considerando as diferenças entre gêneros, incluindo programas de saúde ocupacional direcionados."""
         
         elif tipo_grafico == 'tempo_servico_atestados':
             if not dados or len(dados) == 0:
@@ -752,6 +763,56 @@ A análise de coerência mostra que **{pct_coerente:.1f}% dos dias ({int(dados.g
 Esta distribuição permite identificar a qualidade e consistência dos atestados, orientando ações de gestão e controle.
 
 💡 **Recomendação**: Investigar causas dos atestados sem coerência e implementar ações para melhorar a qualidade e consistência dos registros."""
+        
+        elif tipo_grafico == 'frequencia_atestados':
+            # Dados vêm como: [{frequencia: '1 atestado', quantidade: 10}, ...]
+            if not dados or len(dados) == 0:
+                return "Não há dados suficientes para análise."
+            
+            total_funcionarios = sum(d.get('quantidade', 0) for d in dados)
+            mais_comum = max(dados, key=lambda x: x.get('quantidade', 0))
+            pct_mais_comum = (mais_comum.get('quantidade', 0) / total_funcionarios * 100) if total_funcionarios > 0 else 0
+            
+            # Calcula funcionários com múltiplos atestados (3+)
+            multiplos = sum(d.get('quantidade', 0) for d in dados if '3' in d.get('frequencia', '') or '6' in d.get('frequencia', '') or '11' in d.get('frequencia', ''))
+            pct_multiplos = (multiplos / total_funcionarios * 100) if total_funcionarios > 0 else 0
+            
+            analise = f"""📊 **Análise: Frequência de Atestados por Funcionário**
+
+A maioria dos funcionários ({mais_comum.get('quantidade', 0)} funcionários, {pct_mais_comum:.1f}%) apresenta **{mais_comum.get('frequencia', 'N/A')}** no período analisado.
+
+**{pct_multiplos:.1f}% dos funcionários ({multiplos} funcionários)** apresentam **3 ou mais atestados**, indicando necessidade de atenção especial para este grupo.
+
+Esta distribuição permite identificar funcionários com padrão recorrente de afastamentos, orientando ações preventivas e de acompanhamento individualizado.
+
+💡 **Recomendação**: Implementar programa de acompanhamento para funcionários com múltiplos atestados, incluindo avaliação de saúde ocupacional, análise de causas e ações preventivas direcionadas."""
+        
+        elif tipo_grafico == 'comparativo_dias_horas':
+            # Dados vêm como: [{setor, dias_perdidos, horas_perdidas}, ...]
+            if not dados or len(dados) == 0:
+                return "Não há dados suficientes para análise."
+            
+            # Encontra setor com maior impacto
+            setor_maior = max(dados, key=lambda x: (x.get('dias_perdidos', 0) + x.get('horas_perdidas', 0) / 8))
+            total_dias = sum(d.get('dias_perdidos', 0) for d in dados)
+            total_horas = sum(d.get('horas_perdidas', 0) for d in dados)
+            
+            pct_dias = (setor_maior.get('dias_perdidos', 0) / total_dias * 100) if total_dias > 0 else 0
+            pct_horas = (setor_maior.get('horas_perdidas', 0) / total_horas * 100) if total_horas > 0 else 0
+            
+            # Converte horas para dias equivalentes
+            horas_equivalente = setor_maior.get('horas_perdidas', 0) / 8
+            dias_totais_equivalente = setor_maior.get('dias_perdidos', 0) + horas_equivalente
+            
+            analise = f"""📊 **Análise: Comparativo Dias vs Horas Perdidas**
+
+O setor **{setor_maior.get('setor', 'N/A')}** apresenta o maior impacto combinado, com **{int(setor_maior.get('dias_perdidos', 0))} dias perdidos ({pct_dias:.1f}% do total)** e **{int(setor_maior.get('horas_perdidas', 0))} horas perdidas ({pct_horas:.1f}% do total)**, equivalente a aproximadamente **{dias_totais_equivalente:.1f} dias** de impacto total.
+
+**Total geral:** {int(total_dias)} dias e {int(total_horas)} horas perdidas no período analisado.
+
+Esta análise permite identificar setores que demandam maior atenção tanto em afastamentos completos (dias) quanto em afastamentos parciais (horas), orientando estratégias de gestão diferenciadas.
+
+💡 **Recomendação**: Implementar programa de gestão de absenteísmo específico para o setor, considerando tanto afastamentos completos quanto parciais, com foco em prevenção e acompanhamento."""
         
         else:
             analise = "Análise não disponível para este tipo de gráfico."

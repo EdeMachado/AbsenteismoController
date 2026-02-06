@@ -3130,7 +3130,7 @@ async def dados_apresentacao(
                 comparativo_dias_horas = analytics.comparativo_dias_horas(client_id, mes_inicio, mes_fim, funcionario, setor)
                 if comparativo_dias_horas and len(comparativo_dias_horas) > 0:
                     try:
-                        analise_comp_dh = insights_engine.gerar_analise_grafico('setor_genero', comparativo_dias_horas, metricas)
+                        analise_comp_dh = insights_engine.gerar_analise_grafico('comparativo_dias_horas', comparativo_dias_horas, metricas)
                     except Exception as e:
                         print(f"Erro ao gerar análise comparativo dias/horas: {e}")
                         analise_comp_dh = "Análise não disponível."
@@ -3151,7 +3151,7 @@ async def dados_apresentacao(
                 frequencia_atestados = analytics.frequencia_atestados_por_funcionario(client_id, mes_inicio, mes_fim, funcionario, setor)
                 if frequencia_atestados and len(frequencia_atestados) > 0:
                     try:
-                        analise_freq = insights_engine.gerar_analise_grafico('funcionarios_dias', frequencia_atestados, metricas)
+                        analise_freq = insights_engine.gerar_analise_grafico('frequencia_atestados', frequencia_atestados, metricas)
                     except Exception as e:
                         print(f"Erro ao gerar análise frequência atestados: {e}")
                         analise_freq = "Análise não disponível."

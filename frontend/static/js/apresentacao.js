@@ -218,19 +218,26 @@ if (typeof window !== 'undefined') {
     });
     
     // Observa mudanças diretas no localStorage (mesma aba)
+    // CORREÇÃO: Só recarrega se o cliente realmente mudou
     const originalSetItem = localStorage.setItem;
     localStorage.setItem = function(key, value) {
-        originalSetItem.apply(this, arguments);
         if (key === 'cliente_selecionado') {
-            console.log('Cliente mudou no localStorage, recarregando apresentação...');
-            // Recarrega a apresentação quando o cliente muda
-            setTimeout(() => {
-                const newClientId = Number(value);
-                if (newClientId && Number.isFinite(newClientId) && newClientId > 0) {
+            const currentClientId = typeof window.getCurrentClientId === 'function' 
+                ? window.getCurrentClientId(null) 
+                : (localStorage.getItem('cliente_selecionado') ? Number(localStorage.getItem('cliente_selecionado')) : null);
+            const newClientId = Number(value);
+            
+            // Só recarrega se o cliente realmente mudou
+            if (newClientId && Number.isFinite(newClientId) && newClientId > 0 && newClientId !== currentClientId) {
+                console.log('Cliente mudou no localStorage, recarregando apresentação...');
+                originalSetItem.apply(this, arguments);
+                setTimeout(() => {
                     carregarApresentacao(newClientId);
-                }
-            }, 300);
+                }, 300);
+                return;
+            }
         }
+        originalSetItem.apply(this, arguments);
     };
 }
 
@@ -2069,7 +2076,7 @@ function renderizarGrafico(slide) {
             break;
         
         case 'comparativo_ano_anterior':
-            // Gráfico de linha comparando mês a mês do ano atual vs anterior
+            // Gráfico de barras agrupadas comparando mês a mês do ano atual vs anterior
             // Dados vêm como: [{mes, mes_label, ano_atual: {dias_perdidos, horas_perdidas}, ano_anterior: {...}}, ...]
             console.log('[APRESENTACAO] comparativo_ano_anterior - Dados recebidos:', dados);
             if (Array.isArray(dados) && dados.length > 0) {
@@ -2078,51 +2085,21 @@ function renderizarGrafico(slide) {
                 const labels = dados.map(d => d.mes_label || d.mes || 'N/A');
                 const diasAtual = dados.map(d => (d.ano_atual && d.ano_atual.dias_perdidos) || 0);
                 const diasAnterior = dados.map(d => (d.ano_anterior && d.ano_anterior.dias_perdidos) || 0);
-                const horasAtual = dados.map(d => (d.ano_atual && d.ano_atual.horas_perdidas) || 0);
-                const horasAnterior = dados.map(d => (d.ano_anterior && d.ano_anterior.horas_perdidas) || 0);
                 
                 config = {
-                    type: 'line',
+                    type: 'bar',
                     data: {
                         labels: labels,
                         datasets: [
                             {
-                                label: 'Dias Perdidos - Ano Atual',
+                                label: 'Ano Atual - Dias Perdidos',
                                 data: diasAtual,
-                                borderColor: CORES_EMPRESA.primary,
-                                backgroundColor: CORES_EMPRESA.primaryLight + '40',
-                                fill: true,
-                                tension: 0.4,
-                                yAxisID: 'y'
+                                backgroundColor: CORES_EMPRESA.primary
                             },
                             {
-                                label: 'Dias Perdidos - Ano Anterior',
+                                label: 'Ano Anterior - Dias Perdidos',
                                 data: diasAnterior,
-                                borderColor: CORES_EMPRESA.secondary,
-                                backgroundColor: CORES_EMPRESA.secondaryLight + '40',
-                                fill: true,
-                                tension: 0.4,
-                                yAxisID: 'y'
-                            },
-                            {
-                                label: 'Horas Perdidas - Ano Atual',
-                                data: horasAtual,
-                                borderColor: CORES_EMPRESA.primaryLight,
-                                backgroundColor: CORES_EMPRESA.primaryLight + '20',
-                                fill: false,
-                                tension: 0.4,
-                                yAxisID: 'y1',
-                                borderDash: [5, 5]
-                            },
-                            {
-                                label: 'Horas Perdidas - Ano Anterior',
-                                data: horasAnterior,
-                                borderColor: CORES_EMPRESA.secondaryLight,
-                                backgroundColor: CORES_EMPRESA.secondaryLight + '20',
-                                fill: false,
-                                tension: 0.4,
-                                yAxisID: 'y1',
-                                borderDash: [5, 5]
+                                backgroundColor: CORES_EMPRESA.secondary
                             }
                         ]
                     },
@@ -2131,19 +2108,20 @@ function renderizarGrafico(slide) {
                         maintainAspectRatio: false,
                         plugins: {
                             legend: { display: true, position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
+                            tooltip: { 
+                                mode: 'index', 
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.parsed.y.toFixed(2)} dias`;
+                                    }
+                                }
+                            }
                         },
                         scales: {
                             y: { 
-                                beginAtZero: true, 
-                                title: { display: true, text: 'Dias Perdidos' },
-                                position: 'left'
-                            },
-                            y1: {
                                 beginAtZero: true,
-                                title: { display: true, text: 'Horas Perdidas' },
-                                position: 'right',
-                                grid: { drawOnChartArea: false }
+                                title: { display: true, text: 'Dias Perdidos' }
                             }
                         }
                     }
@@ -2717,6 +2695,29 @@ function renderizarAcoesSaudeSocial(tipo) {
 // ==================== HEATMAP ====================
 function renderizarHeatmapTabela(dados, container) {
     console.log('[HEATMAP] Criando tabela com', dados.setores?.length || 0, 'setores e', dados.meses?.length || 0, 'meses');
+    console.log('[HEATMAP] Dados completos:', dados);
+    
+    // Limpa container antes de renderizar
+    container.innerHTML = '';
+    
+    // Validação de dados
+    if (!dados || !dados.setores || !dados.meses || !dados.dados) {
+        console.error('[HEATMAP] Dados inválidos:', dados);
+        container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Dados do heatmap não disponíveis.</p>';
+        return;
+    }
+    
+    if (!Array.isArray(dados.setores) || dados.setores.length === 0) {
+        console.error('[HEATMAP] Setores vazios ou inválidos');
+        container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Nenhum setor encontrado.</p>';
+        return;
+    }
+    
+    if (!Array.isArray(dados.meses) || dados.meses.length === 0) {
+        console.error('[HEATMAP] Meses vazios ou inválidos');
+        container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Nenhum mês encontrado.</p>';
+        return;
+    }
     
     // Encontra o valor máximo para normalizar as cores
     let maxValor = 0;
@@ -2730,6 +2731,12 @@ function renderizarHeatmapTabela(dados, container) {
                 }
             }
         }
+    }
+    
+    if (maxValor === 0) {
+        console.warn('[HEATMAP] Nenhum valor encontrado nos dados');
+        container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Nenhum dado disponível para exibição.</p>';
+        return;
     }
     
     // Cria função para gerar cor baseada no valor
