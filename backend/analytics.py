@@ -2161,90 +2161,105 @@ class Analytics:
     def comparativo_ano_anterior(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """
         Compara período atual com mesmo período do ano anterior
-        CORREÇÃO: Usa o último ano COM DADOS como referência, não o ano do calendário
+        CORREÇÃO: Compara mês a mês, mesmo que os dados não comecem em janeiro
         Retorna dados mês a mês com valores atuais e do ano anterior
         """
-        # CORREÇÃO: Busca o último mês com dados para determinar o período
+        # Busca todos os meses com dados para determinar o período
         query_uploads = self.db.query(
             Upload.mes_referencia
         ).filter(
             Upload.client_id == client_id
-        ).order_by(Upload.mes_referencia.desc()).limit(1).first()
+        ).distinct().order_by(Upload.mes_referencia.asc()).all()
         
-        if not query_uploads:
+        if not query_uploads or len(query_uploads) == 0:
             # Se não há dados, retorna lista vazia
             return []
         
-        # Usa o último mês com dados como referência
-        ultimo_mes_com_dados = query_uploads.mes_referencia
-        ultimo_mes_date = datetime.strptime(ultimo_mes_com_dados + '-01', '%Y-%m-%d')
+        # Determina o primeiro e último mês com dados
+        primeiro_mes = query_uploads[0].mes_referencia
+        ultimo_mes = query_uploads[-1].mes_referencia
+        primeiro_mes_date = datetime.strptime(primeiro_mes + '-01', '%Y-%m-%d')
+        ultimo_mes_date = datetime.strptime(ultimo_mes + '-01', '%Y-%m-%d')
         
+        # Se não fornecidos, usa todos os meses disponíveis
         if not mes_inicio or not mes_fim:
-            # Se não fornecidos, usa últimos 12 meses a partir do último mês com dados
-            mes_fim = ultimo_mes_com_dados
-            mes_inicio_date = ultimo_mes_date - relativedelta(months=11)
-            mes_inicio = mes_inicio_date.strftime('%Y-%m')
+            mes_inicio = primeiro_mes
+            mes_fim = ultimo_mes
         else:
             # Garante que não usa mês futuro
             mes_fim_date = datetime.strptime(mes_fim + '-01', '%Y-%m-%d')
             if mes_fim_date > ultimo_mes_date:
-                mes_fim = ultimo_mes_com_dados
-                mes_fim_date = ultimo_mes_date
+                mes_fim = ultimo_mes
         
-        # Busca dados do período atual
-        evolucao_atual = self.evolucao_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+        # Busca dados do período atual (ano mais recente)
+        evolucao_atual = self.evolucao_mensal(client_id, meses=120, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
         
         if not evolucao_atual or len(evolucao_atual) == 0:
             # Se não há dados no período atual, retorna vazio
             return []
         
-        # Calcula período do ano anterior
-        inicio_date = datetime.strptime(mes_inicio + '-01', '%Y-%m-%d')
-        fim_date = datetime.strptime(mes_fim + '-01', '%Y-%m-%d')
+        # Determina o ano atual (ano do último mês com dados)
+        ano_atual = int(ultimo_mes.split('-')[0])
+        ano_anterior = ano_atual - 1
         
-        mes_inicio_anterior = (inicio_date - relativedelta(years=1)).strftime('%Y-%m')
-        mes_fim_anterior = (fim_date - relativedelta(years=1)).strftime('%Y-%m')
-        
-        # Busca dados do ano anterior
-        evolucao_anterior = self.evolucao_mensal(client_id, mes_inicio_anterior, mes_fim_anterior, funcionario, setor)
-        
-        # Cria mapa de dados do ano anterior por mês relativo
-        mapa_anterior = {}
-        for item in evolucao_anterior:
-            mes_date = datetime.strptime(item['mes'] + '-01', '%Y-%m-%d')
-            mes_relativo = mes_date.strftime('%m')  # Apenas o mês (01-12)
-            mapa_anterior[mes_relativo] = item
-        
-        # Combina dados
+        # Busca dados do ano anterior (mesmo período, ano anterior)
+        # Pega o mês relativo (01-12) de cada mês atual e busca o mesmo mês no ano anterior
         resultado = []
+        meses_pt = {
+            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+            '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+            '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro'
+        }
+        
         for item_atual in evolucao_atual:
-            mes_date = datetime.strptime(item_atual['mes'] + '-01', '%Y-%m-%d')
-            mes_relativo = mes_date.strftime('%m')
+            mes_atual_str = item_atual['mes']
+            mes_parts = mes_atual_str.split('-')
+            if len(mes_parts) != 2:
+                continue
             
-            item_anterior = mapa_anterior.get(mes_relativo, {})
+            ano_mes_atual = int(mes_parts[0])
+            mes_num = mes_parts[1]  # MM (01-12)
             
-            dias_atual = item_atual.get('dias_perdidos', 0)
-            dias_anterior = item_anterior.get('dias_perdidos', 0)
-            horas_atual = item_atual.get('horas_perdidas', 0)
-            horas_anterior = item_anterior.get('horas_perdidas', 0)
+            # Só compara se o mês atual for do ano mais recente
+            if ano_mes_atual != ano_atual:
+                continue
+            
+            # Busca o mesmo mês no ano anterior
+            mes_anterior_str = f"{ano_anterior}-{mes_num}"
+            
+            # Busca dados do mês anterior
+            evolucao_anterior_mes = self.evolucao_mensal(client_id, meses=1, mes_inicio=mes_anterior_str, mes_fim=mes_anterior_str, funcionario=funcionario, setor=setor)
+            
+            # Extrai dados do ano anterior (pode estar vazio se não houver dados)
+            item_anterior = {}
+            if evolucao_anterior_mes and len(evolucao_anterior_mes) > 0:
+                item_anterior = evolucao_anterior_mes[0]
+            
+            dias_atual = item_atual.get('dias_perdidos', 0) or 0
+            dias_anterior = item_anterior.get('dias_perdidos', 0) or 0
+            horas_atual = item_atual.get('horas_perdidas', 0) or 0
+            horas_anterior = item_anterior.get('horas_perdidas', 0) or 0
             
             # Calcula variação
             variacao_dias = ((dias_atual - dias_anterior) / dias_anterior * 100) if dias_anterior > 0 else (100 if dias_atual > 0 else 0)
             variacao_horas = ((horas_atual - horas_anterior) / horas_anterior * 100) if horas_anterior > 0 else (100 if horas_atual > 0 else 0)
             
+            # Cria label do mês
+            mes_label = f"{meses_pt.get(mes_num, mes_num)}/{ano_mes_atual}"
+            
             resultado.append({
-                'mes': item_atual['mes'],
-                'mes_label': item_atual.get('mes_label', ''),
+                'mes': mes_atual_str,
+                'mes_label': mes_label,
                 'ano_atual': {
-                    'dias_perdidos': dias_atual,
-                    'horas_perdidas': horas_atual,
+                    'dias_perdidos': round(dias_atual, 2),
+                    'horas_perdidas': round(horas_atual, 2),
                     'quantidade': item_atual.get('quantidade', 0)
                 },
                 'ano_anterior': {
-                    'dias_perdidos': dias_anterior,
-                    'horas_perdidas': horas_anterior,
+                    'dias_perdidos': round(dias_anterior, 2),
+                    'horas_perdidas': round(horas_anterior, 2),
                     'quantidade': item_anterior.get('quantidade', 0),
-                    'mes_referencia': item_anterior.get('mes', '')
+                    'mes_referencia': mes_anterior_str
                 },
                 'variacao': {
                     'dias_percentual': round(variacao_dias, 2),
@@ -2254,7 +2269,8 @@ class Analytics:
                 }
             })
         
-        return resultado
+        # Retorna apenas se houver pelo menos um mês com dados
+        return resultado if len(resultado) > 0 else []
     
     def analise_sazonalidade(self, client_id: int, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """
