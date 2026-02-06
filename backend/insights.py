@@ -356,36 +356,59 @@ Estes números representam o impacto direto do absenteísmo na operação, impac
 💡 **Recomendação**: Implementar programa de gestão de absenteísmo com foco em prevenção e acompanhamento individualizado."""
             
         elif tipo_grafico == 'funcionarios_dias':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            # Validação mais flexível: aceita dados mesmo se vazio, desde que tenha estrutura
+            if not dados:
+                return "📊 **Análise: Dias Perdidos por Funcionário**\n\nDados ainda não disponíveis para este período."
             
-            top = dados[0]
-            top5_total = sum(d.get('dias_perdidos', 0) for d in dados[:5])
+            # Se for lista vazia, tenta usar métricas
+            if isinstance(dados, list) and len(dados) == 0:
+                total_dias = metricas.get('total_dias_perdidos', 0) if metricas else 0
+                if total_dias > 0:
+                    analise = f"""📊 **Análise: Dias Perdidos por Funcionário**
+
+O período analisado apresenta **{int(total_dias)} dias perdidos** distribuídos entre os funcionários.
+
+💡 **Recomendação**: Implementar programa de acompanhamento individualizado para funcionários com alto índice de absenteísmo."""
+                    return analise
+                return "📊 **Análise: Dias Perdidos por Funcionário**\n\nDados ainda não disponíveis para este período."
+            
+            top = dados[0] if isinstance(dados, list) else dados
+            top5_total = sum(d.get('dias_perdidos', 0) for d in (dados[:5] if isinstance(dados, list) else [dados]))
             total_dias = metricas.get('total_dias_perdidos', 0) if metricas else top5_total
             pct_top5 = (top5_total / total_dias * 100) if total_dias > 0 else 0
             
+            nome_funcionario = top.get('nome', 'Não informado') if isinstance(top, dict) else 'Não informado'
+            if nome_funcionario == 'N/A' or not nome_funcionario:
+                nome_funcionario = 'Não informado'
+            
+            dias_perdidos = int(top.get('dias_perdidos', 0)) if isinstance(top, dict) else 0
+            
             analise = f"""👤 **Análise: Dias Perdidos por Funcionário**
 
-O funcionário **{top.get('nome', 'N/A')}** apresenta **{int(top.get('dias_perdidos', 0))} dias perdidos**, representando o maior índice individual de afastamento.
+O funcionário **{nome_funcionario}** apresenta **{dias_perdidos} dias perdidos**, representando o maior índice individual de afastamento.
 
 Os **5 funcionários com maior incidência** concentram **{pct_top5:.1f}%** do total de dias perdidos, indicando necessidade de foco em ações preventivas específicas para este grupo.
 
 💡 **Recomendação**: Implementar programa de acompanhamento individualizado para funcionários com alto índice de absenteísmo, incluindo avaliação de saúde ocupacional e apoio multidisciplinar."""
             
         elif tipo_grafico == 'top_cids':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "📊 **Análise: TOP 10 Doenças mais Frequentes**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "📊 **Análise: TOP 10 Doenças mais Frequentes**\n\nDados ainda não disponíveis para este período."
             
             top = dados[0]
             total_cids = sum(d.get('quantidade', 0) for d in dados)
             pct_top = (top.get('quantidade', 0) / total_cids * 100) if total_cids > 0 else 0
             
             # CORREÇÃO: Se descricao = cid (sem diagnóstico), mostra apenas o código
-            cid_codigo = top.get('cid', 'N/A')
-            cid_descricao = top.get('descricao', top.get('diagnostico', cid_codigo))
+            cid_codigo = top.get('cid', 'Não informado')
+            if cid_codigo == 'N/A' or not cid_codigo:
+                cid_codigo = 'Não informado'
             
-            # Se descricao é igual ao código, mostra apenas "CID X"
-            if cid_descricao == cid_codigo:
+            cid_descricao = top.get('descricao', top.get('diagnostico', ''))
+            if not cid_descricao or cid_descricao == 'N/A' or cid_descricao == cid_codigo:
                 texto_cid = f"**CID {cid_codigo}**"
             else:
                 texto_cid = f"**CID {cid_codigo}** - **{cid_descricao}**"
@@ -399,40 +422,80 @@ As doenças mais frequentes indicam padrões que podem estar relacionados a cond
 💡 **Recomendação**: Implementar ações preventivas específicas para as principais causas identificadas, incluindo programas de saúde ocupacional, ergonomia e qualidade de vida no trabalho."""
             
         elif tipo_grafico == 'evolucao_mensal':
-            if not dados or len(dados) < 2:
-                return "Não há dados suficientes para análise de tendência."
+            if not dados:
+                return "📈 **Análise: Evolução Mensal**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) < 2:
+                if len(dados) == 1:
+                    item = dados[0]
+                    dias = item.get('dias_perdidos', 0) if isinstance(item, dict) else 0
+                    mes = item.get('mes', 'Período') if isinstance(item, dict) else 'Período'
+                    analise = f"""📈 **Análise: Evolução Mensal**
+
+O período analisado ({mes}) apresenta **{int(dias)} dias perdidos**.
+
+💡 **Recomendação**: Continuar monitorando a evolução mensal para identificar tendências."""
+                    return analise
+                return "📈 **Análise: Evolução Mensal**\n\nDados ainda não disponíveis para este período."
             
             ultimo = dados[-1]
             penultimo = dados[-2]
             variacao = ((ultimo.get('dias_perdidos', 0) - penultimo.get('dias_perdidos', 0)) / penultimo.get('dias_perdidos', 1) * 100) if penultimo.get('dias_perdidos', 0) > 0 else 0
             
+            mes_ultimo = ultimo.get('mes', 'Último mês')
+            mes_penultimo = penultimo.get('mes', 'Mês anterior')
+            if mes_ultimo == 'N/A' or not mes_ultimo:
+                mes_ultimo = 'Último mês'
+            if mes_penultimo == 'N/A' or not mes_penultimo:
+                mes_penultimo = 'Mês anterior'
+            
             analise = f"""📈 **Análise: Evolução Mensal - Últimos 12 Meses**
 
-A análise da tendência mostra uma **{"variação positiva" if variacao > 0 else "variação negativa"} de {abs(variacao):.1f}%** comparando o último mês ({ultimo.get('mes', 'N/A')}) com o anterior ({penultimo.get('mes', 'N/A')}).
+A análise da tendência mostra uma **{"variação positiva" if variacao > 0 else "variação negativa"} de {abs(variacao):.1f}%** comparando o último mês ({mes_ultimo}) com o anterior ({mes_penultimo}).
 
 Esta evolução indica a necessidade de monitoramento contínuo e ajuste das estratégias de gestão de absenteísmo conforme a tendência observada.
 
 💡 **Recomendação**: {"Manter atenção às ações preventivas e investigar causas do aumento" if variacao > 0 else "Manter as ações atuais e buscar consolidar a redução observada"}."""
             
         elif tipo_grafico == 'top_setores':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "🏢 **Análise: TOP 5 Setores**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "🏢 **Análise: TOP 5 Setores**\n\nDados ainda não disponíveis para este período."
             
             top = dados[0]
             total_setores = sum(d.get('quantidade', 0) for d in dados)
             pct_top = (top.get('quantidade', 0) / total_setores * 100) if total_setores > 0 else 0
             
+            setor_nome = top.get('setor', 'Não informado')
+            if setor_nome == 'N/A' or not setor_nome:
+                setor_nome = 'Não informado'
+            
             analise = f"""🏢 **Análise: TOP 5 Setores**
 
-O setor **{top.get('setor', 'N/A')}** apresenta o maior índice de atestados, com **{top.get('quantidade', 0)} ocorrências**, representando **{pct_top:.1f}%** do total.
+O setor **{setor_nome}** apresenta o maior índice de atestados, com **{top.get('quantidade', 0)} ocorrências**, representando **{pct_top:.1f}%** do total.
 
 Esta concentração pode indicar questões específicas relacionadas a condições de trabalho, carga horária, ergonomia ou fatores organizacionais deste setor.
 
 💡 **Recomendação**: Realizar avaliação detalhada das condições de trabalho no setor, incluindo análise ergonômica, gestão de carga de trabalho e programa de saúde ocupacional específico."""
             
         elif tipo_grafico == 'genero':
-            if not dados or len(dados) < 2:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "👥 **Análise: Distribuição por Gênero**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) < 2:
+                if len(dados) == 1:
+                    item = dados[0]
+                    genero_nome = "Masculino" if item.get('genero') == 'M' else "Feminino" if item.get('genero') == 'F' else "Não informado"
+                    quantidade = item.get('quantidade', 0) if isinstance(item, dict) else 0
+                    analise = f"""👥 **Análise: Distribuição por Gênero**
+
+Funcionários do sexo **{genero_nome}** representam **{quantidade} atestados** no período analisado.
+
+💡 **Recomendação**: Considerar ações de saúde preventiva específicas por gênero."""
+                    return analise
+                return "👥 **Análise: Distribuição por Gênero**\n\nDados ainda não disponíveis para este período."
             
             total = sum(d.get('quantidade', 0) for d in dados)
             maior = max(dados, key=lambda x: x.get('quantidade', 0))
@@ -449,8 +512,11 @@ Esta distribuição pode refletir características demográficas da organizaçã
 💡 **Recomendação**: Considerar ações de saúde preventiva específicas por gênero, respeitando as particularidades e necessidades de cada grupo."""
             
         elif tipo_grafico == 'dias_doenca':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "📊 **Análise: Dias por Doença**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "📊 **Análise: Dias por Doença**\n\nDados ainda não disponíveis para este período."
             
             top = dados[0]
             total_dias = sum(d.get('dias_perdidos', 0) for d in dados)
@@ -474,72 +540,103 @@ Esta análise permite identificar as condições de saúde que geram maior impac
 💡 **Recomendação**: Desenvolver programa de prevenção específico para as principais causas de afastamento de maior duração."""
             
         elif tipo_grafico == 'escalas':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "⏰ **Análise: Escalas com mais Atestados**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "⏰ **Análise: Escalas com mais Atestados**\n\nDados ainda não disponíveis para este período."
             
             top = dados[0]
             total = sum(d.get('quantidade', 0) for d in dados)
             pct = (top.get('quantidade', 0) / total * 100) if total > 0 else 0
             
+            escala_nome = top.get('escala', 'Não informado')
+            if escala_nome == 'N/A' or not escala_nome:
+                escala_nome = 'Não informado'
+            
             analise = f"""⏰ **Análise: Escalas com mais Atestados**
 
-A escala **{top.get('escala', 'N/A')}** apresenta o maior número de atestados, com **{top.get('quantidade', 0)} ocorrências ({pct:.1f}% do total)**.
+A escala **{escala_nome}** apresenta o maior número de atestados, com **{top.get('quantidade', 0)} ocorrências ({pct:.1f}% do total)**.
 
 Esta informação pode indicar relação entre horários de trabalho e incidência de afastamentos, possivelmente relacionada a fatores como fadiga, privação de sono ou condições específicas de cada turno.
 
 💡 **Recomendação**: Avaliar condições de trabalho específicas das escalas com maior incidência, considerando ajustes de carga horária, pausas e programas de saúde para trabalhadores em turnos."""
             
         elif tipo_grafico == 'motivos':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "📋 **Análise: Motivos de Incidência**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "📋 **Análise: Motivos de Incidência**\n\nDados ainda não disponíveis para este período."
             
             top = dados[0]
             total = sum(d.get('quantidade', 0) for d in dados)
             pct = (top.get('quantidade', 0) / total * 100) if total > 0 else 0
             
+            motivo_nome = top.get('motivo', 'Não informado')
+            if motivo_nome == 'N/A' or not motivo_nome:
+                motivo_nome = 'Não informado'
+            
             analise = f"""📋 **Análise: Motivos de Incidência**
 
-O motivo **{top.get('motivo', 'N/A')}** é o principal responsável pelos atestados, com **{pct:.1f}%** das ocorrências ({top.get('quantidade', 0)} de {total} total).
+O motivo **{motivo_nome}** é o principal responsável pelos atestados, com **{pct:.1f}%** das ocorrências ({top.get('quantidade', 0)} de {total} total).
 
 Esta distribuição permite identificar padrões nas causas de afastamento, orientando estratégias de prevenção e gestão de saúde ocupacional.
 
 💡 **Recomendação**: Desenvolver ações preventivas específicas para os principais motivos identificados, com foco em redução de incidência e promoção de saúde."""
             
         elif tipo_grafico == 'centro_custo':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "💰 **Análise: Dias Perdidos por Centro de Custo**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "💰 **Análise: Dias Perdidos por Centro de Custo**\n\nDados ainda não disponíveis para este período."
             
             top = dados[0]
             total_dias = sum(d.get('dias_perdidos', 0) for d in dados)
             pct = (top.get('dias_perdidos', 0) / total_dias * 100) if total_dias > 0 else 0
             
+            setor_nome = top.get('setor', 'Não informado')
+            if setor_nome == 'N/A' or not setor_nome:
+                setor_nome = 'Não informado'
+            
             analise = f"""💰 **Análise: Dias Perdidos por Centro de Custo (Setor)**
 
-O setor **{top.get('setor', 'N/A')}** apresenta o maior impacto em dias perdidos, com **{int(top.get('dias_perdidos', 0))} dias ({pct:.1f}% do total)**.
+O setor **{setor_nome}** apresenta o maior impacto em dias perdidos, com **{int(top.get('dias_perdidos', 0))} dias ({pct:.1f}% do total)**.
 
 Esta análise permite identificar os setores que demandam maior atenção em termos de gestão de absenteísmo e saúde ocupacional.
 
 💡 **Recomendação**: Implementar programa de gestão de saúde ocupacional específico para os setores com maior impacto, incluindo avaliações periódicas e ações preventivas."""
             
         elif tipo_grafico == 'distribuicao_dias':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "📊 **Análise: Distribuição de Dias por Atestado**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "📊 **Análise: Distribuição de Dias por Atestado**\n\nDados ainda não disponíveis para este período."
             
             # Encontra a faixa mais comum
             mais_comum = max(dados, key=lambda x: x.get('quantidade', 0))
             media = sum(d.get('dias', 0) * d.get('quantidade', 0) for d in dados) / sum(d.get('quantidade', 0) for d in dados) if sum(d.get('quantidade', 0) for d in dados) > 0 else 0
             
+            dias_faixa = mais_comum.get('dias', 'Não informado')
+            if dias_faixa == 'N/A' or not dias_faixa:
+                dias_faixa = 'Não informado'
+            
             analise = f"""📊 **Análise: Distribuição de Dias por Atestado**
 
-A maioria dos atestados concentra-se na faixa de **{mais_comum.get('dias', 'N/A')} dias**, com média geral de **{media:.1f} dias por atestado**.
+A maioria dos atestados concentra-se na faixa de **{dias_faixa} dias**, com média geral de **{media:.1f} dias por atestado**.
 
 Esta distribuição permite entender o padrão de duração dos afastamentos, orientando estratégias de gestão e acompanhamento.
 
 💡 **Recomendação**: Estabelecer protocolos de acompanhamento diferenciados conforme a duração esperada do afastamento, priorizando casos de maior duração."""
             
         elif tipo_grafico == 'media_cid':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "📊 **Análise: Média de Dias por CID**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "📊 **Análise: Média de Dias por CID**\n\nDados ainda não disponíveis para este período."
             
             top = dados[0]
             
@@ -561,15 +658,21 @@ Esta informação permite identificar as condições de saúde que demandam maio
 💡 **Recomendação**: Desenvolver programa de prevenção específico para as condições com maior média de dias, incluindo ações de promoção de saúde e acompanhamento."""
             
         elif tipo_grafico == 'setor_genero':
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "👥 **Análise: Dias Perdidos por Setor e Gênero**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "👥 **Análise: Dias Perdidos por Setor e Gênero**\n\nDados ainda não disponíveis para este período."
             
             # Dados vêm como: [{setor, genero, dias_perdidos}, ...]
             # Agrupa por setor
             setores_map = {}
             for item in dados:
                 setor = item.get('setor', 'Não informado')
-                genero = item.get('genero', 'N/A')
+                if setor == 'N/A' or not setor:
+                    setor = 'Não informado'
+                
+                genero = item.get('genero', '')
                 dias = item.get('dias_perdidos', 0)
                 
                 if setor not in setores_map:
@@ -608,7 +711,13 @@ Esta análise permite identificar padrões específicos por setor e gênero, ori
             
             analise = f"""⏱️ **Análise: Tempo Serviço x Atestados**
 
-Funcionários com **{faixa_mais_dias.get('faixa_tempo_servico', 'N/A')}** de empresa apresentam o maior índice de dias de afastamento, com **{int(faixa_mais_dias.get('dias_afastamento', 0))} dias ({pct:.1f}% do total)** e **{faixa_mais_dias.get('quantidade_atestados', 0)} atestados**.
+            faixa_tempo = faixa_mais_dias.get('faixa_tempo_servico', 'Não informado')
+            if faixa_tempo == 'N/A' or not faixa_tempo:
+                faixa_tempo = 'Não informado'
+            
+            analise = f"""⏱️ **Análise: Tempo Serviço x Atestados**
+
+Funcionários com **{faixa_tempo}** de empresa apresentam o maior índice de dias de afastamento, com **{int(faixa_mais_dias.get('dias_afastamento', 0))} dias ({pct:.1f}% do total)** e **{faixa_mais_dias.get('quantidade_atestados', 0)} atestados**.
 
 Esta análise permite identificar se funcionários mais antigos (com mais tempo na empresa) ou mais novos (recém-admitidos) apresentam maior incidência de atestados.
 
@@ -623,9 +732,13 @@ Esta análise permite identificar se funcionários mais antigos (com mais tempo 
             total_dias = metricas.get('total_dias_perdidos', 0) if metricas else top5_total
             pct_top5 = (top5_total / total_dias * 100) if total_dias > 0 else 0
             
+            nome_funcionario = top.get('nome', 'Não informado')
+            if nome_funcionario == 'N/A' or not nome_funcionario:
+                nome_funcionario = 'Não informado'
+            
             analise = f"""👤 **Análise: Classificação por Funcionário**
 
-O funcionário **{top.get('nome', 'N/A')}** apresenta **{int(top.get('quantidade', 0))} dias de atestados**, representando o maior índice individual de afastamento.
+O funcionário **{nome_funcionario}** apresenta **{int(top.get('quantidade', 0))} dias de atestados**, representando o maior índice individual de afastamento.
 
 Os **5 funcionários com maior incidência** concentram **{pct_top5:.1f}%** do total de dias perdidos, indicando necessidade de foco em ações preventivas específicas para este grupo.
 
@@ -639,9 +752,13 @@ Os **5 funcionários com maior incidência** concentram **{pct_top5:.1f}%** do t
             total_dias = sum(d.get('dias_afastamento', 0) for d in dados)
             pct = (top.get('dias_afastamento', 0) / total_dias * 100) if total_dias > 0 else 0
             
+            setor_nome = top.get('setor', 'Não informado')
+            if setor_nome == 'N/A' or not setor_nome:
+                setor_nome = 'Não informado'
+            
             analise = f"""🏢 **Análise: Classificação por Setor**
 
-O setor **{top.get('setor', 'N/A')}** apresenta o maior índice de dias de afastamento, com **{int(top.get('dias_afastamento', 0))} dias ({pct:.1f}% do total)**.
+O setor **{setor_nome}** apresenta o maior índice de dias de afastamento, com **{int(top.get('dias_afastamento', 0))} dias ({pct:.1f}% do total)**.
 
 Esta concentração pode indicar questões específicas relacionadas a condições de trabalho, carga horária, ergonomia ou fatores organizacionais deste setor.
 
@@ -779,7 +896,13 @@ Esta distribuição permite identificar a qualidade e consistência dos atestado
             
             analise = f"""📊 **Análise: Frequência de Atestados por Funcionário**
 
-A maioria dos funcionários ({mais_comum.get('quantidade', 0)} funcionários, {pct_mais_comum:.1f}%) apresenta **{mais_comum.get('frequencia', 'N/A')}** no período analisado.
+            frequencia_nome = mais_comum.get('frequencia', 'Não informado')
+            if frequencia_nome == 'N/A' or not frequencia_nome:
+                frequencia_nome = 'Não informado'
+            
+            analise = f"""📊 **Análise: Frequência de Atestados por Funcionário**
+
+A maioria dos funcionários ({mais_comum.get('quantidade', 0)} funcionários, {pct_mais_comum:.1f}%) apresenta **{frequencia_nome}** no período analisado.
 
 **{pct_multiplos:.1f}% dos funcionários ({multiplos} funcionários)** apresentam **3 ou mais atestados**, indicando necessidade de atenção especial para este grupo.
 
@@ -806,7 +929,13 @@ Esta distribuição permite identificar funcionários com padrão recorrente de 
             
             analise = f"""📊 **Análise: Comparativo Dias vs Horas Perdidas**
 
-O setor **{setor_maior.get('setor', 'N/A')}** apresenta o maior impacto combinado, com **{int(setor_maior.get('dias_perdidos', 0))} dias perdidos ({pct_dias:.1f}% do total)** e **{int(setor_maior.get('horas_perdidas', 0))} horas perdidas ({pct_horas:.1f}% do total)**, equivalente a aproximadamente **{dias_totais_equivalente:.1f} dias** de impacto total.
+            setor_nome = setor_maior.get('setor', 'Não informado')
+            if setor_nome == 'N/A' or not setor_nome:
+                setor_nome = 'Não informado'
+            
+            analise = f"""📊 **Análise: Comparativo Dias vs Horas Perdidas**
+
+O setor **{setor_nome}** apresenta o maior impacto combinado, com **{int(setor_maior.get('dias_perdidos', 0))} dias perdidos ({pct_dias:.1f}% do total)** e **{int(setor_maior.get('horas_perdidas', 0))} horas perdidas ({pct_horas:.1f}% do total)**, equivalente a aproximadamente **{dias_totais_equivalente:.1f} dias** de impacto total.
 
 **Total geral:** {int(total_dias)} dias e {int(total_horas)} horas perdidas no período analisado.
 

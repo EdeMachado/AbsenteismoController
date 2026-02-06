@@ -2082,9 +2082,26 @@ function renderizarGrafico(slide) {
             if (Array.isArray(dados) && dados.length > 0) {
                 console.log('[APRESENTACAO] comparativo_ano_anterior - Total de itens:', dados.length);
                 console.log('[APRESENTACAO] comparativo_ano_anterior - Primeiro item:', dados[0]);
-                const labels = dados.map(d => d.mes_label || d.mes || 'N/A');
-                const diasAtual = dados.map(d => (d.ano_atual && d.ano_atual.dias_perdidos) || 0);
-                const diasAnterior = dados.map(d => (d.ano_anterior && d.ano_anterior.dias_perdidos) || 0);
+                
+                // Filtra apenas meses com dados válidos
+                const dadosFiltrados = dados.filter(d => {
+                    const atual = (d.ano_atual && d.ano_atual.dias_perdidos) || 0;
+                    const anterior = (d.ano_anterior && d.ano_anterior.dias_perdidos) || 0;
+                    return atual > 0 || anterior > 0;
+                });
+                
+                if (dadosFiltrados.length === 0) {
+                    console.warn('[APRESENTACAO] comparativo_ano_anterior - Nenhum dado válido após filtro');
+                    break;
+                }
+                
+                const labels = dadosFiltrados.map(d => {
+                    const label = d.mes_label || d.mes || '';
+                    // Remove "N/A" se aparecer
+                    return label.replace('N/A', '').trim() || 'Mês';
+                });
+                const diasAtual = dadosFiltrados.map(d => (d.ano_atual && d.ano_atual.dias_perdidos) || 0);
+                const diasAnterior = dadosFiltrados.map(d => (d.ano_anterior && d.ano_anterior.dias_perdidos) || 0);
                 
                 config = {
                     type: 'bar',
@@ -2092,14 +2109,16 @@ function renderizarGrafico(slide) {
                         labels: labels,
                         datasets: [
                             {
-                                label: 'Ano Atual - Dias Perdidos',
+                                label: 'Ano Atual',
                                 data: diasAtual,
-                                backgroundColor: CORES_EMPRESA.primary
+                                backgroundColor: CORES_EMPRESA.primary,
+                                borderRadius: 4
                             },
                             {
-                                label: 'Ano Anterior - Dias Perdidos',
+                                label: 'Ano Anterior',
                                 data: diasAnterior,
-                                backgroundColor: CORES_EMPRESA.secondary
+                                backgroundColor: CORES_EMPRESA.secondary,
+                                borderRadius: 4
                             }
                         ]
                     },
@@ -2107,13 +2126,19 @@ function renderizarGrafico(slide) {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: { display: true, position: 'top' },
+                            legend: { 
+                                display: true, 
+                                position: 'top',
+                                labels: { font: { size: 12 } }
+                            },
                             tooltip: { 
                                 mode: 'index', 
                                 intersect: false,
                                 callbacks: {
                                     label: function(context) {
-                                        return `${context.dataset.label}: ${context.parsed.y.toFixed(2)} dias`;
+                                        const label = context.dataset.label || '';
+                                        const value = context.parsed.y || 0;
+                                        return `${label}: ${value.toFixed(2)} dias`;
                                     }
                                 }
                             }
@@ -2121,7 +2146,21 @@ function renderizarGrafico(slide) {
                         scales: {
                             y: { 
                                 beginAtZero: true,
-                                title: { display: true, text: 'Dias Perdidos' }
+                                title: { 
+                                    display: true, 
+                                    text: 'Dias Perdidos',
+                                    font: { size: 12 }
+                                },
+                                ticks: {
+                                    font: { size: 11 }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    font: { size: 11 },
+                                    maxRotation: 45,
+                                    minRotation: 0
+                                }
                             }
                         }
                     }
@@ -2139,22 +2178,24 @@ function renderizarGrafico(slide) {
                 console.log('[APRESENTACAO] heatmap - Setores:', dados.setores.length, 'Meses:', dados.meses.length, 'Dados:', dados.dados.length);
                 // Se tiver dados estruturados, tenta criar visualização
                 const container = document.getElementById('chartSlide');
-                if (container && container.parentElement) {
-                    // Limpa container anterior
-                    container.parentElement.innerHTML = '';
-                    
-                    // Cria div para heatmap HTML
-                    const heatmapDiv = document.createElement('div');
-                    heatmapDiv.id = 'heatmapApresentacao';
-                    heatmapDiv.style.width = '100%';
-                    heatmapDiv.style.height = '100%';
-                    heatmapDiv.style.overflow = 'auto';
-                    container.parentElement.appendChild(heatmapDiv);
-                    
-                    // Renderiza tabela HTML (similar ao dashboard)
-                    setTimeout(() => {
+                if (container) {
+                    // Limpa container anterior completamente
+                    const parent = container.parentElement;
+                    if (parent) {
+                        parent.innerHTML = '';
+                        
+                        // Cria div para heatmap HTML
+                        const heatmapDiv = document.createElement('div');
+                        heatmapDiv.id = 'heatmapApresentacao';
+                        heatmapDiv.style.width = '100%';
+                        heatmapDiv.style.height = '100%';
+                        heatmapDiv.style.overflow = 'auto';
+                        heatmapDiv.style.minHeight = '300px';
+                        parent.appendChild(heatmapDiv);
+                        
+                        // Renderiza tabela HTML imediatamente
                         renderizarHeatmapTabela(dados, heatmapDiv);
-                    }, 100);
+                    }
                 }
                 // Não cria config Chart.js para heatmap
                 return;

@@ -3083,7 +3083,18 @@ async def dados_apresentacao(
                 comparativo_ano = analytics.comparativo_ano_anterior(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
                 if comparativo_ano and len(comparativo_ano) > 0:
                     try:
-                        analise_comp_ano = insights_engine.gerar_analise_grafico('evolucao_mensal', comparativo_ano, metricas)
+                        # Gera análise específica para comparativo ano anterior
+                        total_atual = sum((d.get('ano_atual', {}).get('dias_perdidos', 0) or 0) for d in comparativo_ano)
+                        total_anterior = sum((d.get('ano_anterior', {}).get('dias_perdidos', 0) or 0) for d in comparativo_ano)
+                        variacao = ((total_atual - total_anterior) / total_anterior * 100) if total_anterior > 0 else (100 if total_atual > 0 else 0)
+                        
+                        analise_comp_ano = f"""📊 **Análise: Comparativo Ano Anterior**
+
+O período atual apresenta **{int(total_atual)} dias perdidos**, comparado a **{int(total_anterior)} dias** no mesmo período do ano anterior, representando uma **{"variação positiva" if variacao > 0 else "variação negativa"} de {abs(variacao):.1f}%**.
+
+Esta comparação permite avaliar a evolução do absenteísmo ao longo do tempo, identificando tendências e orientando estratégias de gestão.
+
+💡 **Recomendação**: {"Manter atenção às ações preventivas e investigar causas do aumento observado" if variacao > 0 else "Manter as ações atuais e buscar consolidar a redução observada"}."""
                     except Exception as e:
                         print(f"Erro ao gerar análise comparativo ano anterior: {e}")
                         analise_comp_ano = "Análise não disponível."
@@ -3109,7 +3120,28 @@ async def dados_apresentacao(
                     dados_array = heatmap_data.get('dados', [])
                     if setores and len(setores) > 0 and meses and len(meses) > 0 and dados_array and len(dados_array) > 0:
                         try:
-                            analise_heatmap = insights_engine.gerar_analise_grafico('top_setores', None, heatmap_data)
+                            # Calcula análise específica para heatmap
+                            total_dias = 0
+                            max_setor = None
+                            max_valor = 0
+                            
+                            for i, setor in enumerate(setores):
+                                if i < len(dados_array):
+                                    total_setor = sum(dados_array[i]) if isinstance(dados_array[i], list) else 0
+                                    total_dias += total_setor
+                                    if total_setor > max_valor:
+                                        max_valor = total_setor
+                                        max_setor = setor
+                            
+                            analise_heatmap = f"""🔥 **Análise: Mapa de Calor - Setores x Meses**
+
+O mapa de calor mostra a distribuição de **{int(total_dias)} dias perdidos** ao longo dos meses analisados, distribuídos entre **{len(setores)} setores**.
+
+O setor **{max_setor or 'Não informado'}** apresenta o maior impacto total, com **{int(max_valor)} dias perdidos** no período.
+
+Esta visualização permite identificar padrões temporais e por setor, facilitando a identificação de períodos críticos e setores que demandam maior atenção.
+
+💡 **Recomendação**: Focar ações preventivas nos setores e períodos com maior concentração de dias perdidos, implementando programas de saúde ocupacional direcionados."""
                         except Exception as e:
                             print(f"Erro ao gerar análise heatmap: {e}")
                             analise_heatmap = "Análise não disponível."
