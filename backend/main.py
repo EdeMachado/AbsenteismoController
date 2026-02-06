@@ -1014,8 +1014,8 @@ async def update_user(
     email: Optional[str] = Form(None),
     password: Optional[str] = Form(None),
     nome_completo: Optional[str] = Form(None),
-    is_admin: Optional[bool] = Form(None),
-    is_active: Optional[bool] = Form(None),
+    is_admin: Optional[str] = Form(None),  # Recebe como string e converte
+    is_active: Optional[str] = Form(None),  # Recebe como string e converte
     client_id: Optional[str] = Form(None),  # Recebe como string para tratar vazio
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
