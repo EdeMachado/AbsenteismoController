@@ -751,6 +751,55 @@ async def logout(current_user: User = Depends(get_current_active_user)):
     """Logout (client-side deve remover o token)"""
     return {"message": "Logout realizado com sucesso"}
 
+@app.post("/api/users/atualizar-permissoes")
+async def atualizar_permissoes_usuarios(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Atualiza permissões de usuários existentes:
+    - Todos os usuários (exceto Nilceia) recebem client_id = NULL (acesso a todos)
+    - Nilceia recebe client_id = 2 (CONVERPLAST)
+    """
+    try:
+        # Busca usuário Nilceia (pode ser por username ou email)
+        nilceia = db.query(User).filter(
+            (User.username.ilike('%nilceia%')) | 
+            (User.email.ilike('%nilceia%')) |
+            (User.nome_completo.ilike('%nilceia%'))
+        ).first()
+        
+        if nilceia:
+            nilceia.client_id = 2  # CONVERPLAST
+            print(f"✅ Usuário {nilceia.username} atualizado: client_id = 2 (CONVERPLAST)")
+        else:
+            print("⚠️ Usuário Nilceia não encontrado")
+        
+        # Todos os outros usuários recebem client_id = NULL (acesso a todos)
+        outros_usuarios = db.query(User).filter(
+            User.id != nilceia.id if nilceia else True
+        ).all()
+        
+        atualizados = 0
+        for user in outros_usuarios:
+            if user.client_id is not None:
+                user.client_id = None
+                atualizados += 1
+                print(f"✅ Usuário {user.username} atualizado: client_id = NULL (acesso a todos)")
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Permissões atualizadas: {atualizados} usuários com acesso a todos os clientes, Nilceia com acesso apenas a CONVERPLAST",
+            "atualizados": atualizados + (1 if nilceia else 0)
+        }
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar permissões: {str(e)}")
+
 # ==================== CADASTRO DE EMPRESA ====================
 
 class CadastroEmpresa(BaseModel):
@@ -915,6 +964,7 @@ async def list_users(current_user: User = Depends(get_current_admin_user), db: S
             "nome_completo": u.nome_completo,
             "is_active": u.is_active,
             "is_admin": u.is_admin,
+            "client_id": u.client_id,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "last_login": u.last_login.isoformat() if u.last_login else None
         }
@@ -928,6 +978,7 @@ async def create_user(
     password: str = Form(...),
     nome_completo: str = Form(None),
     is_admin: bool = Form(False),
+    client_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -939,17 +990,81 @@ async def create_user(
     if existing:
         raise HTTPException(status_code=400, detail="Usuário ou email já existe")
     
+    # Valida client_id se fornecido
+    if client_id is not None and client_id > 0:
+        validar_client_id(db, client_id)
+    
     user = User(
         username=username,
         email=email,
         password_hash=get_password_hash(password),
         nome_completo=nome_completo,
         is_admin=is_admin,
+        client_id=client_id if client_id and client_id > 0 else None,
         is_active=True
     )
     db.add(user)
     db.commit()
     return {"message": "Usuário criado com sucesso", "user_id": user.id}
+
+@app.put("/api/users/{user_id}")
+async def update_user(
+    user_id: int,
+    username: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    nome_completo: Optional[str] = Form(None),
+    is_admin: Optional[bool] = Form(None),
+    is_active: Optional[bool] = Form(None),
+    client_id: Optional[int] = Form(None),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Atualiza usuário (apenas admin)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Não permite editar seu próprio usuário
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não é possível editar seu próprio usuário")
+    
+    # Atualiza campos se fornecidos
+    if username is not None:
+        # Verifica se username já existe em outro usuário
+        existing = db.query(User).filter(User.username == username, User.id != user_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username já existe")
+        user.username = username
+    
+    if email is not None:
+        # Verifica se email já existe em outro usuário
+        existing = db.query(User).filter(User.email == email, User.id != user_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email já existe")
+        user.email = email
+    
+    if password is not None and password.strip():
+        user.password_hash = get_password_hash(password)
+    
+    if nome_completo is not None:
+        user.nome_completo = nome_completo
+    
+    if is_admin is not None:
+        user.is_admin = is_admin
+    
+    if is_active is not None:
+        user.is_active = is_active
+    
+    if client_id is not None:
+        if client_id > 0:
+            validar_client_id(db, client_id)
+            user.client_id = client_id
+        else:
+            user.client_id = None
+    
+    db.commit()
+    return {"message": "Usuário atualizado com sucesso"}
 
 @app.post("/api/upload")
 async def upload_file(
@@ -1734,10 +1849,19 @@ class ClienteCreate(BaseModel):
     atividade_principal: Optional[str] = None
 
 @app.get("/api/clientes")
-async def listar_clientes(db: Session = Depends(get_db)):
-    """Lista todos os clientes"""
+async def listar_clientes(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Lista clientes - filtra por client_id do usuário se não for admin"""
     try:
-        clientes = db.query(Client).order_by(Client.nome).all()
+        # Se usuário é admin ou não tem client_id, vê todos os clientes
+        if current_user.is_admin or not current_user.client_id:
+            clientes = db.query(Client).order_by(Client.nome).all()
+        else:
+            # Usuário comum só vê o cliente associado a ele
+            clientes = db.query(Client).filter(Client.id == current_user.client_id).all()
+        
         return [
             {
                 "id": c.id,
