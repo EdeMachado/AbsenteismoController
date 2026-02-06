@@ -317,28 +317,8 @@ async def startup_event():
     
     db = next(get_db())
     
-    # Remove cliente fictício GrupoBiomed se existir (não cria mais automaticamente)
-    from sqlalchemy import or_, func
-    client_grupobiomed = db.query(Client).filter(
-        or_(
-            func.lower(Client.nome).like("%grupobiomed%"),
-            func.lower(Client.nome_fantasia).like("%grupobiomed%"),
-            Client.nome == "GrupoBiomed",
-            Client.id == 1  # Remove também se for ID 1 (cliente padrão antigo)
-        )
-    ).first()
-    if client_grupobiomed:
-        # Deleta todos os dados relacionados primeiro
-        from .models import Atestado, Upload, ClientLogo, ClientColumnMapping, SavedFilter
-        for upload in client_grupobiomed.uploads:
-            db.query(Atestado).filter(Atestado.upload_id == upload.id).delete()
-        db.query(Upload).filter(Upload.client_id == client_grupobiomed.id).delete()
-        db.query(ClientLogo).filter(ClientLogo.client_id == client_grupobiomed.id).delete()
-        db.query(ClientColumnMapping).filter(ClientColumnMapping.client_id == client_grupobiomed.id).delete()
-        db.query(SavedFilter).filter(SavedFilter.client_id == client_grupobiomed.id).delete()
-        db.delete(client_grupobiomed)
-        db.commit()
-        print("✅ Cliente fictício GrupoBiomed removido permanentemente")
+    # REMOVIDO: Código que deletava clientes no startup foi removido por segurança
+    # NUNCA deletar dados automaticamente no startup - pode causar perda de dados reais
     
     # Cria usuário admin padrão se não existir (verifica por username E email)
     admin = db.query(User).filter(User.username == "admin").first()
