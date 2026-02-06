@@ -640,6 +640,10 @@ function renderizarGrafico(slide) {
     }
     
     console.log(`[APRESENTACAO] Renderizando gráfico ${tipo} com dados:`, dados);
+    console.log(`[APRESENTACAO] Tipo de dados:`, typeof dados, Array.isArray(dados) ? 'Array' : 'Object');
+    if (dados && typeof dados === 'object') {
+        console.log(`[APRESENTACAO] Keys do objeto:`, Object.keys(dados));
+    }
     
     let config = {};
     
@@ -1909,8 +1913,10 @@ function renderizarGrafico(slide) {
         case 'evolucao_setor':
             // Evolução de dias perdidos por setor ao longo do tempo
             // Dados vêm como: {setor1: [{mes, dias_perdidos}, ...], setor2: [...], ...}
+            console.log('[APRESENTACAO] evolucao_setor - Dados recebidos:', dados);
             if (dados && typeof dados === 'object' && !Array.isArray(dados)) {
                 const setores = Object.keys(dados).filter(s => dados[s] && Array.isArray(dados[s]) && dados[s].length > 0);
+                console.log('[APRESENTACAO] evolucao_setor - Setores encontrados:', setores.length, setores);
                 
                 if (setores.length === 0) {
                     console.warn('[APRESENTACAO] evolucao_setor: Nenhum setor com dados');
@@ -1986,7 +1992,10 @@ function renderizarGrafico(slide) {
         case 'comparativo_trimestral':
             // Gráfico de barras comparando dois períodos
             // Dados vêm como: {periodo_atual: {total_registros, dias_perdidos, horas_perdidas}, periodo_anterior: {...}}
+            console.log('[APRESENTACAO]', tipo, '- Dados recebidos:', dados);
             if (dados && dados.periodo_atual && dados.periodo_anterior) {
+                console.log('[APRESENTACAO]', tipo, '- Período atual:', dados.periodo_atual);
+                console.log('[APRESENTACAO]', tipo, '- Período anterior:', dados.periodo_anterior);
                 const labels = ['Registros', 'Dias Perdidos', 'Horas Perdidas'];
                 const atual = [
                     dados.periodo_atual.total_registros || 0,
@@ -2062,7 +2071,10 @@ function renderizarGrafico(slide) {
         case 'comparativo_ano_anterior':
             // Gráfico de linha comparando mês a mês do ano atual vs anterior
             // Dados vêm como: [{mes, mes_label, ano_atual: {dias_perdidos, horas_perdidas}, ano_anterior: {...}}, ...]
+            console.log('[APRESENTACAO] comparativo_ano_anterior - Dados recebidos:', dados);
             if (Array.isArray(dados) && dados.length > 0) {
+                console.log('[APRESENTACAO] comparativo_ano_anterior - Total de itens:', dados.length);
+                console.log('[APRESENTACAO] comparativo_ano_anterior - Primeiro item:', dados[0]);
                 const labels = dados.map(d => d.mes_label || d.mes || 'N/A');
                 const diasAtual = dados.map(d => (d.ano_atual && d.ano_atual.dias_perdidos) || 0);
                 const diasAnterior = dados.map(d => (d.ano_anterior && d.ano_anterior.dias_perdidos) || 0);
@@ -2141,10 +2153,12 @@ function renderizarGrafico(slide) {
         
         case 'heatmap':
             // Heatmap será renderizado como tabela HTML (similar ao dashboard)
+            console.log('[APRESENTACAO] heatmap - Dados recebidos:', dados);
             if (dados && dados.setores && dados.meses && dados.dados && 
                 Array.isArray(dados.setores) && dados.setores.length > 0 &&
                 Array.isArray(dados.meses) && dados.meses.length > 0 &&
                 Array.isArray(dados.dados) && dados.dados.length > 0) {
+                console.log('[APRESENTACAO] heatmap - Setores:', dados.setores.length, 'Meses:', dados.meses.length, 'Dados:', dados.dados.length);
                 // Se tiver dados estruturados, tenta criar visualização
                 const container = document.getElementById('chartSlide');
                 if (container && container.parentElement) {
@@ -2173,7 +2187,10 @@ function renderizarGrafico(slide) {
         
         case 'comparativo_dias_horas':
             // Gráfico de barras agrupadas comparando dias vs horas por setor
+            console.log('[APRESENTACAO] comparativo_dias_horas - Dados recebidos:', dados);
             if (Array.isArray(dados) && dados.length > 0) {
+                console.log('[APRESENTACAO] comparativo_dias_horas - Total de itens:', dados.length);
+                console.log('[APRESENTACAO] comparativo_dias_horas - Primeiro item:', dados[0]);
                 const setores = dados.slice(0, 10).map(d => truncate(d.setor || 'Sem setor', 20));
                 const dias = dados.slice(0, 10).map(d => d.dias_perdidos || 0);
                 const horas = dados.slice(0, 10).map(d => d.horas_perdidas || 0);
@@ -2213,7 +2230,10 @@ function renderizarGrafico(slide) {
         case 'frequencia_atestados':
             // Histograma de frequência de atestados por funcionário
             // Dados vêm como: [{frequencia: '1 atestado', quantidade: 10}, ...]
+            console.log('[APRESENTACAO] frequencia_atestados - Dados recebidos:', dados);
             if (Array.isArray(dados) && dados.length > 0) {
+                console.log('[APRESENTACAO] frequencia_atestados - Total de itens:', dados.length);
+                console.log('[APRESENTACAO] frequencia_atestados - Primeiro item:', dados[0]);
                 const labels = dados.map(d => d.frequencia || 'N/A');
                 const valores = dados.map(d => d.quantidade || 0);
                 
@@ -2283,13 +2303,17 @@ function renderizarGrafico(slide) {
         }
         
         try {
-        charts['chartSlide'] = new Chart(ctx, config);
+            console.log(`[APRESENTACAO] Criando gráfico ${tipo} com config:`, config);
+            charts['chartSlide'] = new Chart(ctx, config);
             console.log(`[APRESENTACAO] Gráfico ${tipo} renderizado com sucesso`);
         } catch (error) {
             console.error(`[APRESENTACAO] Erro ao criar gráfico ${tipo}:`, error);
+            console.error(`[APRESENTACAO] Stack trace:`, error.stack);
         }
     } else {
         console.warn(`[APRESENTACAO] Configuração de gráfico não criada para ${tipo}`);
+        console.warn(`[APRESENTACAO] Dados recebidos:`, dados);
+        console.warn(`[APRESENTACAO] Tipo de dados:`, typeof dados, Array.isArray(dados));
     }
 }
 
