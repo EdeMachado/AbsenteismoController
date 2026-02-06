@@ -228,6 +228,18 @@ function renderizarUsuarios() {
                 <button class="btn btn-sm btn-secondary" onclick="editarUsuario(${user.id})" title="Editar">
                     <i class="fas fa-edit"></i>
                 </button>
+                ${user.is_active ? `
+                    <button class="btn btn-sm btn-danger" onclick="desativarUsuario(${user.id}, '${user.username}')" title="Desativar">
+                        <i class="fas fa-ban"></i>
+                    </button>
+                ` : `
+                    <button class="btn btn-sm btn-success" onclick="ativarUsuario(${user.id})" title="Ativar">
+                        <i class="fas fa-check"></i>
+                    </button>
+                `}
+                <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id}, '${user.username}')" title="Excluir" style="margin-left: 4px;">
+                    <i class="fas fa-trash"></i>
+                </button>
             </td>
         </tr>
     `;
@@ -485,6 +497,101 @@ async function salvarEdicaoUsuario() {
         mostrarAlert(error.message || 'Erro ao atualizar usuário', 'error');
     }
 }
+
+// Excluir usuário
+async function excluirUsuario(userId, username) {
+    if (!confirm(`⚠️ ATENÇÃO: Tem certeza que deseja EXCLUIR permanentemente o usuário "${username}"?\n\nEsta ação não pode ser desfeita!`)) {
+        return;
+    }
+    
+    if (!confirm(`🔴 CONFIRMAÇÃO FINAL:\n\nVocê está prestes a EXCLUIR PERMANENTEMENTE o usuário "${username}".\n\nEsta ação é IRREVERSÍVEL!\n\nDeseja realmente continuar?`)) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/users/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao excluir usuário');
+        }
+        
+        mostrarAlert('Usuário excluído com sucesso!', 'success');
+        carregarUsuarios();
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarAlert(error.message || 'Erro ao excluir usuário', 'error');
+    }
+}
+
+// Desativar usuário
+async function desativarUsuario(userId, username) {
+    if (!confirm(`⚠️ Deseja desativar o usuário "${username}"?\n\nO usuário não poderá mais fazer login, mas os dados serão preservados.`)) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(`/api/users/${userId}/desativar`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao desativar usuário');
+        }
+        
+        mostrarAlert('Usuário desativado com sucesso!', 'success');
+        carregarUsuarios();
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarAlert(error.message || 'Erro ao desativar usuário', 'error');
+    }
+}
+
+// Ativar usuário
+async function ativarUsuario(userId) {
+    try {
+        const token = localStorage.getItem('access_token');
+        
+        // Usa a rota de atualização para ativar
+        const formData = new FormData();
+        formData.append('is_active', 'true');
+        
+        const response = await fetch(`/api/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Erro ao ativar usuário');
+        }
+        
+        mostrarAlert('Usuário ativado com sucesso!', 'success');
+        carregarUsuarios();
+    } catch (error) {
+        console.error('Erro:', error);
+        mostrarAlert(error.message || 'Erro ao ativar usuário', 'error');
+    }
+}
+
+// Garantir que funções estão disponíveis globalmente
+window.excluirUsuario = excluirUsuario;
+window.desativarUsuario = desativarUsuario;
+window.ativarUsuario = ativarUsuario;
 
 // Mostra alerta
 function mostrarAlert(message, type = 'info') {

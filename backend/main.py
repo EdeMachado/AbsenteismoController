@@ -1085,7 +1085,110 @@ async def update_user(
     
     db.commit()
     db.refresh(user)
+    
+    # Log de auditoria
+    try:
+        log_operation(
+            operation="UPDATE_USER",
+            user=current_user.username,
+            details={
+                "user_id": user.id,
+                "username": user.username,
+                "is_admin": user.is_admin,
+                "is_active": user.is_active,
+                "client_id": user.client_id
+            }
+        )
+    except:
+        pass
+    
     return {"message": "Usuário atualizado com sucesso", "user_id": user.id}
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Deleta ou desativa usuário (apenas admin)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Não permite excluir seu próprio usuário
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não é possível excluir seu próprio usuário")
+    
+    # Não permite excluir o último admin
+    admins_count = db.query(User).filter(User.is_admin == True, User.is_active == True).count()
+    if user.is_admin and admins_count <= 1:
+        raise HTTPException(
+            status_code=400, 
+            detail="Não é possível excluir o último administrador ativo. Desative o usuário ao invés de excluir."
+        )
+    
+    # Log antes de deletar
+    try:
+        log_operation(
+            operation="DELETE_USER",
+            user=current_user.username,
+            details={
+                "deleted_user_id": user.id,
+                "deleted_username": user.username,
+                "deleted_email": user.email,
+                "was_admin": user.is_admin
+            }
+        )
+    except:
+        pass
+    
+    # Deleta o usuário
+    db.delete(user)
+    db.commit()
+    
+    return {"message": "Usuário excluído com sucesso"}
+
+@app.post("/api/users/{user_id}/desativar")
+async def desativar_user(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Desativa um usuário (mais seguro que deletar)"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Não permite desativar seu próprio usuário
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não é possível desativar seu próprio usuário")
+    
+    # Não permite desativar o último admin
+    admins_count = db.query(User).filter(User.is_admin == True, User.is_active == True).count()
+    if user.is_admin and admins_count <= 1:
+        raise HTTPException(
+            status_code=400, 
+            detail="Não é possível desativar o último administrador ativo"
+        )
+    
+    # Desativa o usuário
+    user.is_active = False
+    db.commit()
+    
+    # Log de auditoria
+    try:
+        log_operation(
+            operation="DEACTIVATE_USER",
+            user=current_user.username,
+            details={
+                "deactivated_user_id": user.id,
+                "deactivated_username": user.username
+            }
+        )
+    except:
+        pass
+    
+    return {"message": "Usuário desativado com sucesso"}
 
 @app.post("/api/upload")
 async def upload_file(
