@@ -333,13 +333,24 @@ async function carregarClientes() {
 
 // Editar usuário
 function editarUsuario(userId) {
+    console.log('🔧 Editar usuário chamado:', userId);
     const user = usersData.find(u => u.id === userId);
     if (!user) {
+        console.error('❌ Usuário não encontrado:', userId);
         mostrarAlert('Usuário não encontrado', 'error');
         return;
     }
     
+    console.log('✅ Usuário encontrado:', user);
+    
     // Preenche campos do modal
+    const modal = document.getElementById('modalEditarUsuario');
+    if (!modal) {
+        console.error('❌ Modal não encontrado');
+        mostrarAlert('Modal de edição não encontrado', 'error');
+        return;
+    }
+    
     document.getElementById('editar_user_id').value = user.id;
     document.getElementById('editar_username').value = user.username || '';
     document.getElementById('editar_email').value = user.email || '';
@@ -381,8 +392,14 @@ function editarUsuario(userId) {
     }
     
     // Mostra modal
-    document.getElementById('modalEditarUsuario').style.display = 'flex';
+    modal.style.display = 'flex';
+    console.log('✅ Modal exibido');
 }
+
+// Garantir que função está disponível globalmente
+window.editarUsuario = editarUsuario;
+window.salvarEdicaoUsuario = salvarEdicaoUsuario;
+window.fecharModalEditarUsuario = fecharModalEditarUsuario;
 
 // Fecha modal de edição
 function fecharModalEditarUsuario() {
@@ -391,8 +408,10 @@ function fecharModalEditarUsuario() {
 
 // Salva edição de usuário
 async function salvarEdicaoUsuario() {
+    console.log('💾 Salvar edição chamado');
     try {
         const userId = document.getElementById('editar_user_id').value;
+        console.log('📝 User ID:', userId);
         if (!userId) {
             mostrarAlert('ID do usuário não encontrado', 'error');
             return;
@@ -418,7 +437,18 @@ async function salvarEdicaoUsuario() {
             formData.append('client_id', '');
         }
         
+        console.log('📤 Enviando dados:', {
+            username: formData.get('username'),
+            email: formData.get('email'),
+            is_admin: formData.get('is_admin'),
+            client_id: formData.get('client_id')
+        });
+        
         const token = localStorage.getItem('access_token');
+        if (!token) {
+            throw new Error('Token de autenticação não encontrado');
+        }
+        
         const response = await fetch(`/api/users/${userId}`, {
             method: 'PUT',
             headers: {
@@ -427,17 +457,23 @@ async function salvarEdicaoUsuario() {
             body: formData
         });
         
+        console.log('📥 Resposta recebida:', response.status, response.statusText);
+        
         if (!response.ok) {
             const error = await response.json();
+            console.error('❌ Erro da API:', error);
             throw new Error(error.detail || 'Erro ao atualizar usuário');
         }
+        
+        const result = await response.json();
+        console.log('✅ Sucesso:', result);
         
         mostrarAlert('Usuário atualizado com sucesso!', 'success');
         fecharModalEditarUsuario();
         carregarUsuarios();
         
     } catch (error) {
-        console.error('Erro:', error);
+        console.error('❌ Erro completo:', error);
         mostrarAlert(error.message || 'Erro ao atualizar usuário', 'error');
     }
 }
