@@ -3419,7 +3419,21 @@ Esta visualização permite identificar padrões temporais e por setor, facilita
                 horas_perdidas_genero = analytics.horas_perdidas_por_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
                 if horas_perdidas_genero and len(horas_perdidas_genero) > 0:
                     try:
-                        analise_horas_genero = insights_engine.gerar_analise_grafico('genero', horas_perdidas_genero, metricas)
+                        # Gera análise específica para horas perdidas por gênero
+                        total_horas = sum(g.get('horas_perdidas', 0) for g in horas_perdidas_genero)
+                        total_semanas = sum(g.get('semanas_perdidas', 0) for g in horas_perdidas_genero)
+                        genero_maior = max(horas_perdidas_genero, key=lambda x: x.get('horas_perdidas', 0))
+                        pct_maior = (genero_maior.get('horas_perdidas', 0) / total_horas * 100) if total_horas > 0 else 0
+                        
+                        analise_horas_genero = f"""👥 **Análise: Horas Perdidas por Gênero**
+
+O gênero **{genero_maior.get('genero_label', 'Não informado')}** apresenta o maior índice de horas perdidas, com **{int(genero_maior.get('horas_perdidas', 0))} horas ({pct_maior:.1f}% do total)**, equivalente a aproximadamente **{genero_maior.get('semanas_perdidas', 0):.1f} semanas** de trabalho perdidas.
+
+**Total geral:** {int(total_horas)} horas perdidas ({total_semanas:.1f} semanas equivalentes) no período analisado.
+
+Esta análise permite identificar diferenças no padrão de absenteísmo entre gêneros, considerando tanto afastamentos completos quanto parciais.
+
+💡 **Recomendação**: Desenvolver ações preventivas específicas considerando as particularidades observadas por gênero, incluindo programas de saúde ocupacional direcionados."""
                     except Exception as e:
                         print(f"Erro ao gerar análise horas por gênero: {e}")
                         analise_horas_genero = "Análise não disponível."
@@ -3439,7 +3453,21 @@ Esta visualização permite identificar padrões temporais e por setor, facilita
                 horas_perdidas_setor = analytics.horas_perdidas_por_setor(client_id, 10, mes_inicio, mes_fim, funcionario, setor)
                 if horas_perdidas_setor and len(horas_perdidas_setor) > 0:
                     try:
-                        analise_horas_setor = insights_engine.gerar_analise_grafico('centro_custo', horas_perdidas_setor, metricas)
+                        # Gera análise específica para horas perdidas por setor
+                        total_horas = sum(s.get('horas_perdidas', 0) for s in horas_perdidas_setor)
+                        total_semanas = sum(s.get('semanas_perdidas', 0) for s in horas_perdidas_setor)
+                        setor_maior = max(horas_perdidas_setor, key=lambda x: x.get('horas_perdidas', 0))
+                        pct_maior = (setor_maior.get('horas_perdidas', 0) / total_horas * 100) if total_horas > 0 else 0
+                        
+                        analise_horas_setor = f"""🏢 **Análise: Horas Perdidas por Setor**
+
+O setor **{setor_maior.get('setor', 'Não informado')}** apresenta o maior índice de horas perdidas, com **{int(setor_maior.get('horas_perdidas', 0))} horas ({pct_maior:.1f}% do total)**, equivalente a aproximadamente **{setor_maior.get('semanas_perdidas', 0):.1f} semanas** de trabalho perdidas.
+
+**Total geral:** {int(total_horas)} horas perdidas ({total_semanas:.1f} semanas equivalentes) distribuídas entre os setores no período analisado.
+
+Esta análise permite identificar setores que demandam maior atenção em termos de gestão de absenteísmo, considerando afastamentos parciais (horas).
+
+💡 **Recomendação**: Implementar programa de gestão de saúde ocupacional específico para o setor com maior impacto, incluindo avaliações periódicas e ações preventivas direcionadas."""
                     except Exception as e:
                         print(f"Erro ao gerar análise horas por setor: {e}")
                         analise_horas_setor = "Análise não disponível."
@@ -3460,7 +3488,43 @@ Esta visualização permite identificar padrões temporais e por setor, facilita
                 evolucao_mensal_horas = analytics.evolucao_mensal_horas(client_id, meses=0, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
                 if evolucao_mensal_horas and len(evolucao_mensal_horas) > 0:
                     try:
-                        analise_evol_horas = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_mensal_horas, metricas)
+                        # Gera análise específica para evolução mensal de horas
+                        if len(evolucao_mensal_horas) >= 2:
+                            ultimo = evolucao_mensal_horas[-1]
+                            penultimo = evolucao_mensal_horas[-2]
+                            
+                            horas_ultimo = ultimo.get('horas_perdidas', 0) or 0
+                            horas_penultimo = penultimo.get('horas_perdidas', 0) or 0
+                            variacao = ((horas_ultimo - horas_penultimo) / horas_penultimo * 100) if horas_penultimo > 0 else (100 if horas_ultimo > 0 else 0)
+                            
+                            total_horas = sum(e.get('horas_perdidas', 0) for e in evolucao_mensal_horas)
+                            total_semanas = sum(e.get('semanas_perdidas', 0) for e in evolucao_mensal_horas)
+                            
+                            mes_ultimo = ultimo.get('mes', 'Último mês')
+                            mes_penultimo = penultimo.get('mes', 'Mês anterior')
+                            
+                            analise_evol_horas = f"""📈 **Análise: Evolução Mensal de Horas Perdidas**
+
+A análise da tendência mostra uma **{"variação positiva" if variacao > 0 else "variação negativa"} de {abs(variacao):.1f}%** comparando o último mês ({mes_ultimo}) com o anterior ({mes_penultimo}).
+
+**Último mês:** {int(horas_ultimo)} horas perdidas ({ultimo.get('semanas_perdidas', 0):.1f} semanas equivalentes)
+**Mês anterior:** {int(horas_penultimo)} horas perdidas ({penultimo.get('semanas_perdidas', 0):.1f} semanas equivalentes)
+
+**Total do período:** {int(total_horas)} horas perdidas ({total_semanas:.1f} semanas equivalentes) distribuídas ao longo dos meses analisados.
+
+Esta análise permite identificar tendências de absenteísmo considerando afastamentos parciais (horas), orientando estratégias de gestão e ações preventivas.
+
+💡 **Recomendação**: {"Investigar causas do aumento observado e intensificar ações preventivas" if variacao > 0 else "Manter as ações atuais e buscar consolidar a redução observada"}."""
+                        else:
+                            unico = evolucao_mensal_horas[0]
+                            horas = unico.get('horas_perdidas', 0) or 0
+                            mes = unico.get('mes', 'Período')
+                            
+                            analise_evol_horas = f"""📈 **Análise: Evolução Mensal de Horas Perdidas**
+
+O período analisado ({mes}) apresenta **{int(horas)} horas perdidas** ({unico.get('semanas_perdidas', 0):.1f} semanas equivalentes).
+
+💡 **Recomendação**: Continuar monitorando a evolução mensal para identificar tendências."""
                     except Exception as e:
                         print(f"Erro ao gerar análise evolução horas: {e}")
                         analise_evol_horas = "Análise não disponível."
@@ -3480,7 +3544,32 @@ Esta visualização permite identificar padrões temporais e por setor, facilita
                 comparativo_dias_horas_genero = analytics.comparativo_dias_horas_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
                 if comparativo_dias_horas_genero and len(comparativo_dias_horas_genero) > 0:
                     try:
-                        analise_comp = insights_engine.gerar_analise_grafico('setor_genero', comparativo_dias_horas_genero, metricas)
+                        # Gera análise específica para comparativo dias/horas por gênero
+                        total_dias = sum(g.get('dias_perdidos', 0) for g in comparativo_dias_horas_genero)
+                        total_horas = sum(g.get('horas_perdidas', 0) for g in comparativo_dias_horas_genero)
+                        total_semanas = sum(g.get('semanas_perdidas', 0) for g in comparativo_dias_horas_genero)
+                        
+                        genero_maior_dias = max(comparativo_dias_horas_genero, key=lambda x: x.get('dias_perdidos', 0))
+                        genero_maior_horas = max(comparativo_dias_horas_genero, key=lambda x: x.get('horas_perdidas', 0))
+                        
+                        pct_dias = (genero_maior_dias.get('dias_perdidos', 0) / total_dias * 100) if total_dias > 0 else 0
+                        pct_horas = (genero_maior_horas.get('horas_perdidas', 0) / total_horas * 100) if total_horas > 0 else 0
+                        
+                        analise_comp = f"""📊 **Análise: Comparativo Dias vs Horas vs Semanas por Gênero**
+
+**Maior impacto em dias perdidos:**
+O gênero **{genero_maior_dias.get('genero_label', 'Não informado')}** apresenta **{int(genero_maior_dias.get('dias_perdidos', 0))} dias perdidos ({pct_dias:.1f}% do total)**.
+
+**Maior impacto em horas perdidas:**
+O gênero **{genero_maior_horas.get('genero_label', 'Não informado')}** apresenta **{int(genero_maior_horas.get('horas_perdidas', 0))} horas perdidas ({pct_horas:.1f}% do total)**, equivalente a **{genero_maior_horas.get('semanas_perdidas', 0):.1f} semanas**.
+
+**Total geral:**
+- {int(total_dias)} dias perdidos
+- {int(total_horas)} horas perdidas ({total_semanas:.1f} semanas equivalentes)
+
+Esta análise permite identificar diferenças no padrão de absenteísmo entre gêneros, considerando tanto afastamentos completos (dias) quanto parciais (horas).
+
+💡 **Recomendação**: Desenvolver ações preventivas específicas considerando as particularidades observadas por gênero, incluindo programas de saúde ocupacional direcionados."""
                     except Exception as e:
                         print(f"Erro ao gerar análise comparativo: {e}")
                         analise_comp = "Análise não disponível."
@@ -3500,7 +3589,33 @@ Esta visualização permite identificar padrões temporais e por setor, facilita
                 analise_detalhada_genero = analytics.analise_detalhada_genero(client_id, mes_inicio, mes_fim, funcionario, setor)
                 if analise_detalhada_genero and analise_detalhada_genero.get('generos') and len(analise_detalhada_genero['generos']) > 0:
                     try:
-                        analise_det = insights_engine.gerar_analise_grafico('genero', analise_detalhada_genero['generos'], metricas)
+                        # Gera análise específica para análise detalhada por gênero
+                        generos = analise_detalhada_genero.get('generos', [])
+                        total_dias = analise_detalhada_genero.get('total_dias', 0) or 0
+                        total_horas = analise_detalhada_genero.get('total_horas', 0) or 0
+                        total_registros = analise_detalhada_genero.get('total_registros', 0) or 0
+                        
+                        genero_maior = max(generos, key=lambda x: x.get('dias_perdidos', 0) + (x.get('horas_perdidas', 0) / 8))
+                        
+                        pct_dias = genero_maior.get('percentual_dias', 0) or 0
+                        pct_horas = genero_maior.get('percentual_horas', 0) or 0
+                        pct_registros = genero_maior.get('percentual_registros', 0) or 0
+                        
+                        analise_det = f"""📊 **Análise Detalhada por Gênero**
+
+O gênero **{genero_maior.get('genero_label', 'Não informado')}** apresenta o maior impacto geral:
+- **{pct_dias:.1f}% dos dias perdidos** ({int(genero_maior.get('dias_perdidos', 0))} dias)
+- **{pct_horas:.1f}% das horas perdidas** ({int(genero_maior.get('horas_perdidas', 0))} horas)
+- **{pct_registros:.1f}% dos registros** ({genero_maior.get('quantidade', 0)} atestados)
+
+**Total geral do período:**
+- {int(total_dias)} dias perdidos
+- {int(total_horas)} horas perdidas
+- {int(total_registros)} registros de atestados
+
+Esta análise detalhada permite identificar padrões específicos de absenteísmo por gênero, considerando múltiplas dimensões (dias, horas e quantidade de registros).
+
+💡 **Recomendação**: Desenvolver estratégias de gestão de absenteísmo específicas considerando as particularidades observadas por gênero, incluindo programas de saúde ocupacional e ações preventivas direcionadas."""
                     except Exception as e:
                         print(f"Erro ao gerar análise detalhada gênero: {e}")
                         analise_det = "Análise não disponível."
