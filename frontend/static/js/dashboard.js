@@ -4213,10 +4213,12 @@ function renderizarHeatmapTabela(dados, container) {
     const table = document.createElement('table');
     table.style.width = '100%';
     table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '12px';
+    table.style.fontSize = '10px';
     table.style.fontFamily = 'Arial, sans-serif';
     table.style.border = '1px solid #ddd';
     table.style.backgroundColor = '#fff';
+    table.style.maxHeight = '100%';
+    table.style.overflow = 'auto';
     
     // Cabeçalho com meses
     const thead = document.createElement('thead');
@@ -4226,11 +4228,12 @@ function renderizarHeatmapTabela(dados, container) {
     const rowLabelHeader = document.createElement('th');
     rowLabelHeader.textContent = 'Setores';
     rowLabelHeader.style.border = '1px solid #ddd';
-    rowLabelHeader.style.padding = '8px';
+    rowLabelHeader.style.padding = '4px';
     rowLabelHeader.style.backgroundColor = '#f0f0f0';
     rowLabelHeader.style.fontWeight = 'bold';
     rowLabelHeader.style.textAlign = 'left';
-    rowLabelHeader.style.minWidth = '150px';
+    rowLabelHeader.style.minWidth = '120px';
+    rowLabelHeader.style.maxWidth = '120px';
     rowLabelHeader.style.position = 'sticky';
     rowLabelHeader.style.left = '0';
     rowLabelHeader.style.zIndex = '10';
@@ -4241,11 +4244,12 @@ function renderizarHeatmapTabela(dados, container) {
         const th = document.createElement('th');
         th.textContent = mes;
         th.style.border = '1px solid #ddd';
-        th.style.padding = '8px';
+        th.style.padding = '4px';
         th.style.backgroundColor = '#f0f0f0';
         th.style.textAlign = 'center';
         th.style.fontWeight = 'bold';
-        th.style.minWidth = '70px';
+        th.style.minWidth = '50px';
+        th.style.maxWidth = '50px';
         headerRow.appendChild(th);
     });
     
@@ -4260,16 +4264,17 @@ function renderizarHeatmapTabela(dados, container) {
         
         // Nome do setor (primeira coluna)
         const setorCell = document.createElement('td');
-        setorCell.textContent = setor || 'Sem setor';
+        setorCell.textContent = truncate(setor || 'Sem setor', 20);
         setorCell.style.border = '1px solid #ddd';
-        setorCell.style.padding = '8px';
+        setorCell.style.padding = '4px';
         setorCell.style.backgroundColor = '#f9f9f9';
         setorCell.style.position = 'sticky';
         setorCell.style.left = '0';
         setorCell.style.zIndex = '5';
         setorCell.style.fontWeight = 'normal';
         setorCell.style.textAlign = 'left';
-        setorCell.style.minWidth = '150px';
+        setorCell.style.minWidth = '120px';
+        setorCell.style.maxWidth = '120px';
         row.appendChild(setorCell);
         
         // Células de dados (meses) - estilo similar ao exemplo
@@ -4281,11 +4286,12 @@ function renderizarHeatmapTabela(dados, container) {
                 // Mostra valor numérico dentro da célula (como no exemplo)
                 cell.textContent = valorNum > 0 ? valorNum.toFixed(1) : '';
                 cell.style.border = '1px solid #ddd';
-                cell.style.padding = '8px';
+                cell.style.padding = '4px';
                 cell.style.backgroundColor = getColorForValue(valorNum);
                 cell.style.textAlign = 'center';
                 cell.style.fontWeight = '500';
-                cell.style.minWidth = '70px';
+                cell.style.minWidth = '50px';
+                cell.style.maxWidth = '50px';
                 cell.style.cursor = 'pointer';
                 cell.style.transition = 'all 0.2s';
                 
@@ -4314,9 +4320,10 @@ function renderizarHeatmapTabela(dados, container) {
                 const cell = document.createElement('td');
                 cell.textContent = '';
                 cell.style.border = '1px solid #ddd';
-                cell.style.padding = '8px';
+                cell.style.padding = '4px';
                 cell.style.backgroundColor = '#ffffff';
-                cell.style.minWidth = '70px';
+                cell.style.minWidth = '50px';
+                cell.style.maxWidth = '50px';
                 row.appendChild(cell);
             });
         }
