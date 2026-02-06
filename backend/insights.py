@@ -912,8 +912,11 @@ Esta distribuição permite identificar funcionários com padrão recorrente de 
         
         elif tipo_grafico == 'comparativo_dias_horas':
             # Dados vêm como: [{setor, dias_perdidos, horas_perdidas}, ...]
-            if not dados or len(dados) == 0:
-                return "Não há dados suficientes para análise."
+            if not dados:
+                return "📊 **Análise: Comparativo Dias vs Horas Perdidas**\n\nDados ainda não disponíveis para este período."
+            
+            if isinstance(dados, list) and len(dados) == 0:
+                return "📊 **Análise: Comparativo Dias vs Horas Perdidas**\n\nDados ainda não disponíveis para este período."
             
             # Encontra setor com maior impacto
             setor_maior = max(dados, key=lambda x: (x.get('dias_perdidos', 0) + x.get('horas_perdidas', 0) / 8))
