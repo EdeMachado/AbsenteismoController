@@ -930,8 +930,6 @@ Esta distribuição permite identificar funcionários com padrão recorrente de 
             horas_equivalente = setor_maior.get('horas_perdidas', 0) / 8
             dias_totais_equivalente = setor_maior.get('dias_perdidos', 0) + horas_equivalente
             
-            analise = f"""📊 **Análise: Comparativo Dias vs Horas Perdidas**
-
             setor_nome = setor_maior.get('setor', 'Não informado')
             if setor_nome == 'N/A' or not setor_nome:
                 setor_nome = 'Não informado'
