@@ -249,7 +249,19 @@
     </div>
     
     <script src="/static/js/auth.js"></script>
-    <script src="/static/js/configuracoes.js"></script>
+    <script src="/static/js/configuracoes.js?v=2.0"></script>
+    <script>
+        // Força sobrescrever função antiga se existir
+        if (typeof editarUsuario === 'function') {
+            console.log('✅ Função editarUsuario carregada');
+        }
+        // Garante que window.editarUsuario está disponível
+        if (typeof window.editarUsuario === 'function') {
+            console.log('✅ window.editarUsuario disponível');
+        } else {
+            console.error('❌ window.editarUsuario não encontrada');
+        }
+    </script>
 </body>
 </html>
 
