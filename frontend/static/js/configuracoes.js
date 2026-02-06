@@ -225,19 +225,19 @@ function renderizarUsuarios() {
             </td>
             <td>${empresaNome}</td>
             <td>
-                <button class="btn btn-sm btn-secondary" onclick="editarUsuario(${user.id})" title="Editar">
+                <button class="btn btn-sm btn-secondary" onclick="window.editarUsuario(${user.id})" title="Editar">
                     <i class="fas fa-edit"></i>
                 </button>
                 ${user.is_active ? `
-                    <button class="btn btn-sm btn-danger" onclick="desativarUsuario(${user.id}, '${user.username}')" title="Desativar">
+                    <button class="btn btn-sm btn-danger" onclick="window.desativarUsuario(${user.id}, '${user.username.replace(/'/g, "\\'")}')" title="Desativar">
                         <i class="fas fa-ban"></i>
                     </button>
                 ` : `
-                    <button class="btn btn-sm btn-success" onclick="ativarUsuario(${user.id})" title="Ativar">
+                    <button class="btn btn-sm btn-success" onclick="window.ativarUsuario(${user.id})" title="Ativar">
                         <i class="fas fa-check"></i>
                     </button>
                 `}
-                <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id}, '${user.username}')" title="Excluir" style="margin-left: 4px;">
+                <button class="btn btn-sm btn-danger" onclick="window.excluirUsuario(${user.id}, '${user.username.replace(/'/g, "\\'")}')" title="Excluir" style="margin-left: 4px;">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
