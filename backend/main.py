@@ -291,6 +291,47 @@ async def startup_event():
     run_migrations()
     os.makedirs(LOGOS_DIR, exist_ok=True)
     
+    # Atualiza permissões de usuários automaticamente no startup
+    try:
+        db = next(get_db())
+        
+        # Busca usuário Nilceia
+        nilceia = db.query(User).filter(
+            (User.username.ilike('%nilceia%')) | 
+            (User.email.ilike('%nilceia%')) |
+            (User.nome_completo.ilike('%nilceia%'))
+        ).first()
+        
+        if nilceia:
+            if nilceia.client_id != 2:
+                nilceia.client_id = 2  # CONVERPLAST
+                print(f"✅ Usuário {nilceia.username} atualizado: client_id = 2 (CONVERPLAST)")
+        
+        # Todos os outros usuários recebem client_id = NULL (acesso a todos)
+        outros_usuarios = db.query(User).filter(
+            User.id != nilceia.id if nilceia else True
+        ).all()
+        
+        atualizados = 0
+        for user in outros_usuarios:
+            if user.client_id is not None:
+                user.client_id = None
+                atualizados += 1
+                if atualizados <= 5:  # Log apenas os primeiros 5 para não poluir
+                    print(f"✅ Usuário {user.username} atualizado: client_id = NULL (acesso a todos)")
+        
+        if atualizados > 0 or (nilceia and nilceia.client_id == 2):
+            db.commit()
+            print(f"✅ Permissões atualizadas: {atualizados} usuários com acesso a todos, Nilceia com acesso apenas a CONVERPLAST")
+        else:
+            db.rollback()
+    except Exception as e:
+        print(f"⚠️ Erro ao atualizar permissões no startup (não crítico): {e}")
+        try:
+            db.rollback()
+        except:
+            pass
+    
     # Inicializa backup automático (opcional - com fallback)
     try:
         from .backup_service import init_backup_service
