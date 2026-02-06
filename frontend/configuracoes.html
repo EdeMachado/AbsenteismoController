@@ -137,7 +137,7 @@
                                 </thead>
                                 <tbody id="usersTableBody">
                                     <tr>
-                                        <td colspan="6" class="text-center">
+                                        <td colspan="7" class="text-center">
                                             <i class="fas fa-spinner fa-spin"></i> Carregando...
                                         </td>
                                     </tr>
@@ -183,10 +183,67 @@
                         <input type="checkbox" id="novo_is_admin"> Administrador
                     </label>
                 </div>
+                <div class="form-group">
+                    <label>Empresa (Acesso Limitado)</label>
+                    <select id="novo_client_id" class="form-control">
+                        <option value="">Todas as empresas (acesso completo)</option>
+                    </select>
+                    <small class="text-muted">Deixe em branco para acesso a todas as empresas, ou selecione uma empresa para limitar o acesso</small>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="fecharModalNovoUsuario()">Cancelar</button>
                 <button class="btn btn-primary" onclick="criarUsuario()">Criar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Editar Usuário -->
+    <div id="modalEditarUsuario" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Usuário</h3>
+                <button class="modal-close" onclick="fecharModalEditarUsuario()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editar_user_id">
+                <div class="form-group">
+                    <label>Usuário</label>
+                    <input type="text" id="editar_username" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="editar_email" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Senha <small>(deixe em branco para não alterar)</small></label>
+                    <input type="password" id="editar_password" class="form-control" placeholder="Nova senha (opcional)">
+                </div>
+                <div class="form-group">
+                    <label>Nome Completo</label>
+                    <input type="text" id="editar_nome_completo" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="editar_is_admin"> Administrador
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="editar_is_active" checked> Ativo
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Empresa (Acesso Limitado)</label>
+                    <select id="editar_client_id" class="form-control">
+                        <option value="">Todas as empresas (acesso completo)</option>
+                    </select>
+                    <small class="text-muted">Deixe em branco para acesso a todas as empresas, ou selecione uma empresa para limitar o acesso</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharModalEditarUsuario()">Cancelar</button>
+                <button class="btn btn-primary" onclick="salvarEdicaoUsuario()">Salvar</button>
             </div>
         </div>
     </div>
