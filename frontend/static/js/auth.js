@@ -184,7 +184,7 @@ async function logout() {
     } finally {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        window.location.href = '/landing';
     }
 }
 

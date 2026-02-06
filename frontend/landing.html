@@ -202,6 +202,165 @@
                 grid-template-columns: 1fr;
             }
         }
+        
+        /* Modal de Cadastro */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+        }
+        
+        .modal-cadastro {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        .modal-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .modal-header h2 {
+            color: #1a237e;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .modal-header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        
+        .modal-close:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .form-group-modal {
+            margin-bottom: 20px;
+        }
+        
+        .form-group-modal label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .form-group-modal input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group-modal input:focus {
+            outline: none;
+            border-color: #1a237e;
+        }
+        
+        .form-group-modal input::placeholder {
+            color: #999;
+        }
+        
+        .btn-submit-cadastro {
+            width: 100%;
+            padding: 16px;
+            background: #1a237e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        
+        .btn-submit-cadastro:hover {
+            background: #283593;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
+        }
+        
+        .btn-submit-cadastro:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .alert-modal {
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .alert-modal.show {
+            display: block;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .loading-spinner.show {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -216,9 +375,9 @@
                 <a href="/login" class="btn-landing btn-secondary-landing">
                     <i class="fas fa-sign-in-alt"></i> Entrar
                 </a>
-                <a href="/login" class="btn-landing btn-primary-landing">
-                    <i class="fas fa-rocket"></i> Começar Agora
-                </a>
+                <button onclick="abrirModalCadastro()" class="btn-landing btn-primary-landing">
+                    <i class="fas fa-user-plus"></i> Cadastre-se
+                </button>
             </div>
         </header>
         
@@ -234,9 +393,9 @@
                     Sistema completo de análise e controle que identifica padrões, previne problemas e reduz custos operacionais.
                 </p>
                 <div class="hero-buttons">
-                    <a href="/login" class="btn-landing btn-primary-landing" style="font-size: 18px; padding: 16px 32px;">
-                        <i class="fas fa-arrow-right"></i> Começar Agora - Grátis
-                    </a>
+                    <button onclick="abrirModalCadastro()" class="btn-landing btn-primary-landing" style="font-size: 18px; padding: 16px 32px;">
+                        <i class="fas fa-user-plus"></i> Cadastre-se
+                    </button>
                 </div>
             </div>
         </section>
@@ -531,10 +690,10 @@
                     Cada dia sem gestão adequada é dinheiro perdido. Comece hoje a transformar dados em economia e resultados.
                 </p>
                 <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-                    <a href="/login" class="btn-landing btn-primary-landing" style="font-size: 20px; padding: 18px 40px; background: #ffd700; color: #1a237e; font-weight: 700;">
-                        <i class="fas fa-rocket"></i> Começar Agora - Grátis
-                    </a>
-                    <a href="/login" class="btn-landing btn-secondary-landing" style="font-size: 20px; padding: 18px 40px; background: transparent; color: white; border: 2px solid white;">
+                    <button onclick="abrirModalCadastro()" class="btn-landing btn-primary-landing" style="font-size: 20px; padding: 18px 40px; background: #ffd700; color: #1a237e; font-weight: 700;">
+                        <i class="fas fa-user-plus"></i> Cadastre-se
+                    </button>
+                    <a href="#features" class="btn-landing btn-secondary-landing" style="font-size: 20px; padding: 18px 40px; background: transparent; color: white; border: 2px solid white;">
                         <i class="fas fa-info-circle"></i> Saber Mais
                     </a>
                 </div>
@@ -549,6 +708,181 @@
             <p>&copy; 2025 AbsenteismoController - GrupoBiomed. Todos os direitos reservados.</p>
         </footer>
     </div>
+    
+    <!-- Modal de Cadastro -->
+    <div id="modalCadastro" class="modal-overlay">
+        <div class="modal-cadastro">
+            <button class="modal-close" onclick="fecharModalCadastro()">&times;</button>
+            <div class="modal-header">
+                <h2><i class="fas fa-building"></i> Cadastro de Empresa</h2>
+                <p>Preencha os dados abaixo e entraremos em contato em breve</p>
+            </div>
+            
+            <div id="alertModal" class="alert-modal"></div>
+            
+            <div class="loading-spinner" id="loadingSpinner">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #1a237e;"></i>
+            </div>
+            
+            <form id="formCadastro">
+                <div class="form-group-modal">
+                    <label for="nomeEmpresa">Nome da Empresa *</label>
+                    <input type="text" id="nomeEmpresa" name="nome_empresa" placeholder="Digite o nome da empresa" required>
+                </div>
+                
+                <div class="form-group-modal">
+                    <label for="cnpj">CNPJ *</label>
+                    <input type="text" id="cnpj" name="cnpj" placeholder="00.000.000/0000-00" required>
+                </div>
+                
+                <div class="form-group-modal">
+                    <label for="endereco">Endereço *</label>
+                    <input type="text" id="endereco" name="endereco" placeholder="Rua, número, bairro, cidade - UF" required>
+                </div>
+                
+                <div class="form-group-modal">
+                    <label for="telefone">Telefone *</label>
+                    <input type="text" id="telefone" name="telefone" placeholder="(00) 00000-0000" required>
+                </div>
+                
+                <button type="submit" class="btn-submit-cadastro" id="btnSubmitCadastro">
+                    <i class="fas fa-paper-plane"></i> Enviar Cadastro
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // Funções do Modal - Garantir que estão disponíveis globalmente
+        window.abrirModalCadastro = function() {
+            const modal = document.getElementById('modalCadastro');
+            if (modal) {
+                modal.classList.add('show');
+                document.body.style.overflow = 'hidden';
+            } else {
+                console.error('Modal não encontrado');
+            }
+        };
+        
+        window.fecharModalCadastro = function() {
+            const modal = document.getElementById('modalCadastro');
+            if (modal) {
+                modal.classList.remove('show');
+                document.body.style.overflow = 'auto';
+                // Limpa o formulário
+                const form = document.getElementById('formCadastro');
+                if (form) form.reset();
+                const alert = document.getElementById('alertModal');
+                if (alert) alert.classList.remove('show');
+            }
+        };
+        
+        // Aguardar DOM estar pronto
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fechar modal ao clicar fora
+            const modal = document.getElementById('modalCadastro');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        window.fecharModalCadastro();
+                    }
+                });
+            }
+            
+            // Máscaras de input
+            const cnpjInput = document.getElementById('cnpj');
+            if (cnpjInput) {
+                cnpjInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length <= 14) {
+                        value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+                        value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+                        value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+                        value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                        e.target.value = value;
+                    }
+                });
+            }
+            
+            const telefoneInput = document.getElementById('telefone');
+            if (telefoneInput) {
+                telefoneInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length <= 11) {
+                        if (value.length <= 10) {
+                            value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+                            value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                        } else {
+                            value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+                            value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                        }
+                        e.target.value = value;
+                    }
+                });
+            }
+            
+            // Envio do formulário
+            const formCadastro = document.getElementById('formCadastro');
+            if (formCadastro) {
+                formCadastro.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btnSubmit = document.getElementById('btnSubmitCadastro');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const alertModal = document.getElementById('alertModal');
+            
+            // Desabilita botão e mostra loading
+            btnSubmit.disabled = true;
+            loadingSpinner.classList.add('show');
+            alertModal.classList.remove('show');
+            
+            const formData = {
+                nome_empresa: document.getElementById('nomeEmpresa').value.trim(),
+                cnpj: document.getElementById('cnpj').value.trim(),
+                endereco: document.getElementById('endereco').value.trim(),
+                telefone: document.getElementById('telefone').value.trim()
+            };
+            
+            try {
+                const response = await fetch('/api/cadastro-empresa', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Sucesso
+                    alertModal.className = 'alert-modal alert-success show';
+                    alertModal.innerHTML = '<i class="fas fa-check-circle"></i> <strong>Cadastro enviado com sucesso!</strong><br>Entraremos em contato em breve.';
+                    
+                    // Limpa formulário
+                    document.getElementById('formCadastro').reset();
+                    
+                    // Fecha modal após 3 segundos
+                    setTimeout(() => {
+                        window.fecharModalCadastro();
+                    }, 3000);
+                } else {
+                    // Erro
+                    alertModal.className = 'alert-modal alert-error show';
+                    alertModal.innerHTML = '<i class="fas fa-exclamation-circle"></i> <strong>Erro ao enviar cadastro:</strong><br>' + (data.detail || 'Tente novamente mais tarde.');
+                }
+            } catch (error) {
+                alertModal.className = 'alert-modal alert-error show';
+                alertModal.innerHTML = '<i class="fas fa-exclamation-circle"></i> <strong>Erro ao conectar com o servidor.</strong><br>Tente novamente mais tarde.';
+                console.error('Erro:', error);
+            } finally {
+                btnSubmit.disabled = false;
+                loadingSpinner.classList.remove('show');
+            }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
 

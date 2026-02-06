@@ -52,6 +52,7 @@ from .auth import (
     get_current_admin_user, get_config_value, set_config_value,
     get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from .email_service import EmailService
 from datetime import timedelta
 import requests
 import re
@@ -749,6 +750,122 @@ async def get_current_user_info(current_user: User = Depends(get_current_active_
 async def logout(current_user: User = Depends(get_current_active_user)):
     """Logout (client-side deve remover o token)"""
     return {"message": "Logout realizado com sucesso"}
+
+# ==================== CADASTRO DE EMPRESA ====================
+
+class CadastroEmpresa(BaseModel):
+    nome_empresa: str
+    cnpj: str
+    endereco: str
+    telefone: str
+
+@app.post("/api/cadastro-empresa")
+async def cadastro_empresa(cadastro: CadastroEmpresa):
+    """Recebe cadastro de empresa da landing page e envia email"""
+    try:
+        email_service = EmailService()
+        
+        if not email_service.is_configured():
+            # Se email não estiver configurado, apenas retorna sucesso (para não quebrar o fluxo)
+            # Mas loga o cadastro para possível processamento manual
+            print(f"📧 Cadastro recebido (email não configurado):")
+            print(f"   Empresa: {cadastro.nome_empresa}")
+            print(f"   CNPJ: {cadastro.cnpj}")
+            print(f"   Endereço: {cadastro.endereco}")
+            print(f"   Telefone: {cadastro.telefone}")
+            return {"success": True, "message": "Cadastro recebido com sucesso"}
+        
+        # Prepara o email
+        to_email = "katya.figueira@grupobiomed.com"
+        subject = f"Novo Cadastro - {cadastro.nome_empresa}"
+        
+        body_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: #1a237e; color: white; padding: 20px; text-align: center; }}
+                .content {{ padding: 20px; background: #f9f9f9; }}
+                .info-box {{ background: white; padding: 15px; margin: 10px 0; border-left: 4px solid #1a237e; }}
+                .info-box strong {{ color: #1a237e; }}
+                .footer {{ text-align: center; padding: 20px; color: #666; font-size: 12px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>📋 Novo Cadastro de Empresa</h1>
+                </div>
+                <div class="content">
+                    <p>Olá,</p>
+                    <p>Uma nova empresa se cadastrou através da landing page:</p>
+                    
+                    <div class="info-box">
+                        <p><strong>Nome da Empresa:</strong> {cadastro.nome_empresa}</p>
+                        <p><strong>CNPJ:</strong> {cadastro.cnpj}</p>
+                        <p><strong>Endereço:</strong> {cadastro.endereco}</p>
+                        <p><strong>Telefone:</strong> {cadastro.telefone}</p>
+                    </div>
+                    
+                    <p><strong>Data do cadastro:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+                    
+                    <p>Por favor, entre em contato com a empresa em breve.</p>
+                </div>
+                <div class="footer">
+                    <p>AbsenteismoController - GrupoBiomed</p>
+                    <p>Este é um email automático gerado pelo sistema.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        body_text = f"""
+        Novo Cadastro de Empresa
+        
+        Olá,
+        
+        Uma nova empresa se cadastrou através da landing page:
+        
+        Nome da Empresa: {cadastro.nome_empresa}
+        CNPJ: {cadastro.cnpj}
+        Endereço: {cadastro.endereco}
+        Telefone: {cadastro.telefone}
+        
+        Data do cadastro: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+        
+        Por favor, entre em contato com a empresa em breve.
+        
+        AbsenteismoController - GrupoBiomed
+        """
+        
+        # Envia o email
+        success = email_service.send_email(
+            to_emails=[to_email],
+            subject=subject,
+            body_html=body_html,
+            body_text=body_text
+        )
+        
+        if success:
+            return {"success": True, "message": "Cadastro enviado com sucesso"}
+        else:
+            # Mesmo se falhar o envio, retorna sucesso para não quebrar a UX
+            # Mas loga para debug
+            print(f"⚠️ Falha ao enviar email, mas cadastro recebido:")
+            print(f"   Empresa: {cadastro.nome_empresa}")
+            print(f"   CNPJ: {cadastro.cnpj}")
+            return {"success": True, "message": "Cadastro recebido com sucesso"}
+    
+    except Exception as e:
+        print(f"❌ Erro ao processar cadastro: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao processar cadastro. Tente novamente mais tarde."
+        )
 
 # ==================== CONFIGURATIONS API ====================
 
