@@ -340,19 +340,22 @@ async def startup_event():
         db.commit()
         print("✅ Cliente fictício GrupoBiomed removido permanentemente")
     
-    # Cria usuário admin padrão se não existir
+    # Cria usuário admin padrão se não existir (verifica por username E email)
     admin = db.query(User).filter(User.username == "admin").first()
     if not admin:
-        admin = User(
-            username="admin",
-            email="admin@grupobiomed.com",
-            password_hash=get_password_hash("admin123"),
-            nome_completo="Administrador",
-            is_active=True,
-            is_admin=True
-        )
-        db.add(admin)
-        db.commit()
+        # Verifica também se já existe usuário com esse email
+        existing_email = db.query(User).filter(User.email == "admin@grupobiomed.com").first()
+        if not existing_email:
+            admin = User(
+                username="admin",
+                email="admin@grupobiomed.com",
+                password_hash=get_password_hash("admin123"),
+                nome_completo="Administrador",
+                is_active=True,
+                is_admin=True
+            )
+            db.add(admin)
+            db.commit()
     # Configurações padrão
     if not db.query(Config).filter(Config.chave == "nome_sistema").first():
         set_config_value(db, "nome_sistema", "AbsenteismoController", "Nome do sistema", "string")
