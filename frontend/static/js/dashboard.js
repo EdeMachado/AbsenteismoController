@@ -530,8 +530,12 @@ async function carregarDashboard() {
         }
         
         // Heatmap de Setores x Meses
+        console.log('[DEBUG] Verificando heatmap:', data.heatmap_setores_meses);
         if (data.heatmap_setores_meses && data.heatmap_setores_meses.setores && data.heatmap_setores_meses.setores.length > 0) {
+            console.log('[DEBUG] Renderizando heatmap com', data.heatmap_setores_meses.setores.length, 'setores');
             renderizarChartHeatmap(data.heatmap_setores_meses);
+        } else {
+            console.log('[DEBUG] Heatmap não renderizado - dados:', data.heatmap_setores_meses);
         }
         
         // Carrega e renderiza gráficos personalizados configurados pelo usuário
@@ -4098,30 +4102,52 @@ function renderizarChartComparativoAnoAnterior(dados) {
 let chartHeatmap = null;
 
 function renderizarChartHeatmap(dados) {
+    console.log('[HEATMAP] Iniciando renderização:', dados);
     const ctx = document.getElementById('chartHeatmap');
-    if (!ctx || !dados || !dados.setores || dados.setores.length === 0) {
-        if (ctx) {
-            ctx.style.display = 'none';
-        }
+    if (!ctx) {
+        console.error('[HEATMAP] Canvas não encontrado!');
         return;
     }
+    
+    if (!dados || !dados.setores || dados.setores.length === 0) {
+        console.warn('[HEATMAP] Dados inválidos ou vazios');
+        ctx.style.display = 'none';
+        return;
+    }
+    
+    if (!dados.dados || !Array.isArray(dados.dados) || dados.dados.length === 0) {
+        console.warn('[HEATMAP] Matriz de dados vazia');
+        ctx.style.display = 'none';
+        return;
+    }
+    
+    console.log('[HEATMAP] Dados válidos:', {
+        setores: dados.setores.length,
+        meses: dados.meses ? dados.meses.length : 0,
+        dados: dados.dados.length
+    });
     
     destruirGraficoSeguro('chartHeatmap', chartHeatmap);
     chartHeatmap = null;
     
+    // Garante que o canvas está visível
+    ctx.style.display = 'block';
+    
     const cores = getCores();
     
-    // Prepara dados para o heatmap
-    // Chart.js não tem tipo 'heatmap' nativo, então vamos usar um gráfico de barras agrupadas
     // Encontra o valor máximo para normalizar as cores
     let maxValor = 0;
     for (let i = 0; i < dados.dados.length; i++) {
+        if (!Array.isArray(dados.dados[i])) continue;
         for (let j = 0; j < dados.dados[i].length; j++) {
-            if (dados.dados[i][j] > maxValor) {
-                maxValor = dados.dados[i][j];
+            const valor = parseFloat(dados.dados[i][j]) || 0;
+            if (valor > maxValor) {
+                maxValor = valor;
             }
         }
     }
+    
+    console.log('[HEATMAP] Valor máximo encontrado:', maxValor);
     
     // Cria função para gerar cor baseada no valor
     function getColorForValue(valor) {
@@ -4135,32 +4161,36 @@ function renderizarChartHeatmap(dados) {
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
     
-    // Se há muitos meses, agrupa em trimestres para melhor visualização
+    // Prepara datasets
     let datasets = [];
-    let labels = dados.meses;
+    const meses = dados.meses || [];
     
-    if (dados.meses.length > 12) {
+    if (meses.length > 12) {
         // Agrupa meses em trimestres
-        const mesesPorTrimestre = Math.ceil(dados.meses.length / 4);
-        labels = [];
+        const mesesPorTrimestre = Math.ceil(meses.length / 4);
         
         for (let t = 0; t < 4; t++) {
             const inicio = t * mesesPorTrimestre;
-            const fim = Math.min((t + 1) * mesesPorTrimestre, dados.meses.length);
-            const mesesTrimestre = dados.meses.slice(inicio, fim);
+            const fim = Math.min((t + 1) * mesesPorTrimestre, meses.length);
+            const mesesTrimestre = meses.slice(inicio, fim);
             
             const dadosTrimestre = [];
             for (let i = 0; i < dados.setores.length; i++) {
                 let soma = 0;
-                for (let j = inicio; j < fim; j++) {
-                    soma += (dados.dados[i][j] || 0);
+                if (Array.isArray(dados.dados[i])) {
+                    for (let j = inicio; j < fim && j < dados.dados[i].length; j++) {
+                        soma += (parseFloat(dados.dados[i][j]) || 0);
+                    }
                 }
                 dadosTrimestre.push(soma);
             }
             
-            labels.push(`${mesesTrimestre[0]} - ${mesesTrimestre[mesesTrimestre.length - 1]}`);
+            const label = mesesTrimestre.length > 0 
+                ? `${mesesTrimestre[0]} - ${mesesTrimestre[mesesTrimestre.length - 1]}`
+                : `Trimestre ${t + 1}`;
+            
             datasets.push({
-                label: labels[labels.length - 1],
+                label: label,
                 data: dadosTrimestre,
                 backgroundColor: dadosTrimestre.map(v => getColorForValue(v)),
                 borderColor: dadosTrimestre.map(v => getColorForValue(v)),
@@ -4169,10 +4199,14 @@ function renderizarChartHeatmap(dados) {
         }
     } else {
         // Usa todos os meses
-        for (let j = 0; j < dados.meses.length; j++) {
-            const mesData = dados.dados.map((linha) => linha[j] || 0);
+        for (let j = 0; j < meses.length; j++) {
+            const mesData = dados.dados.map((linha) => {
+                if (!Array.isArray(linha)) return 0;
+                return parseFloat(linha[j]) || 0;
+            });
+            
             datasets.push({
-                label: dados.meses[j],
+                label: meses[j] || `Mês ${j + 1}`,
                 data: mesData,
                 backgroundColor: mesData.map(v => getColorForValue(v)),
                 borderColor: mesData.map(v => getColorForValue(v)),
@@ -4181,42 +4215,49 @@ function renderizarChartHeatmap(dados) {
         }
     }
     
-    chartHeatmap = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: dados.setores.map(s => truncate(s, 20)),
-            datasets: datasets
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: { font: { size: 10 }, maxWidth: 100 }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const valor = context.parsed.x;
-                            return `${context.dataset.label}: ${valor.toFixed(2)} dias`;
+    console.log('[HEATMAP] Criando gráfico com', datasets.length, 'datasets');
+    
+    try {
+        chartHeatmap = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: dados.setores.map(s => truncate(s || 'Sem setor', 20)),
+                datasets: datasets
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 10 }, maxWidth: 100 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const valor = context.parsed.x;
+                                return `${context.dataset.label}: ${valor.toFixed(2)} dias`;
+                            }
                         }
                     }
-                }
-            },
-            scales: {
-                x: { 
-                    beginAtZero: true,
-                    stacked: true
                 },
-                y: { 
-                    stacked: true,
-                    ticks: { font: { size: 10 } }
+                scales: {
+                    x: { 
+                        beginAtZero: true,
+                        stacked: true
+                    },
+                    y: { 
+                        stacked: true,
+                        ticks: { font: { size: 10 } }
+                    }
                 }
             }
-        }
-    });
+        });
+        console.log('[HEATMAP] Gráfico criado com sucesso!');
+    } catch (error) {
+        console.error('[HEATMAP] Erro ao criar gráfico:', error);
+    }
 }
 
 // Torna funções globais
