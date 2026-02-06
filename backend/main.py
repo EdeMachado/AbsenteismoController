@@ -3067,10 +3067,11 @@ Esta análise permite identificar tendências de absenteísmo por setor ao longo
                         atual = comparativo_mensal.get('periodo_atual', {})
                         anterior = comparativo_mensal.get('periodo_anterior', {})
                         
-                        dias_atual = atual.get('total_dias_perdidos', 0) or 0
-                        dias_anterior = anterior.get('total_dias_perdidos', 0) or 0
-                        horas_atual = atual.get('total_horas_perdidas', 0) or 0
-                        horas_anterior = anterior.get('total_horas_perdidas', 0) or 0
+                        # CORREÇÃO: analytics retorna 'dias_perdidos', não 'total_dias_perdidos'
+                        dias_atual = atual.get('dias_perdidos', 0) or atual.get('total_dias_perdidos', 0) or 0
+                        dias_anterior = anterior.get('dias_perdidos', 0) or anterior.get('total_dias_perdidos', 0) or 0
+                        horas_atual = atual.get('horas_perdidas', 0) or atual.get('total_horas_perdidas', 0) or 0
+                        horas_anterior = anterior.get('horas_perdidas', 0) or anterior.get('total_horas_perdidas', 0) or 0
                         registros_atual = atual.get('total_registros', 0) or 0
                         registros_anterior = anterior.get('total_registros', 0) or 0
                         
@@ -3114,10 +3115,11 @@ Esta comparação permite avaliar a evolução do absenteísmo mês a mês, iden
                         atual = comparativo_trimestral.get('periodo_atual', {})
                         anterior = comparativo_trimestral.get('periodo_anterior', {})
                         
-                        dias_atual = atual.get('total_dias_perdidos', 0) or 0
-                        dias_anterior = anterior.get('total_dias_perdidos', 0) or 0
-                        horas_atual = atual.get('total_horas_perdidas', 0) or 0
-                        horas_anterior = anterior.get('total_horas_perdidas', 0) or 0
+                        # CORREÇÃO: analytics retorna 'dias_perdidos', não 'total_dias_perdidos'
+                        dias_atual = atual.get('dias_perdidos', 0) or atual.get('total_dias_perdidos', 0) or 0
+                        dias_anterior = anterior.get('dias_perdidos', 0) or anterior.get('total_dias_perdidos', 0) or 0
+                        horas_atual = atual.get('horas_perdidas', 0) or atual.get('total_horas_perdidas', 0) or 0
+                        horas_anterior = anterior.get('horas_perdidas', 0) or anterior.get('total_horas_perdidas', 0) or 0
                         registros_atual = atual.get('total_registros', 0) or 0
                         registros_anterior = anterior.get('total_registros', 0) or 0
                         

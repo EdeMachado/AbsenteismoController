@@ -620,7 +620,8 @@ Esta análise permite identificar os setores que demandam maior atenção em ter
             if isinstance(dados, list) and len(dados) == 0:
                 return "📊 **Análise: Distribuição de Dias por Atestado**\n\nDados ainda não disponíveis para este período."
             
-            # Encontra a faixa mais comum (dados vêm como: [{dias: '1 dia', quantidade: 10}, ...])
+            # CORREÇÃO: analytics retorna 'faixa', não 'dias'!
+            # Dados vêm como: [{'faixa': '1 dia', 'quantidade': 10}, ...]
             mais_comum = max(dados, key=lambda x: x.get('quantidade', 0))
             total_atestados = sum(d.get('quantidade', 0) for d in dados)
             pct_mais_comum = (mais_comum.get('quantidade', 0) / total_atestados * 100) if total_atestados > 0 else 0
@@ -651,9 +652,11 @@ Esta análise permite identificar os setores que demandam maior atenção em ter
                     except:
                         return 0
             
-            media = sum(extrair_media_dias(d.get('dias', '')) * d.get('quantidade', 0) for d in dados) / total_atestados if total_atestados > 0 else 0
+            # CORREÇÃO: usa 'faixa', não 'dias'
+            media = sum(extrair_media_dias(d.get('faixa', d.get('dias', ''))) * d.get('quantidade', 0) for d in dados) / total_atestados if total_atestados > 0 else 0
             
-            dias_faixa = mais_comum.get('dias', 'Não informado')
+            # CORREÇÃO: usa 'faixa', não 'dias'
+            dias_faixa = mais_comum.get('faixa', mais_comum.get('dias', 'Não informado'))
             if dias_faixa == 'N/A' or not dias_faixa:
                 dias_faixa = 'Não informado'
             
