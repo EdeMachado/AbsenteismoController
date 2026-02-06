@@ -762,6 +762,8 @@ async def atualizar_permissoes_usuarios(
     - Nilceia recebe client_id = 2 (CONVERPLAST)
     """
     try:
+        resultado = []
+        
         # Busca usuário Nilceia (pode ser por username ou email)
         nilceia = db.query(User).filter(
             (User.username.ilike('%nilceia%')) | 
@@ -771,8 +773,10 @@ async def atualizar_permissoes_usuarios(
         
         if nilceia:
             nilceia.client_id = 2  # CONVERPLAST
+            resultado.append(f"✅ {nilceia.username}: client_id = 2 (CONVERPLAST)")
             print(f"✅ Usuário {nilceia.username} atualizado: client_id = 2 (CONVERPLAST)")
         else:
+            resultado.append("⚠️ Usuário Nilceia não encontrado")
             print("⚠️ Usuário Nilceia não encontrado")
         
         # Todos os outros usuários recebem client_id = NULL (acesso a todos)
@@ -785,6 +789,7 @@ async def atualizar_permissoes_usuarios(
             if user.client_id is not None:
                 user.client_id = None
                 atualizados += 1
+                resultado.append(f"✅ {user.username}: client_id = NULL (acesso a todos)")
                 print(f"✅ Usuário {user.username} atualizado: client_id = NULL (acesso a todos)")
         
         db.commit()
@@ -792,7 +797,8 @@ async def atualizar_permissoes_usuarios(
         return {
             "success": True,
             "message": f"Permissões atualizadas: {atualizados} usuários com acesso a todos os clientes, Nilceia com acesso apenas a CONVERPLAST",
-            "atualizados": atualizados + (1 if nilceia else 0)
+            "atualizados": atualizados + (1 if nilceia else 0),
+            "detalhes": resultado
         }
     except Exception as e:
         db.rollback()
@@ -1025,9 +1031,9 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    # Não permite editar seu próprio usuário
-    if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Não é possível editar seu próprio usuário")
+    # Permite editar seu próprio usuário (removida restrição)
+    # if user.id == current_user.id:
+    #     raise HTTPException(status_code=400, detail="Não é possível editar seu próprio usuário")
     
     # Atualiza campos se fornecidos
     if username is not None:
