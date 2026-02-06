@@ -64,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         carregarApresentacao();
-        carregarSetoresParaFiltro();
         
         // Ajusta header para RODA DE OURO (preto-cinza)
         setTimeout(() => {
@@ -104,58 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==================== CARREGAR APRESENTAÇÃO ====================
-// Carrega setores disponíveis para filtro
-async function carregarSetoresParaFiltro() {
-    try {
-        const clientId = window.getCurrentClientId ? window.getCurrentClientId() : localStorage.getItem('cliente_selecionado');
-        if (!clientId) return;
-        
-        const response = await fetch(`/api/dashboard?client_id=${clientId}`);
-        if (!response.ok) return;
-        
-        const data = await response.json();
-        const select = document.getElementById('filtroSetorApresentacao');
-        
-        if (data.top_setores && data.top_setores.length > 0) {
-            // Limpa opções antigas (mantém "Todos")
-            select.innerHTML = '<option value="">Todos os Setores</option>';
-            
-            // Adiciona setores únicos
-            const setoresUnicos = [...new Set(data.top_setores.map(s => s.setor))];
-            setoresUnicos.forEach(setor => {
-                const option = document.createElement('option');
-                option.value = setor;
-                option.textContent = setor;
-                select.appendChild(option);
-            });
-        }
-    } catch (error) {
-        console.error('Erro ao carregar setores:', error);
-    }
-}
-
-// Aplica filtros e recarrega apresentação
-async function aplicarFiltrosApresentacao() {
-    const setor = document.getElementById('filtroSetorApresentacao').value;
-    const periodoInicio = document.getElementById('filtroPeriodoInicio').value;
-    const periodoFim = document.getElementById('filtroPeriodoFim').value;
-    
-    // Salva filtros no localStorage
-    const filtros = {
-        setor: setor || null,
-        periodo_inicio: periodoInicio || null,
-        periodo_fim: periodoFim || null
-    };
-    localStorage.setItem('filtros_apresentacao', JSON.stringify(filtros));
-    
-    // Recarrega apresentação com filtros
-    await carregarApresentacao();
-    
-    // Volta para o primeiro slide
-    slideAtual = 0;
-    renderizarSlide(slideAtual);
-}
-
 async function carregarApresentacao(forceClientId = null) {
     // Mostra loading
     const container = document.getElementById('slideContent');
@@ -189,31 +136,8 @@ async function carregarApresentacao(forceClientId = null) {
         
         console.log('Carregando apresentação para cliente ID:', clientId);
         
-        // Pega filtros salvos
-        let filtrosAplicados = {};
-        try {
-            const filtrosSalvos = localStorage.getItem('filtros_apresentacao');
-            if (filtrosSalvos) {
-                filtrosAplicados = JSON.parse(filtrosSalvos);
-            }
-        } catch (e) {
-            console.error('Erro ao ler filtros:', e);
-        }
-        
         // Adiciona timestamp para evitar cache
         const timestamp = new Date().getTime();
-        
-        // Monta URL com filtros
-        let url = `/api/apresentacao?client_id=${clientId}&_t=${timestamp}`;
-        if (filtrosAplicados.setor) {
-            url += `&setor=${encodeURIComponent(filtrosAplicados.setor)}`;
-        }
-        if (filtrosAplicados.periodo_inicio) {
-            url += `&mes_inicio=${filtrosAplicados.periodo_inicio}`;
-        }
-        if (filtrosAplicados.periodo_fim) {
-            url += `&mes_fim=${filtrosAplicados.periodo_fim}`;
-        }
         
         // Cria um AbortController para timeout
         const controller = new AbortController();
@@ -221,7 +145,7 @@ async function carregarApresentacao(forceClientId = null) {
         
         let response;
         try {
-            response = await fetch(url, {
+            response = await fetch(`/api/apresentacao?client_id=${clientId}&_t=${timestamp}`, {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -246,8 +170,6 @@ async function carregarApresentacao(forceClientId = null) {
         console.log('[APRESENTACAO] Resposta completa:', data);
         console.log('[APRESENTACAO] Slides carregados:', slides.length, 'para cliente:', clientId);
         console.log('[APRESENTACAO] Primeiros 3 slides:', slides.slice(0, 3));
-        console.log('[APRESENTACAO] Últimos 5 slides:', slides.slice(-5));
-        console.log('[APRESENTACAO] Slides de ações:', slides.filter(s => s.tipo && s.tipo.startsWith('acoes')));
         
         // Ajusta header para RODA DE OURO (preto-cinza)
         if (clientId === 4) {
@@ -780,15 +702,7 @@ function renderizarGrafico(slide) {
             config = {
                 type: 'bar',
                 data: {
-                    // CORREÇÃO: Se descricao == cid, mostra só o código
-                    labels: cidsOrdenados.map(d => {
-                        const desc = d.descricao || d.diagnostico || d.cid;
-                        // Se descrição é igual ao CID, mostra apenas o CID
-                        if (desc === d.cid) {
-                            return truncate(d.cid, 28);
-                        }
-                        return truncate(desc, 28);
-                    }),
+                    labels: cidsOrdenados.map(d => truncate(d.descricao || d.cid, 28)),
                     datasets: [{
                         label: 'Atestados',
                         data: cidsOrdenados.map(d => d.quantidade),
@@ -807,26 +721,26 @@ function renderizarGrafico(slide) {
                                 title: function(context) {
                                     const index = context[0].dataIndex;
                                     const item = cidsOrdenados[index];
-                                    return `CID ${item.cid || 'N/A'}`;
+                                    const diagnostico = item.descricao || item.diagnostico || item.cid || 'Não especificado';
+                                    return diagnostico;
                                 },
                                 label: function(context) {
                                     const index = context.dataIndex;
                                     const item = cidsOrdenados[index];
-                                    const desc = item.descricao || item.diagnostico || item.cid;
-                                    // Se descrição é igual ao CID, não repete
-                                    const diagnostico = (desc === item.cid) ? 'Sem diagnóstico específico' : desc;
-                                    return [
-                                        `Diagnóstico: ${diagnostico}`,
-                                        `Quantidade: ${item.quantidade || 0} atestados`
-                                    ];
-                                },
-                                afterLabel: function(context) {
-                                    const index = context.dataIndex;
-                                    const item = cidsOrdenados[index];
-                                    if (item.dias_perdidos) {
-                                        return `Dias perdidos: ${item.dias_perdidos}`;
+                                    
+                                    // Mostra CIDs relacionados se houver múltiplos
+                                    let cid_info = '';
+                                    if (item.cids_relacionados && item.cids_relacionados.length > 1) {
+                                        cid_info = `CIDs: ${item.cids_relacionados.join(', ')}`;
+                                    } else if (item.cid) {
+                                        cid_info = `CID: ${item.cid}`;
                                     }
-                                    return '';
+                                    
+                                    return [
+                                        cid_info,
+                                        `Quantidade: ${item.quantidade || 0} atestados`,
+                                        `Dias perdidos: ${item.dias_perdidos || 0}`
+                                    ];
                                 }
                             }
                         }
@@ -838,404 +752,29 @@ function renderizarGrafico(slide) {
                 }
             };
             break;
-        
-        case 'quantidade_atestados':
-            const labelsQtd = dados.map(d => {
-                const mes = d.mes || '';
-                const partes = mes.split('-');
-                if (partes.length === 2) {
-                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                    const anoC = partes[0].slice(-2);
-                    return `${nomesMeses[parseInt(partes[1])-1]}/${anoC}`;
-                }
-                return mes;
-            });
-            config = {
-                type: 'bar',
-                data: {
-                    labels: labelsQtd,
-                    datasets: [{
-                        label: 'Quantidade de Atestados',
-                        data: dados.map(d => d.quantidade || 0),
-                        backgroundColor: CORES_EMPRESA.primary,
-                        borderRadius: 6,
-                        barThickness: 30
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
-                },
-                plugins: [{
-                    afterDatasetsDraw: function(chart) {
-                        const ctx = chart.ctx;
-                        chart.data.datasets.forEach(function(dataset, i) {
-                            const meta = chart.getDatasetMeta(i);
-                            if (!meta.hidden) {
-                                meta.data.forEach(function(element, index) {
-                                    ctx.fillStyle = '#000';
-                                    ctx.font = 'bold 11px Arial';
-                                    const dataString = dataset.data[index].toString();
-                                    ctx.textAlign = 'center';
-                                    ctx.textBaseline = 'bottom';
-                                    const position = element.tooltipPosition();
-                                    ctx.fillText(dataString, position.x, position.y - 5);
-                                });
-                            }
-                        });
-                    }
-                }]
-            };
-            break;
-        
-        case 'variacao_mensal':
-            const labelsVar = dados.map(d => {
-                const mes = d.mes || '';
-                const partes = mes.split('-');
-                if (partes.length === 2) {
-                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                    const anoC = partes[0].slice(-2);
-                    return `${nomesMeses[parseInt(partes[1])-1]}/${anoC}`;
-                }
-                return mes;
-            });
-            config = {
-                type: 'bar',
-                data: {
-                    labels: labelsVar,
-                    datasets: [
-                        {
-                            label: 'Variação de Dias',
-                            data: dados.map(d => d.variacao_dias || 0),
-                            backgroundColor: CORES_EMPRESA.primary,
-                            borderRadius: 6
-                        },
-                        {
-                            label: 'Variação de Horas',
-                            data: dados.map(d => d.variacao_horas || 0),
-                            backgroundColor: CORES_EMPRESA.secondary,
-                            borderRadius: 6
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { display: true, position: 'top', labels: { font: { size: 10 } } }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: value => `${value > 0 ? '+' : ''}${value}`
-                            }
-                        }
-                    }
-                }
-            };
-            break;
-        
-        case 'genero_mensal':
-            const labelsGen = [];
-            const mapaMeses = new Map();
-            dados.forEach(item => {
-                const mes = item.mes || '';
-                const partes = mes.split('-');
-                let mesFormatado = mes;
-                if (partes.length === 2) {
-                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                    const anoC = partes[0].slice(-2);
-                    mesFormatado = `${nomesMeses[parseInt(partes[1])-1]}/${anoC}`;
-                }
-                if (!mapaMeses.has(mesFormatado)) {
-                    mapaMeses.set(mesFormatado, { M: 0, F: 0 });
-                    labelsGen.push(mesFormatado);
-                }
-                const genero = item.genero;
-                if (genero === 'M' || genero === 'F') {
-                    mapaMeses.get(mesFormatado)[genero] += item.quantidade || 0;
-                }
-            });
-            const masculino = labelsGen.map(label => mapaMeses.get(label).M);
-            const feminino = labelsGen.map(label => mapaMeses.get(label).F);
-            config = {
-                type: 'bar',
-                data: {
-                    labels: labelsGen,
-                    datasets: [
-                        {
-                            label: 'Masculino',
-                            data: masculino,
-                            backgroundColor: '#1a237e',
-                            stack: 'genero'
-                        },
-                        {
-                            label: 'Feminino',
-                            data: feminino,
-                            backgroundColor: '#556B2F',
-                            stack: 'genero'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { display: true, position: 'top', labels: { font: { size: 10 } } }
-                    },
-                    scales: {
-                        x: { stacked: true },
-                        y: { stacked: true, beginAtZero: true }
-                    }
-                }
-            };
-            break;
-        
-        case 'atestados_vs_taxa':
-            const labelsAT = dados.map(d => {
-                const partes = (d.mes || '').split('-');
-                if (partes.length === 2) {
-                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                    const anoAT = partes[0].slice(-2);
-                    return `${nomesMeses[parseInt(partes[1])-1]}/${anoAT}`;
-                }
-                return d.mes || 'N/A';
-            });
-            const quantidadesAT = dados.map(d => d.quantidade_atestados || 0);
-            const taxasAT = dados.map(d => d.taxa_absenteismo || 0);
-            
-            config = {
-                type: 'bar',
-                data: {
-                    labels: labelsAT,
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: 'Quantidade de Atestados',
-                            data: quantidadesAT,
-                            backgroundColor: CORES_EMPRESA.primary,
-                            borderRadius: 4,
-                            yAxisID: 'y',
-                            order: 2
-                        },
-                        {
-                            type: 'line',
-                            label: 'Taxa de Absenteísmo (%)',
-                            data: taxasAT,
-                            borderColor: CORES_EMPRESA.secondary,
-                            backgroundColor: 'rgba(85, 107, 47, 0.1)',
-                            borderWidth: 3,
-                            fill: false,
-                            tension: 0.4,
-                            pointRadius: 6,
-                            pointBackgroundColor: CORES_EMPRESA.secondary,
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 2,
-                            pointHoverRadius: 8,
-                            yAxisID: 'y1',
-                            order: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: { font: { size: 10 } }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.datasetIndex === 0) {
-                                        label += context.parsed.y + ' atestados';
-                                    } else {
-                                        label += context.parsed.y.toFixed(2) + '%';
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Quantidade',
-                                font: { size: 10, weight: 'bold' }
-                            },
-                            ticks: { font: { size: 9 } }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Taxa (%)',
-                                font: { size: 10, weight: 'bold' }
-                            },
-                            grid: { drawOnChartArea: false },
-                            ticks: {
-                                font: { size: 9 },
-                                callback: function(value) {
-                                    return value.toFixed(1) + '%';
-                                }
-                            }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { font: { size: 9 } }
-                        }
-                    }
-                }
-            };
-            break;
-        
-        case 'comparativo_ano_anterior':
-            const labelsComp = dados.map(d => {
-                const partes = (d.mes || '').split('-');
-                if (partes.length === 2) {
-                    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                    const anoComp = partes[0].slice(-2);
-                    return `${nomesMeses[parseInt(partes[1])-1]}/${anoComp}`;
-                }
-                return d.mes || 'N/A';
-            });
-            const diasAtualComp = dados.map(d => d.ano_atual?.dias_perdidos || 0);
-            const diasAnteriorComp = dados.map(d => d.ano_anterior?.dias_perdidos || 0);
-            config = {
-                type: 'bar',
-                data: {
-                    labels: labelsComp,
-                    datasets: [
-                        {
-                            label: 'Ano Atual',
-                            data: diasAtualComp,
-                            backgroundColor: CORES_EMPRESA.primary,
-                            borderRadius: 4
-                        },
-                        {
-                            label: 'Ano Anterior',
-                            data: diasAnteriorComp,
-                            backgroundColor: CORES_EMPRESA.secondary,
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { display: true, position: 'top', labels: { font: { size: 10 } } },
-                        tooltip: {
-                            callbacks: {
-                                afterBody: function(tooltipItems) {
-                                    const idx = tooltipItems[0].dataIndex;
-                                    const variacao = dados[idx]?.variacao?.dias_percentual || 0;
-                                    const sinal = variacao >= 0 ? '+' : '';
-                                    return `Variação: ${sinal}${variacao.toFixed(1)}%`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { font: { size: 9 } } },
-                        x: { ticks: { font: { size: 9 } } }
-                    }
-                }
-            };
-            break;
-        
-        case 'sazonalidade':
-            const labelsSaz = dados.map(d => d.mes_nome || d.mes);
-            const mediaDiasSaz = dados.map(d => d.media_dias || 0);
-            config = {
-                type: 'line',
-                data: {
-                    labels: labelsSaz,
-                    datasets: [{
-                        label: 'Média de Dias',
-                        data: mediaDiasSaz,
-                        borderColor: CORES_EMPRESA.primary,
-                        backgroundColor: 'rgba(26, 35, 126, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 5,
-                        pointBackgroundColor: CORES_EMPRESA.primary,
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const idx = context.dataIndex;
-                                    const dadosMes = dados[idx];
-                                    return [
-                                        `Média: ${context.parsed.y.toFixed(1)} dias`,
-                                        `Baseado em ${dadosMes.anos_analisados || 0} ano(s)`
-                                    ];
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { font: { size: 9 } } },
-                        x: { ticks: { font: { size: 9 } } }
-                    }
-                }
-            };
-            break;
             
         case 'evolucao_mensal':
             config = {
-                type: 'bar',
+                type: 'line',
                 data: {
                     labels: dados.map(d => d.mes || 'N/A'),
                     datasets: [
                         {
-                            label: 'Horas Perdidas',
-                            data: dados.map(d => d.horas_perdidas || 0),
-                            backgroundColor: CORES_EMPRESA.primary,
-                            borderColor: CORES_EMPRESA.primaryDark,
-                            borderWidth: 1,
+                            label: 'Dias Perdidos',
+                            data: dados.map(d => d.dias_perdidos || 0),
+                            borderColor: CORES_EMPRESA.primary,
+                            backgroundColor: CORES_EMPRESA.primaryLight + '40',
+                            fill: true,
+                            tension: 0.4,
                             yAxisID: 'y'
                         },
                         {
-                            label: 'Dias Perdidos',
-                            data: dados.map(d => d.dias_perdidos || 0),
-                            backgroundColor: CORES_EMPRESA.secondary,
-                            borderColor: CORES_EMPRESA.secondaryDark,
-                            borderWidth: 1,
+                            label: 'Quantidade de Atestados',
+                            data: dados.map(d => d.quantidade || 0),
+                            borderColor: CORES_EMPRESA.secondary,
+                            backgroundColor: CORES_EMPRESA.secondaryLight + '40',
+                            fill: true,
+                            tension: 0.4,
                             yAxisID: 'y1'
                         }
                     ]
@@ -1256,9 +795,9 @@ function renderizarGrafico(slide) {
                                     const index = context.dataIndex;
                                     const item = dados[index];
                                     if (context.datasetIndex === 0) {
-                                        return `Horas Perdidas: ${(item.horas_perdidas || 0).toFixed(2)}h`;
+                                        return `Dias Perdidos: ${item.dias_perdidos || 0}`;
                                     } else {
-                                        return `Dias Perdidos: ${item.dias_perdidos || 0} dias`;
+                                        return `Atestados: ${item.quantidade || 0}`;
                                     }
                                 }
                             }
@@ -1272,7 +811,7 @@ function renderizarGrafico(slide) {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Horas Perdidas',
+                                text: 'Dias Perdidos',
                                 color: CORES_EMPRESA.primary
                             }
                         },
@@ -1284,7 +823,7 @@ function renderizarGrafico(slide) {
                             grid: { drawOnChartArea: false },
                             title: {
                                 display: true,
-                                text: 'Dias Perdidos',
+                                text: 'Quantidade de Atestados',
                                 color: CORES_EMPRESA.secondary
                             }
                         }
@@ -1610,15 +1149,7 @@ function renderizarGrafico(slide) {
             config = {
                 type: 'bar',
                 data: {
-                    // CORREÇÃO: Se descricao == cid, mostra apenas o código
-                    labels: top10MediaCid.map(d => {
-                        const desc = d.diagnostico || d.descricao || d.cid;
-                        // Se descrição é igual ao CID, mostra apenas o CID
-                        if (desc === d.cid) {
-                            return truncate(d.cid, 30);
-                        }
-                        return truncate(d.cid + ' - ' + desc, 30);
-                    }),
+                    labels: top10MediaCid.map(d => truncate(d.cid + ' - ' + (d.diagnostico || d.descricao || ''), 30)),
                     datasets: [{
                         label: 'Média de Dias',
                         data: top10MediaCid.map(d => d.media_dias || 0),
@@ -1637,13 +1168,11 @@ function renderizarGrafico(slide) {
                                 label: function(context) {
                                     const index = context.dataIndex;
                                     const item = top10MediaCid[index];
-                                    const desc = item.diagnostico || item.descricao || item.cid;
-                                    const diagnostico = (desc === item.cid) ? 'Sem diagnóstico específico' : desc;
                                     return [
                                         `Média: ${item.media_dias || 0} dias`,
                                         `Total de dias: ${item.total_dias || 0}`,
                                         `Quantidade: ${item.quantidade || 0} atestados`,
-                                        `Diagnóstico: ${diagnostico}`
+                                        `Diagnóstico: ${item.diagnostico || item.descricao || 'N/A'}`
                                     ];
                                 }
                             }
@@ -2669,7 +2198,7 @@ function renderizarAcoesSaudeFisica(tipo) {
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0; position: relative;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
             <!-- Linha decorativa no topo -->
             <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
@@ -2686,8 +2215,8 @@ function renderizarAcoesSaudeFisica(tipo) {
                 </div>
             </div>
             
-            <!-- Conteúdo - PARAR ANTES DA FAIXA (60px do bottom) -->
-            <div style="position: absolute; top: 120px; left: 40px; right: 40px; bottom: 70px; overflow-y: auto; padding-right: 20px;">
+            <!-- Conteúdo -->
+            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeFisica" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeFisica" style="list-style: none; padding: 0; margin: 0;">
@@ -2729,7 +2258,7 @@ function renderizarAcoesSaudeEmocional(tipo) {
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0; position: relative;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
             <!-- Linha decorativa no topo -->
             <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
@@ -2746,8 +2275,8 @@ function renderizarAcoesSaudeEmocional(tipo) {
                 </div>
             </div>
             
-            <!-- Conteúdo - PARAR ANTES DA FAIXA (60px do bottom) -->
-            <div style="position: absolute; top: 120px; left: 40px; right: 40px; bottom: 70px; overflow-y: auto; padding-right: 20px;">
+            <!-- Conteúdo -->
+            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeEmocional" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeEmocional" style="list-style: none; padding: 0; margin: 0;">
@@ -2789,7 +2318,7 @@ function renderizarAcoesSaudeSocial(tipo) {
     `).join('');
     
     return `
-        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0; position: relative;">
+        <div style="display: flex; flex-direction: column; height: 100%; padding: 40px; padding-bottom: 0;">
             <!-- Linha decorativa no topo -->
             <div style="height: 3px; background: linear-gradient(to right, ${corSecundaria} 0%, ${corPrimaria} 50%, ${corSecundaria} 100%); margin-bottom: 30px;"></div>
             
@@ -2806,8 +2335,8 @@ function renderizarAcoesSaudeSocial(tipo) {
                 </div>
             </div>
             
-            <!-- Conteúdo - PARAR ANTES DA FAIXA (60px do bottom) -->
-            <div style="position: absolute; top: 120px; left: 40px; right: 40px; bottom: 70px; overflow-y: auto; padding-right: 20px;">
+            <!-- Conteúdo -->
+            <div style="flex: 1; overflow-y: auto; padding-right: 20px; padding-bottom: 60px; margin-bottom: 0;">
                 <p class="conteudo-editavel" id="textoAcoesSaudeSocial" contenteditable="false" style="font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 30px; text-align: justify; outline: none; min-height: 100px;">${dados.texto}</p>
                 
                 <ul id="listaAcoesSaudeSocial" style="list-style: none; padding: 0; margin: 0;">
@@ -3447,7 +2976,7 @@ async function exportarPowerPoint() {
         const token = typeof getAccessToken === 'function' ? getAccessToken() : localStorage.getItem('access_token');
         if (!token) {
             alert('Você precisa estar logado para exportar relatórios.');
-            window.location.href = '/landing';
+            window.location.href = '/login';
             return;
         }
         
@@ -3462,7 +2991,7 @@ async function exportarPowerPoint() {
         if (!response.ok) {
             if (response.status === 401) {
                 alert('Sessão expirada. Por favor, faça login novamente.');
-                window.location.href = '/landing';
+                window.location.href = '/login';
                 return;
             }
             const errorText = await response.text();

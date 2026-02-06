@@ -136,3 +136,5 @@ allow_origins=["https://seudominio.com", "https://www.seudominio.com"]
 
 Todas as melhorias críticas de segurança foram implementadas. O sistema está protegido contra as principais vulnerabilidades OWASP Top 10 e em conformidade com LGPD/GDPR.
 
+
+

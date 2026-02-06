@@ -205,10 +205,7 @@ function refreshClientesUI(selectedId) {
 // ==================== CARREGAMENTO ====================
 async function carregarClientes() {
     try {
-        const token = getAccessToken ? getAccessToken() : localStorage.getItem('access_token');
-        const response = await fetch('/api/clientes', {
-            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
+        const response = await fetch('/api/clientes');
         if (!response.ok) throw new Error('Erro ao carregar clientes');
         
         clientes = await response.json();
@@ -1049,8 +1046,7 @@ async function entrarCliente(event, id) {
     try {
         salvarSelecaoCliente(cliente, branding);
         atualizarSelecaoVisual(cliente.id);
-        // Redireciona para index.html ao invés de '/' para evitar redirecionamento duplo
-        window.location.href = '/index.html';
+        window.location.href = '/';
     } catch (error) {
         console.error('Erro ao selecionar cliente:', error);
         mostrarErro(error.message);

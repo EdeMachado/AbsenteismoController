@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AbsenteismoController - GrupoBiomed</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a237e'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>A</text></svg>">
     
     <!-- Styles -->
     <link rel="stylesheet" href="/static/css/main.css">
@@ -19,11 +18,8 @@
 </head>
 <body>
     <div class="container">
-        <!-- Overlay para mobile -->
-        <div class="sidebar-overlay" onclick="closeSidebar()"></div>
-        
         <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
+        <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo">
                     <i class="fas fa-chart-line"></i> AbsenteismoController
@@ -32,7 +28,7 @@
             </div>
             
             <nav class="sidebar-nav">
-                <a href="/dashboard" class="nav-item" id="navDashboard">
+                <a href="/" class="nav-item" id="navDashboard">
                     <i class="fas fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
@@ -79,11 +75,8 @@
         </aside>
         
         <!-- Main Content -->
-        <main class="main-content" style="display: flex; flex-direction: column; min-height: 100vh;">
+        <main class="main-content">
             <header class="header">
-                <button class="mobile-menu-toggle" onclick="toggleSidebar()" aria-label="Menu">
-                    <i class="fas fa-bars"></i>
-                </button>
                 <h1 class="header-title">Dashboard</h1>
                 <div class="header-actions" style="display: flex; align-items: center; gap: 16px; position: relative;">
                     <button onclick="window.print()" class="btn-print-header" title="Imprimir / Salvar como PDF" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
@@ -279,97 +272,6 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Quantidade de Atestados por Mês</h3>
-                            <p class="chart-subtitle">Total de atestados registrados mensalmente</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 300px;">
-                            <canvas id="chartQuantidadeAtestados"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Gráfico Combinado: Atestados vs Taxa de Absenteísmo -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Atestados vs Taxa de Absenteísmo</h3>
-                            <p class="chart-subtitle">Quantidade (barras) e Taxa % (linha)</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 300px;">
-                            <canvas id="chartAtestadosVsTaxa"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
-                    <!-- Comparativo Ano Anterior -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Comparativo Ano Anterior</h3>
-                            <p class="chart-subtitle">Atual vs Mesmo Período Ano Passado</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 300px;">
-                            <canvas id="chartComparativoAnoAnterior"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Análise de Sazonalidade -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Sazonalidade - Média Histórica</h3>
-                            <p class="chart-subtitle">Média de cada mês ao longo dos anos</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 300px;">
-                            <canvas id="chartSazonalidade"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Variação Mensal</h3>
-                            <p class="chart-subtitle">Diferença mês a mês (dias x horas)</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 300px;">
-                            <canvas id="chartVariacaoMensal"></canvas>
-                        </div>
-                    </div>
-                    
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Distribuição Mensal por Gênero</h3>
-                            <p class="chart-subtitle">Participação mensal de Masculino x Feminino</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 300px;">
-                            <canvas id="chartGeneroMensal"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Heatmap Setores x Meses -->
-                <div class="chart-container" style="margin-bottom: 16px;">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Mapa de Calor: Setores x Meses</h3>
-                        <p class="chart-subtitle">Dias perdidos por setor em cada mês (cores mais fortes = mais críticos)</p>
-                    </div>
-                    <div id="heatmapContainer" style="padding: 20px; max-height: 600px; overflow: auto;">
-                        <!-- Heatmap será renderizado aqui via JavaScript -->
-                    </div>
-                </div>
-                
-                <!-- Top CIDs por Setor -->
-                <div class="chart-container" style="margin-bottom: 16px;">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Top CIDs por Setor</h3>
-                        <p class="chart-subtitle">Principais causas de afastamento em cada setor</p>
-                    </div>
-                    <div class="chart-wrapper" style="height: 400px;">
-                        <canvas id="chartTopCidsSetor"></canvas>
-                    </div>
-                </div>
-                
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
                     <!-- TOP Setores -->
                     <div class="chart-container">
@@ -385,7 +287,7 @@
                     <!-- Distribuição por Gênero -->
                     <div class="chart-container">
                         <div class="chart-header">
-                            <h3 class="chart-title">Funcionários por Gênero</h3>
+                            <h3 class="chart-title">Por Gênero</h3>
                             <p class="chart-subtitle">Masculino vs Feminino</p>
                         </div>
                         <div class="chart-wrapper" style="height: 280px;">
@@ -473,6 +375,19 @@
                         </div>
                         <div class="chart-wrapper" style="height: 350px;">
                             <canvas id="chartComparativoTrimestral"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <!-- Comparativo Ano Anterior -->
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Comparativo Ano Anterior</h3>
+                            <p class="chart-subtitle">Ano atual vs mesmo período do ano anterior</p>
+                        </div>
+                        <div class="chart-wrapper" style="height: 350px;">
+                            <canvas id="chartComparativoAnoAnterior"></canvas>
                         </div>
                     </div>
                 </div>
@@ -736,13 +651,6 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Footer -->
-            <footer style="background: var(--surface); border-top: 1px solid var(--border); padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px; margin-top: auto;">
-                <p style="margin: 0;">
-                    &copy; 2025 GrupoBiomed - Criado por Éde Carlos Viana Machado
-                </p>
-            </footer>
         </main>
     </div>
     
@@ -752,23 +660,19 @@
         // Aguarda cores do cliente carregarem antes de inicializar dashboard
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
-                // Verifica se há cliente selecionado
-                const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
-                
-                // Se não há cliente selecionado, redireciona para página de clientes
-                if (!clientId || clientId <= 0) {
-                    console.log('[DASHBOARD] Nenhum cliente selecionado. Redirecionando para /clientes...');
-                    window.location.href = '/clientes';
-                    return;
-                }
-                
-                // Se há cliente, carrega cores e dashboard
                 if (typeof carregarCoresCliente === 'function') {
-                    carregarCoresCliente(clientId).then(() => {
+                    const clientId = typeof window.getCurrentClientId === 'function' ? window.getCurrentClientId(null) : null;
+                    if (clientId) {
+                        carregarCoresCliente(clientId).then(() => {
+                            if (typeof carregarDashboard === 'function') {
+                                carregarDashboard();
+                            }
+                        });
+                    } else {
                         if (typeof carregarDashboard === 'function') {
                             carregarDashboard();
                         }
-                    });
+                    }
                 } else {
                     if (typeof carregarDashboard === 'function') {
                         carregarDashboard();
@@ -916,59 +820,6 @@
             if (dropdown && headerActions && !headerActions.contains(event.target)) {
                 dropdown.style.display = 'none';
             }
-        });
-        
-        // ==================== MOBILE MENU ====================
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-            
-            if (sidebar && overlay) {
-                sidebar.classList.toggle('open');
-                overlay.classList.toggle('active');
-                
-                // Previne scroll do body quando menu está aberto
-                if (sidebar.classList.contains('open')) {
-                    document.body.style.overflow = 'hidden';
-                } else {
-                    document.body.style.overflow = '';
-                }
-            }
-        }
-        
-        function closeSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-            
-            if (sidebar && overlay) {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        }
-        
-        // Fecha sidebar ao clicar em um link (mobile)
-        document.addEventListener('DOMContentLoaded', function() {
-            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
-            navItems.forEach(item => {
-                item.addEventListener('click', function() {
-                    // Só fecha em mobile (largura < 1024px)
-                    if (window.innerWidth < 1024) {
-                        closeSidebar();
-                    }
-                });
-            });
-            
-            // Fecha sidebar ao redimensionar para desktop
-            let resizeTimer;
-            window.addEventListener('resize', function() {
-                clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(function() {
-                    if (window.innerWidth >= 1024) {
-                        closeSidebar();
-                    }
-                }, 250);
-            });
         });
         
         // Carrega alertas após carregar dashboard

@@ -19,7 +19,7 @@ const DEFAULT_THEME = {
 };
 
 const SIDEBAR_MENU_ITEMS = [
-    { path: '/dashboard', icon: 'fas fa-gauge-high', label: 'Dashboard' },
+    { path: '/', icon: 'fas fa-gauge-high', label: 'Dashboard' },
     { path: '/dados_powerbi', icon: 'fas fa-table', label: 'Meus Dados' },
     { path: '/produtividade', icon: 'fas fa-chart-line', label: 'Produtividade' },
     { path: '/upload', icon: 'fas fa-cloud-arrow-up', label: 'Upload Mensal' },
@@ -31,8 +31,7 @@ const SIDEBAR_MENU_ITEMS = [
 ];
 
 function normalizePath(path) {
-    if (!path) return '/dashboard';
-    if (path === '/') return '/dashboard';
+    if (!path) return '/';
     if (path.length > 1 && path.endsWith('/')) {
         return path.slice(0, -1);
     }
@@ -185,9 +184,7 @@ async function logout() {
     } finally {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
-        localStorage.removeItem('cliente_selecionado');
-        localStorage.removeItem('cliente_nome');
-        window.location.href = '/landing';
+        window.location.href = '/login';
     }
 }
 
@@ -202,7 +199,7 @@ function getAuthHeaders() {
 // Verifica autenticação e redireciona se necessário
 function checkAuth() {
     if (!isAuthenticated()) {
-        window.location.href = '/landing';
+        window.location.href = '/login';
         return false;
     }
     return true;
@@ -259,7 +256,7 @@ function renderHeaderUser() {
     const user = getCurrentUser();
     if (!user) {
         container.innerHTML = `
-            <a href="/landing" class="btn btn-secondary btn-sm header-login-btn">
+            <a href="/login" class="btn btn-secondary btn-sm header-login-btn">
                 <i class="fas fa-sign-in-alt"></i> Entrar
             </a>
         `;
@@ -289,13 +286,12 @@ function getUserInitials(user) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Verifica autenticação ao carregar página (exceto login, landing e raiz)
+// Verifica autenticação ao carregar página (exceto login e landing)
 if (!window.location.pathname.includes('/login') && 
     !window.location.pathname.includes('/landing') &&
-    window.location.pathname !== '/' &&
     !window.location.pathname.includes('/api/')) {
     if (!checkAuth()) {
-        // checkAuth já faz o redirecionamento para /landing quando não autenticado
+        // Redireciona para login
     } else {
         const boot = () => {
             // Tema escuro desabilitado - sempre remove
@@ -410,72 +406,5 @@ if (typeof window !== 'undefined') {
             }, 100);
         }
     };
-}
-
-// Função global para baixar o app desktop
-async function downloadApp() {
-    try {
-        // Obter token
-        const token = getAccessToken();
-        if (!token) {
-            alert('Você precisa estar logado para baixar o app. Redirecionando...');
-            window.location.href = '/landing';
-            return;
-        }
-        
-        // Mostrar loading
-        const loadingMsg = document.createElement('div');
-        loadingMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #1a237e; color: white; padding: 15px 25px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px;';
-        loadingMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Preparando download...</span>';
-        document.body.appendChild(loadingMsg);
-        
-        // Tentar baixar via API primeiro
-        try {
-            const response = await fetch('/api/download/app', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (response.ok) {
-                // Obter blob do arquivo
-                const blob = await response.blob();
-                
-                // Criar link de download
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'AbsenteismoController.exe';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                
-                // Sucesso
-                loadingMsg.innerHTML = '<i class="fas fa-check"></i> <span>Download iniciado!</span>';
-                setTimeout(() => {
-                    if (document.body.contains(loadingMsg)) {
-                        document.body.removeChild(loadingMsg);
-                    }
-                }, 2000);
-                return;
-            }
-        } catch (apiError) {
-            console.log('API não disponível, usando arquivo estático');
-        }
-        
-        // Se API não funcionar, mostrar mensagem
-        document.body.removeChild(loadingMsg);
-        alert('Não foi possível baixar o app.\n\nErro: ' + (apiError?.message || 'Desconhecido') + '\n\nEntre em contato com o administrador.');
-        
-    } catch (error) {
-        console.error('Erro ao baixar app:', error);
-        alert('Erro ao baixar o app: ' + error.message);
-        const loadingMsg = document.querySelector('div[style*="position: fixed"]');
-        if (loadingMsg) {
-            document.body.removeChild(loadingMsg);
-        }
-    }
 }
 

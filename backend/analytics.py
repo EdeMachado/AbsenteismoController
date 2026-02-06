@@ -12,16 +12,20 @@ try:
 except ImportError:
     # Fallback simples se dateutil não estiver disponível
     class relativedelta:
-        def __init__(self, months=0):
+        def __init__(self, months=0, years=0):
             self.months = months
+            self.years = years
         def __rsub__(self, other):
             # Implementação simples para subtração
             if isinstance(other, datetime):
-                year = other.year
+                year = other.year - self.years
                 month = other.month - self.months
                 while month <= 0:
                     month += 12
                     year -= 1
+                while month > 12:
+                    month -= 12
+                    year += 1
                 return datetime(year, month, other.day, other.hour, other.minute, other.second)
             return other
 
@@ -93,15 +97,19 @@ class Analytics:
         }
     
     def top_cids(self, client_id: int, limit: int = 5, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
-        """TOP CIDs mais frequentes"""
+        """
+        TOP Doenças mais frequentes
+        CORREÇÃO: Agrupa por NOME/DESCRIÇÃO da doença, não por CID
+        Isso evita duplicatas quando a mesma doença tem vários CIDs diferentes
+        """
         cids_genericos = ['Z00.0', 'Z00.1', 'Z52.0', 'Z76.0', 'Z76.1']
         
+        # Busca todos os atestados (sem agrupar ainda)
         query = self.db.query(
             Atestado.cid,
             Atestado.diagnostico,
             Atestado.descricao_cid,
-            func.count(Atestado.id).label('quantidade'),
-            func.sum(Atestado.dias_atestados).label('dias_perdidos')
+            Atestado.dias_atestados
         ).join(Upload).filter(
             Upload.client_id == client_id,
             Atestado.cid != '',
@@ -113,16 +121,16 @@ class Analytics:
             query = query.filter(Upload.mes_referencia >= mes_inicio)
         if mes_fim:
             query = query.filter(Upload.mes_referencia <= mes_fim)
+        
         # Aplica filtros usando helper
         from .analytics_helper import aplicar_filtro_funcionario, aplicar_filtro_setor
         query = aplicar_filtro_funcionario(query, funcionario)
         query = aplicar_filtro_setor(query, setor)
         
-        query = query.group_by(Atestado.cid, Atestado.diagnostico, Atestado.descricao_cid).order_by(func.count(Atestado.id).desc()).limit(limit)
-        
+        # Busca todos os resultados
         results = query.all()
         
-        # CORREÇÃO: Se diagnóstico é genérico ou vazio, mostra apenas o código do CID
+        # Lista de diagnósticos genéricos (para ignorar)
         diagnosticos_genericos = [
             'diagnóstico não especificado', 'não especificado', 'nao especificado',
             'sem diagnóstico', 'sem diagnostico', 's/ diagnóstico', 's/ diagnostico',
@@ -130,26 +138,77 @@ class Analytics:
             'diagnóstico não encontrado', '', None
         ]
         
-        resultado_final = []
+        # Agrupa por NOME/DESCRIÇÃO da doença (não por CID)
+        doencas_agrupadas = {}
+        
         for r in results:
-            # Normaliza diagnóstico
-            diag = (r.diagnostico or '').strip()
-            diag_lower = diag.lower()
+            # Determina o nome da doença (prioridade: diagnostico > descricao_cid > cid)
+            nome_doenca = None
             
-            # Se diagnóstico é genérico/vazio, usa apenas o código CID
-            if diag_lower in diagnosticos_genericos or not diag:
-                descricao = r.cid  # Apenas o código (ex: "A09")
+            # Tenta usar diagnostico primeiro
+            if r.diagnostico:
+                diag = r.diagnostico.strip()
+                diag_lower = diag.lower()
+                if diag and diag_lower not in diagnosticos_genericos:
+                    nome_doenca = diag
+            
+            # Se não tem diagnostico válido, tenta descricao_cid
+            if not nome_doenca and r.descricao_cid:
+                desc = r.descricao_cid.strip()
+                desc_lower = desc.lower()
+                if desc and desc_lower not in diagnosticos_genericos:
+                    nome_doenca = desc
+            
+            # Se ainda não tem, usa o CID como fallback
+            if not nome_doenca:
+                nome_doenca = r.cid or 'N/A'
+            
+            # Normaliza o nome (remove espaços extras, uppercase)
+            nome_doenca = nome_doenca.strip().upper()
+            
+            # Agrupa por nome da doença
+            if nome_doenca not in doencas_agrupadas:
+                doencas_agrupadas[nome_doenca] = {
+                    'descricao': nome_doenca,  # Nome normalizado
+                    'cid': r.cid,  # Primeiro CID encontrado (para referência)
+                    'cids': set(),  # Lista de todos os CIDs desta doença
+                    'quantidade': 0,
+                    'dias_perdidos': 0.0
+                }
+            
+            # Soma quantidade e dias
+            doencas_agrupadas[nome_doenca]['quantidade'] += 1
+            doencas_agrupadas[nome_doenca]['dias_perdidos'] += float(r.dias_atestados or 0)
+            
+            # Adiciona CID à lista (se diferente)
+            if r.cid and r.cid not in doencas_agrupadas[nome_doenca]['cids']:
+                doencas_agrupadas[nome_doenca]['cids'].add(r.cid)
+        
+        # Converte para lista e ordena por quantidade
+        resultado_final = []
+        for nome, dados in doencas_agrupadas.items():
+            # Converte set de CIDs para lista ordenada
+            cids_lista = sorted(list(dados['cids']))
+            cid_principal = dados['cid']
+            
+            # Se tem vários CIDs, mostra o principal + quantidade
+            if len(cids_lista) > 1:
+                cid_display = f"{cid_principal} (+{len(cids_lista)-1} outros)"
             else:
-                # Usa diagnóstico da planilha
-                descricao = diag
+                cid_display = cid_principal
             
             resultado_final.append({
-                'cid': r.cid,
-                'descricao': descricao,
-                'diagnostico': descricao,  # Alias para compatibilidade
-                'quantidade': r.quantidade,
-                'dias_perdidos': round(r.dias_perdidos or 0, 2)
+                'cid': cid_display,  # CID principal ou "CID +X outros"
+                'descricao': dados['descricao'],  # Nome da doença
+                'diagnostico': dados['descricao'],  # Alias para compatibilidade
+                'quantidade': dados['quantidade'],
+                'dias_perdidos': round(dados['dias_perdidos'], 2),
+                'cids_relacionados': cids_lista  # Lista completa de CIDs (para referência)
             })
+        
+        # Ordena por quantidade (maior primeiro) e limita
+        resultado_final.sort(key=lambda x: x['quantidade'], reverse=True)
+        resultado_final = resultado_final[:limit]
         
         return resultado_final
     
@@ -1091,8 +1150,11 @@ class Analytics:
             
             # Fallback: se não encontrou em dados_originais, tenta campos do banco
             if not nome_doenca:
-                # Tenta campos do banco como fallback
-                atestado_completo = self.db.query(Atestado).filter(Atestado.dados_originais == r.dados_originais).first()
+                # Tenta campos do banco como fallback (GARANTE ISOLAMENTO: filtra por client_id)
+                atestado_completo = self.db.query(Atestado).join(Upload).filter(
+                    Atestado.dados_originais == r.dados_originais,
+                    Upload.client_id == client_id
+                ).first()
                 if atestado_completo:
                     if atestado_completo.descricao_cid and str(atestado_completo.descricao_cid).strip():
                         nome_doenca = str(atestado_completo.descricao_cid).strip()
@@ -1772,22 +1834,48 @@ class Analytics:
     def comparativo_periodos(self, client_id: int, tipo_comparacao: str = 'mes', funcionario: str = None, setor: str = None) -> Dict[str, Any]:
         """
         Comparativo entre períodos (mês atual vs anterior, trimestre atual vs anterior)
+        CORREÇÃO: Usa o último mês COM DADOS como "atual", não o mês do calendário
         tipo_comparacao: 'mes' ou 'trimestre'
         """
         hoje = datetime.now()
         
         if tipo_comparacao == 'mes':
-            # Mês atual
-            mes_atual = hoje.strftime('%Y-%m')
-            # Mês anterior
-            mes_anterior_date = hoje - relativedelta(months=1)
-            mes_anterior = mes_anterior_date.strftime('%Y-%m')
+            # CORREÇÃO: Busca o último mês que tem dados (não o mês do calendário)
+            # Isso evita comparar com mês futuro que ainda não aconteceu
+            query_uploads = self.db.query(
+                Upload.mes_referencia,
+                func.count(Atestado.id).label('total')
+            ).join(Atestado).filter(
+                Upload.client_id == client_id
+            ).group_by(Upload.mes_referencia).order_by(Upload.mes_referencia.desc()).limit(2).all()
             
-            # Calcula métricas do mês atual
+            # Se não há dados, usa mês atual e anterior do calendário
+            if not query_uploads or len(query_uploads) == 0:
+                mes_atual = hoje.strftime('%Y-%m')
+                mes_anterior_date = hoje - relativedelta(months=1)
+                mes_anterior = mes_anterior_date.strftime('%Y-%m')
+            else:
+                # Usa o último mês com dados como "atual"
+                mes_atual = query_uploads[0].mes_referencia
+                
+                # Mês anterior é o segundo mais recente, ou calcula se só tem 1 mês
+                if len(query_uploads) >= 2:
+                    mes_anterior = query_uploads[1].mes_referencia
+                else:
+                    # Se só tem 1 mês de dados, calcula o mês anterior
+                    mes_atual_date = datetime.strptime(mes_atual + '-01', '%Y-%m-%d')
+                    mes_anterior_date = mes_atual_date - relativedelta(months=1)
+                    mes_anterior = mes_anterior_date.strftime('%Y-%m')
+            
+            # Calcula métricas do mês atual (último com dados)
             metricas_atual = self.metricas_gerais(client_id, mes_inicio=mes_atual, mes_fim=mes_atual, funcionario=funcionario, setor=setor)
             
             # Calcula métricas do mês anterior
             metricas_anterior = self.metricas_gerais(client_id, mes_inicio=mes_anterior, mes_fim=mes_anterior, funcionario=funcionario, setor=setor)
+            
+            # Formata labels
+            mes_atual_date = datetime.strptime(mes_atual + '-01', '%Y-%m-%d')
+            mes_anterior_date = datetime.strptime(mes_anterior + '-01', '%Y-%m-%d')
             
             # Calcula variação percentual
             def calcular_variacao(atual, anterior):
@@ -1799,18 +1887,29 @@ class Analytics:
             variacao_horas = calcular_variacao(metricas_atual.get('total_horas', 0), metricas_anterior.get('total_horas', 0))
             variacao_registros = calcular_variacao(metricas_atual.get('total_registros', 0), metricas_anterior.get('total_registros', 0))
             
+            # Traduz nomes dos meses para português
+            meses_pt = {
+                'January': 'Janeiro', 'February': 'Fevereiro', 'March': 'Março',
+                'April': 'Abril', 'May': 'Maio', 'June': 'Junho',
+                'July': 'Julho', 'August': 'Agosto', 'September': 'Setembro',
+                'October': 'Outubro', 'November': 'Novembro', 'December': 'Dezembro'
+            }
+            
+            mes_atual_nome = meses_pt.get(mes_atual_date.strftime('%B'), mes_atual_date.strftime('%B'))
+            mes_anterior_nome = meses_pt.get(mes_anterior_date.strftime('%B'), mes_anterior_date.strftime('%B'))
+            
             return {
                 'tipo': 'mes',
                 'periodo_atual': {
                     'mes': mes_atual,
-                    'label': hoje.strftime('%B/%Y'),
+                    'label': f"{mes_atual_nome}/{mes_atual_date.strftime('%Y')}",
                     'dias_perdidos': round(metricas_atual.get('total_dias', 0), 2),
                     'horas_perdidas': round(metricas_atual.get('total_horas', 0), 2),
                     'total_registros': metricas_atual.get('total_registros', 0)
                 },
                 'periodo_anterior': {
                     'mes': mes_anterior,
-                    'label': mes_anterior_date.strftime('%B/%Y'),
+                    'label': f"{mes_anterior_nome}/{mes_anterior_date.strftime('%Y')}",
                     'dias_perdidos': round(metricas_anterior.get('total_dias', 0), 2),
                     'horas_perdidas': round(metricas_anterior.get('total_horas', 0), 2),
                     'total_registros': metricas_anterior.get('total_registros', 0)
@@ -2050,16 +2149,42 @@ class Analytics:
     def comparativo_ano_anterior(self, client_id: int, mes_inicio: str = None, mes_fim: str = None, funcionario: str = None, setor: str = None) -> List[Dict[str, Any]]:
         """
         Compara período atual com mesmo período do ano anterior
+        CORREÇÃO: Usa o último ano COM DADOS como referência, não o ano do calendário
         Retorna dados mês a mês com valores atuais e do ano anterior
         """
+        # CORREÇÃO: Busca o último mês com dados para determinar o período
+        query_uploads = self.db.query(
+            Upload.mes_referencia
+        ).filter(
+            Upload.client_id == client_id
+        ).order_by(Upload.mes_referencia.desc()).limit(1).first()
+        
+        if not query_uploads:
+            # Se não há dados, retorna lista vazia
+            return []
+        
+        # Usa o último mês com dados como referência
+        ultimo_mes_com_dados = query_uploads.mes_referencia
+        ultimo_mes_date = datetime.strptime(ultimo_mes_com_dados + '-01', '%Y-%m-%d')
+        
         if not mes_inicio or not mes_fim:
-            # Se não fornecidos, usa últimos 12 meses
-            hoje = datetime.now()
-            mes_fim = hoje.strftime('%Y-%m')
-            mes_inicio = (hoje - relativedelta(months=11)).strftime('%Y-%m')
+            # Se não fornecidos, usa últimos 12 meses a partir do último mês com dados
+            mes_fim = ultimo_mes_com_dados
+            mes_inicio_date = ultimo_mes_date - relativedelta(months=11)
+            mes_inicio = mes_inicio_date.strftime('%Y-%m')
+        else:
+            # Garante que não usa mês futuro
+            mes_fim_date = datetime.strptime(mes_fim + '-01', '%Y-%m-%d')
+            if mes_fim_date > ultimo_mes_date:
+                mes_fim = ultimo_mes_com_dados
+                mes_fim_date = ultimo_mes_date
         
         # Busca dados do período atual
         evolucao_atual = self.evolucao_mensal(client_id, mes_inicio, mes_fim, funcionario, setor)
+        
+        if not evolucao_atual or len(evolucao_atual) == 0:
+            # Se não há dados no período atual, retorna vazio
+            return []
         
         # Calcula período do ano anterior
         inicio_date = datetime.strptime(mes_inicio + '-01', '%Y-%m-%d')

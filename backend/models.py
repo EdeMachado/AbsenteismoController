@@ -294,3 +294,35 @@ class AlertRule(Base):
     
     # Relationships
     client = relationship("Client")
+
+class ColaboradorINSS(Base):
+    """Colaboradores em acompanhamento INSS - Afastados, Retornando e Aposentados por Invalidez"""
+    __tablename__ = "colaboradores_inss"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    
+    # Campos da planilha INSS
+    cont = Column(String(50), nullable=True)  # CONT
+    re = Column(String(50), nullable=True)  # RE
+    nome = Column(String(200), nullable=True)  # NOME
+    id_colaborador = Column(String(50), nullable=True)  # ID
+    setor = Column(String(100), nullable=True)  # SETOR
+    funcao = Column(String(100), nullable=True)  # FUNÇÃO
+    data_de_afast = Column(Date, nullable=True)  # DATA DE AFAST.
+    acid_trab = Column(String(50), nullable=True)  # ACID. TRAB.
+    cid10 = Column(String(20), nullable=True)  # CID10
+    inicio_do_inss = Column(Date, nullable=True)  # INÍCIO DO INSS
+    fim_do_beneficio = Column(Date, nullable=True)  # FIM DO BENÉFICIO
+    motivo = Column(String(200), nullable=True)  # MOTIVO
+    parecer_medico = Column(Text, nullable=True)  # PARECER MÉDICO
+    
+    # Dados originais da planilha (JSON com todas as colunas)
+    dados_originais = Column(Text, nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    client = relationship("Client")

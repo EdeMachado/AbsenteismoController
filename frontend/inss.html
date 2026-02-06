@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Módulo INSS - AbsenteismoController</title>
+    
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--background, #f8f9fa);
+        }
+        
+        .inss-container {
+            min-height: 100vh;
+            padding: 24px 32px;
+            background: var(--background, #f5f7fa);
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        
+        .stat-card-title {
+            font-size: 13px;
+            color: #7f8c8d;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        .stat-card-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        
+        .stat-card.afastados { border-left: 4px solid #e74c3c; }
+        .stat-card.retornando { border-left: 4px solid #f39c12; }
+        .stat-card.aposentados { border-left: 4px solid #3498db; }
+        .stat-card.total { border-left: 4px solid #2ecc71; }
+        
+        .toolbar {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        
+        .table-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead th {
+            background: #f8f9fa;
+            padding: 14px 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        tbody td {
+            padding: 12px;
+            font-size: 13px;
+            color: #495057;
+        }
+        
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .action-btn.delete {
+            background: #fee;
+            color: #c00;
+        }
+        
+        .action-btn.delete:hover {
+            background: #fcc;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #7f8c8d;
+        }
+        
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        
+        .upload-status {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        .upload-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        
+        .loading i {
+            font-size: 32px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .inss-container {
+                padding: 12px 16px;
+            }
+            
+            .page-title {
+                font-size: 22px;
+            }
+            
+            .stats-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .toolbar {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .table-container {
+                overflow-x: auto;
+            }
+            
+            table {
+                min-width: 1200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="menu-container"></div>
+    
+    <div class="inss-container">
+        <div class="page-header">
+            <h1 class="page-title">
+                <i class="fas fa-user-injured"></i> Módulo INSS
+            </h1>
+        </div>
+        
+        <!-- Cards de Estatísticas -->
+        <div class="stats-cards">
+            <div class="stat-card total">
+                <div class="stat-card-title">Total</div>
+                <div class="stat-card-value" id="statTotal">0</div>
+            </div>
+            <div class="stat-card afastados">
+                <div class="stat-card-title">Afastados</div>
+                <div class="stat-card-value" id="statAfastados">0</div>
+            </div>
+            <div class="stat-card retornando">
+                <div class="stat-card-title">Retornando</div>
+                <div class="stat-card-value" id="statRetornando">0</div>
+            </div>
+            <div class="stat-card aposentados">
+                <div class="stat-card-title">Aposentados</div>
+                <div class="stat-card-value" id="statAposentados">0</div>
+            </div>
+        </div>
+        
+        <!-- Status de Upload -->
+        <div id="uploadStatus" class="upload-status"></div>
+        
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <label class="btn btn-primary" for="fileInput">
+                <i class="fas fa-upload"></i>
+                Upload Planilha INSS
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+            </label>
+            
+            <button class="btn btn-danger" onclick="deletarTodosDados()">
+                <i class="fas fa-trash-alt"></i>
+                Deletar Todos os Dados
+            </button>
+        </div>
+        
+        <!-- Tabela de Dados -->
+        <div class="table-container">
+            <div class="table-header">
+                <i class="fas fa-table"></i> Colaboradores INSS
+            </div>
+            <div id="loadingContainer" class="loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Carregando dados...</p>
+            </div>
+            <div id="tableContainer" style="display: none;">
+                <table id="tableINSS">
+                    <thead>
+                        <tr>
+                            <th>CONT</th>
+                            <th>RE</th>
+                            <th>Nome</th>
+                            <th>ID</th>
+                            <th>Setor</th>
+                            <th>Função</th>
+                            <th>Data Afastamento</th>
+                            <th>Acid. Trab.</th>
+                            <th>CID10</th>
+                            <th>Início INSS</th>
+                            <th>Fim Benefício</th>
+                            <th>Motivo</th>
+                            <th>Parecer Médico</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Preenchido via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/auth.js?v=4"></script>
+    <script src="/static/js/menu.js?v=4"></script>
+    <script src="/static/js/inss.js?v=4"></script>
+</body>
+</html>
+

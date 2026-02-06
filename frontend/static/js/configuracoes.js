@@ -4,7 +4,6 @@
 
 let configData = {};
 let usersData = [];
-let clientesData = [];
 
 // Carrega configurações
 async function carregarConfiguracoes() {
@@ -12,7 +11,7 @@ async function carregarConfiguracoes() {
         const response = await fetch('/api/config');
         if (!response.ok) {
             if (response.status === 401) {
-                window.location.href = '/landing';
+                window.location.href = '/login';
                 return;
             }
             throw new Error('Erro ao carregar configurações');
@@ -195,7 +194,7 @@ function renderizarUsuarios() {
     if (!tbody) return;
     
     if (usersData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum usuário encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nenhum usuário encontrado</td></tr>';
         return;
     }
     
@@ -204,7 +203,6 @@ function renderizarUsuarios() {
             <td>${user.username}</td>
             <td>${user.email}</td>
             <td>${user.nome_completo || '-'}</td>
-            <td>${user.client_nome || '-'}</td>
             <td>
                 <span class="badge ${user.is_admin ? 'badge-primary' : 'badge-secondary'}">
                     ${user.is_admin ? 'Sim' : 'Não'}
@@ -219,40 +217,9 @@ function renderizarUsuarios() {
                 <button class="btn btn-sm btn-secondary" onclick="editarUsuario(${user.id})" title="Editar">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-danger" onclick="excluirUsuario(${user.id})" title="Excluir" style="margin-left: 5px;">
-                    <i class="fas fa-trash"></i>
-                </button>
             </td>
         </tr>
     `).join('');
-}
-
-// Carrega lista de clientes
-async function carregarClientes() {
-    try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('/api/clientes', {
-            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
-        if (!response.ok) throw new Error('Erro ao carregar empresas');
-        
-        clientesData = await response.json();
-        preencherSelectsClientes();
-    } catch (error) {
-        console.error('Erro ao carregar empresas:', error);
-    }
-}
-
-// Preenche os selects de empresa
-function preencherSelectsClientes() {
-    const novoSelect = document.getElementById('novo_client_id');
-    const editarSelect = document.getElementById('editar_client_id');
-    
-    const options = '<option value="">Nenhuma (Acesso a todas)</option>' +
-        clientesData.map(c => `<option value="${c.id}">${c.nome_fantasia || c.nome}</option>`).join('');
-    
-    if (novoSelect) novoSelect.innerHTML = options;
-    if (editarSelect) editarSelect.innerHTML = options;
 }
 
 // Mostra modal de novo usuário
@@ -263,7 +230,6 @@ function mostrarModalNovoUsuario() {
     document.getElementById('novo_email').value = '';
     document.getElementById('novo_password').value = '';
     document.getElementById('novo_nome_completo').value = '';
-    document.getElementById('novo_client_id').value = '';
     document.getElementById('novo_is_admin').checked = false;
 }
 
@@ -281,11 +247,6 @@ async function criarUsuario() {
         formData.append('password', document.getElementById('novo_password').value);
         formData.append('nome_completo', document.getElementById('novo_nome_completo').value);
         formData.append('is_admin', document.getElementById('novo_is_admin').checked.toString());
-        
-        const clientId = document.getElementById('novo_client_id').value;
-        if (clientId) {
-            formData.append('client_id', clientId);
-        }
         
         const response = await fetch('/api/users', {
             method: 'POST',
@@ -310,111 +271,9 @@ async function criarUsuario() {
 // Editar usuário
 function editarUsuario(userId) {
     const user = usersData.find(u => u.id === userId);
-    if (!user) {
-        mostrarAlert('Usuário não encontrado', 'error');
-        return;
-    }
+    if (!user) return;
     
-    // Preenche o modal com os dados do usuário
-    document.getElementById('editar_user_id').value = user.id;
-    document.getElementById('editar_username').value = user.username;
-    document.getElementById('editar_email').value = user.email;
-    document.getElementById('editar_password').value = '';
-    document.getElementById('editar_nome_completo').value = user.nome_completo || '';
-    document.getElementById('editar_client_id').value = user.client_id || '';
-    document.getElementById('editar_is_admin').checked = user.is_admin || false;
-    document.getElementById('editar_is_active').checked = user.is_active !== false;
-    
-    // Mostra o modal
-    document.getElementById('modalEditarUsuario').style.display = 'flex';
-}
-
-// Fecha modal de edição
-function fecharModalEditarUsuario() {
-    document.getElementById('modalEditarUsuario').style.display = 'none';
-}
-
-// Salva edição do usuário
-async function salvarEdicaoUsuario() {
-    try {
-        const userId = document.getElementById('editar_user_id').value;
-        if (!userId) {
-            mostrarAlert('ID do usuário não encontrado', 'error');
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('username', document.getElementById('editar_username').value);
-        formData.append('email', document.getElementById('editar_email').value);
-        
-        const password = document.getElementById('editar_password').value;
-        if (password && password.trim()) {
-            formData.append('password', password);
-        }
-        
-        formData.append('nome_completo', document.getElementById('editar_nome_completo').value);
-        formData.append('is_admin', document.getElementById('editar_is_admin').checked.toString());
-        formData.append('is_active', document.getElementById('editar_is_active').checked.toString());
-        
-        const clientId = document.getElementById('editar_client_id').value;
-        if (clientId) {
-            formData.append('client_id', clientId);
-        } else {
-            formData.append('client_id', ''); // Permite remover associação
-        }
-        
-        const response = await fetch(`/api/users/${userId}`, {
-            method: 'PUT',
-            body: formData
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Erro ao atualizar usuário');
-        }
-        
-        mostrarAlert('Usuário atualizado com sucesso!', 'success');
-        fecharModalEditarUsuario();
-        carregarUsuarios();
-        
-    } catch (error) {
-        console.error('Erro:', error);
-        mostrarAlert(error.message || 'Erro ao atualizar usuário', 'error');
-    }
-}
-
-// Excluir usuário
-async function excluirUsuario(userId) {
-    if (!confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.')) {
-        return;
-    }
-    
-    try {
-        // Tenta DELETE primeiro, se falhar usa POST
-        let response = await fetch(`/api/users/${userId}`, {
-            method: 'DELETE'
-        });
-        
-        // Se DELETE retornar 405, tenta POST como alternativa
-        if (response.status === 405) {
-            console.log('DELETE bloqueado, tentando POST...');
-            response = await fetch(`/api/users/${userId}/delete`, {
-                method: 'POST'
-            });
-        }
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Erro ao excluir usuário');
-        }
-        
-        mostrarAlert('Usuário excluído com sucesso!', 'success');
-        carregarUsuarios();
-        
-    } catch (error) {
-        console.error('Erro:', error);
-        mostrarAlert(error.message || 'Erro ao excluir usuário', 'error');
-    }
+    mostrarAlert('Funcionalidade de edição em desenvolvimento', 'info');
 }
 
 // Mostra alerta
@@ -438,9 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Carrega configurações sempre
     carregarConfiguracoes();
-    
-    // Carrega lista de empresas
-    carregarClientes();
     
     // Aguarda auth.js carregar e verifica se é admin
     setTimeout(() => {

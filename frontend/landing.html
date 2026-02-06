@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AbsenteismoController - Controle de Absenteísmo e Redução de Custos</title>
+    <title>AbsenteismoController - Gestão de Absenteísmo</title>
     <link rel="stylesheet" href="/static/css/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -13,659 +13,292 @@
             box-sizing: border-box;
         }
         
-        html, body {
-            height: 100%;
-        }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #5c6bc0 100%);
             color: #333;
             min-height: 100vh;
-            overflow: hidden; /* impede a página inteira de rolar */
         }
         
         .landing-container {
             min-height: 100vh;
-            height: 100vh;
-            display: flex;
-            overflow: hidden; /* controla o scroll apenas dentro das colunas */
-        }
-        
-        /* Lado Esquerdo - Login */
-        .login-section {
-            width: 450px;
-            background: rgba(255, 255, 255, 0.98);
-            padding: 60px 40px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
-            z-index: 10;
-            position: sticky;
-            top: 0;
-            align-self: flex-start;
-            height: 100vh; /* fixa o login em toda a altura da tela */
         }
         
-        .login-header {
-            text-align: center;
-            margin-bottom: 40px;
+        /* Header */
+        .landing-header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
-        .login-logo {
-            font-size: 48px;
-            color: #1a237e;
-            margin-bottom: 16px;
-        }
-        
-        .login-header h2 {
-            font-size: 28px;
-            color: #1a237e;
-            margin-bottom: 8px;
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
             font-weight: 700;
+            color: #1a237e;
         }
         
-        .login-header p {
-            color: #666;
-            font-size: 14px;
+        .logo i {
+            font-size: 32px;
         }
         
-        .login-form {
-            margin-top: 30px;
+        .header-actions {
+            display: flex;
+            gap: 16px;
         }
         
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        .input-icon {
-            position: relative;
-        }
-        
-        .input-icon i {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #999;
-            z-index: 1;
-        }
-        
-        .input-icon input {
-            width: 100%;
-            padding: 14px 16px 14px 45px;
-            border: 2px solid #e0e0e0;
+        .btn-landing {
+            padding: 12px 24px;
             border-radius: 8px;
-            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
             transition: all 0.3s;
-        }
-        
-        .input-icon.password-input {
-            position: relative;
-        }
-        
-        .input-icon.password-input input {
-            padding-right: 45px;
-        }
-        
-        .password-toggle {
-            position: absolute;
-            right: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: transparent;
             border: none;
-            color: #999;
             cursor: pointer;
-            padding: 8px;
-            font-size: 18px;
-            transition: color 0.3s;
-            z-index: 100;
+            font-size: 16px;
+        }
+        
+        .btn-primary-landing {
+            background: #1a237e;
+            color: white;
+        }
+        
+        .btn-primary-landing:hover {
+            background: #283593;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
+        }
+        
+        .btn-secondary-landing {
+            background: white;
+            color: #1a237e;
+            border: 2px solid #1a237e;
+        }
+        
+        .btn-secondary-landing:hover {
+            background: #f5f5f5;
+        }
+        
+        /* Hero Section */
+        .hero {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-        }
-        
-        .password-toggle:hover {
-            color: #1a237e;
-            background: rgba(26, 35, 126, 0.05);
-        }
-        
-        .password-toggle:focus {
-            outline: 2px solid #1a237e;
-            outline-offset: 2px;
-        }
-        
-        .password-toggle i {
-            pointer-events: none;
-        }
-        
-        .input-icon input:focus {
-            outline: none;
-            border-color: #1a237e;
-            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
-        }
-        
-        .btn-login {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #1a237e, #283593);
+            padding: 60px 40px;
+            text-align: center;
             color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 10px;
         }
         
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(26, 35, 126, 0.4);
+        .hero-content {
+            max-width: 900px;
         }
         
-        .btn-login:active {
-            transform: translateY(0);
-        }
-        
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            display: none;
-        }
-        
-        .error-message.show {
-            display: block;
-        }
-        
-        /* Lado Direito - Conteúdo */
-        .content-section {
-            flex: 1;
-            padding: 80px 60px;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            position: relative;
-            height: 100vh;
-            overflow-y: auto; /* apenas o conteúdo rola */
-        }
-        
-        .content-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(26, 35, 126, 0.1);
-            z-index: 0;
-        }
-        
-        .content-wrapper {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-        }
-        
-        .hero-title {
+        .hero h1 {
             font-size: 56px;
             font-weight: 800;
             margin-bottom: 24px;
             line-height: 1.2;
-            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         }
         
-        .hero-subtitle {
-            font-size: 24px;
+        .hero p {
+            font-size: 22px;
             margin-bottom: 40px;
             line-height: 1.6;
             opacity: 0.95;
-            font-weight: 300;
         }
         
-        .stats-grid {
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        /* Features */
+        .features {
+            background: white;
+            padding: 80px 40px;
+        }
+        
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 42px;
+            color: #1a237e;
+            margin-bottom: 60px;
+        }
+        
+        .features-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 30px;
-            margin: 50px 0;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
         }
         
-        .stat-card {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            padding: 30px;
+        .feature-card {
+            background: #f8f9fa;
+            padding: 40px;
             border-radius: 12px;
             text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
         }
         
-        .stat-number {
-            font-size: 42px;
-            font-weight: 800;
-            margin-bottom: 8px;
-            color: #ffd700;
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
         }
         
-        .stat-label {
-            font-size: 16px;
-            opacity: 0.9;
-        }
-        
-        .benefits-section {
-            margin-top: 30px;
-        }
-        
-        .benefits-title {
-            font-size: 30px;
-            font-weight: 700;
+        .feature-icon {
+            font-size: 48px;
+            color: #1a237e;
             margin-bottom: 20px;
         }
-
-        /* motivos lado a lado */
-        .benefits-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px;
+        
+        .feature-card h3 {
+            font-size: 24px;
+            color: #1a237e;
+            margin-bottom: 16px;
         }
         
-        .benefit-item {
-            display: flex;
-            align-items: flex-start;
-            padding: 18px;
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 10px;
-            backdrop-filter: blur(5px);
-        }
-        
-        .benefit-icon {
-            font-size: 32px;
-            color: #ffd700;
-            margin-right: 20px;
-            flex-shrink: 0;
-        }
-        
-        .benefit-content h3 {
-            font-size: 20px;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        
-        .benefit-content p {
-            font-size: 16px;
+        .feature-card p {
+            color: #666;
             line-height: 1.6;
+        }
+        
+        /* Footer */
+        .landing-footer {
+            background: #1a237e;
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .landing-footer p {
             opacity: 0.9;
-        }
-        
-        .cost-reduction {
-            background: rgba(255, 215, 0, 0.2);
-            border-left: 4px solid #ffd700;
-            padding: 22px;
-            border-radius: 10px;
-            margin-top: 30px;
-        }
-        
-        .cost-reduction h3 {
-            font-size: 22px;
-            margin-bottom: 12px;
-            color: #ffd700;
-        }
-        
-        .cost-reduction ul {
-            list-style: none;
-            padding-left: 0;
-        }
-        
-        .cost-reduction li {
-            padding: 8px 0;
-            padding-left: 26px;
-            position: relative;
-            font-size: 15px;
-            line-height: 1.5;
-        }
-        
-        .cost-reduction li::before {
-            content: '✓';
-            position: absolute;
-            left: 0;
-            color: #ffd700;
-            font-weight: bold;
-            font-size: 20px;
-        }
-        
-        /* Responsivo */
-        @media (max-width: 1024px) {
-            .landing-container {
-                flex-direction: column;
-            }
-            
-            .login-section {
-                width: 100%;
-                padding: 40px 30px;
-            }
-            
-            .content-section {
-                padding: 40px 30px;
-            }
-            
-            .hero-title {
-                font-size: 36px;
-            }
-            
-            .hero-subtitle {
-                font-size: 20px;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
         }
         
         @media (max-width: 768px) {
-            .hero-title {
-                font-size: 28px;
+            .hero h1 {
+                font-size: 36px;
             }
             
-            .benefits-title {
-                font-size: 28px;
+            .hero p {
+                font-size: 18px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
     <div class="landing-container">
-        <!-- Lado Esquerdo - Login -->
-        <div class="login-section">
-            <div class="login-header">
-                <div class="login-logo">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-                <h2>AbsenteismoController</h2>
-                <p>Gestão Inteligente de Absenteísmo</p>
+        <!-- Header -->
+        <header class="landing-header">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                <span>AbsenteismoController</span>
             </div>
-            
-            <div class="error-message" id="errorMessage"></div>
-            
-            <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label for="username">Usuário</label>
-                    <div class="input-icon">
-                        <i class="fas fa-user"></i>
-                        <input 
-                            type="text" 
-                            id="username" 
-                            name="username" 
-                            placeholder="Digite seu usuário"
-                            required
-                            autocomplete="username"
-                        >
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Senha</label>
-                    <div class="input-icon password-input">
-                        <i class="fas fa-lock"></i>
-                        <input 
-                            type="password" 
-                            id="password" 
-                            name="password" 
-                            placeholder="Digite sua senha"
-                            required
-                            autocomplete="current-password"
-                        >
-                        <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar senha">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <button type="submit" class="btn-login" id="loginButton">
+            <div class="header-actions">
+                <a href="/login" class="btn-landing btn-secondary-landing">
                     <i class="fas fa-sign-in-alt"></i> Entrar
-                </button>
-            </form>
-        </div>
+                </a>
+                <a href="/login" class="btn-landing btn-primary-landing">
+                    <i class="fas fa-rocket"></i> Começar Agora
+                </a>
+            </div>
+        </header>
         
-        <!-- Lado Direito - Conteúdo -->
-        <div class="content-section">
-            <div class="content-wrapper">
-                <h1 class="hero-title">
-                    Controle de Absenteísmo:<br>
-                    Reduza Custos, Aumente Produtividade
-                </h1>
-                
-                <p class="hero-subtitle">
-                    O absenteísmo custa milhões às empresas todos os anos. 
-                    Com o AbsenteismoController, transforme dados em ações estratégicas 
-                    e reduza custos operacionais significativamente.
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Gestão Inteligente de Absenteísmo</h1>
+                <p>
+                    Sistema completo para análise, controle e gestão de absenteísmo empresarial. 
+                    Transforme dados em insights acionáveis para melhorar a saúde ocupacional da sua empresa.
                 </p>
-                
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-number">30%</div>
-                        <div class="stat-label">Redução Média de Custos</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">R$ 2M+</div>
-                        <div class="stat-label">Economizados por Empresa/Ano</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number">85%</div>
-                        <div class="stat-label">Melhoria na Produtividade</div>
-                    </div>
-                </div>
-                
-                <div class="benefits-section">
-                    <h2 class="benefits-title">Por que controlar o absenteísmo?</h2>
-                    
-                    <div class="benefits-grid">
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="fas fa-dollar-sign"></i>
-                            </div>
-                            <div class="benefit-content">
-                                <h3>Redução de custos</h3>
-                                <p>
-                                    O absenteísmo consome em média 2–3% da folha. 
-                                    Com controle estruturado, é possível reduzir gastos operacionais 
-                                    em até 30% ao ano.
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="fas fa-chart-line"></i>
-                            </div>
-                            <div class="benefit-content">
-                                <h3>Mais produtividade</h3>
-                                <p>
-                                    Identifique setores, turnos e causas com maior impacto 
-                                    e direcione ações que elevem a performance da equipe.
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="fas fa-shield-alt"></i>
-                            </div>
-                            <div class="benefit-content">
-                                <h3>Saúde e prevenção</h3>
-                                <p>
-                                    Antecipe afastamentos, doenças ocupacionais e riscos, 
-                                    fortalecendo programas de saúde e segurança do trabalho.
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div class="benefit-item">
-                            <div class="benefit-icon">
-                                <i class="fas fa-lightbulb"></i>
-                            </div>
-                            <div class="benefit-content">
-                                <h3>Decisão baseada em dados</h3>
-                                <p>
-                                    Dashboards, comparativos e insights automáticos 
-                                    trazem clareza para decisões estratégicas de RH e diretoria.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="cost-reduction">
-                    <h3>Como Reduzimos Seus Custos:</h3>
-                    <ul>
-                        <li>
-                            <strong>Identificação de Padrões:</strong> Detecte setores, 
-                            períodos e causas com maior incidência de absenteísmo
-                        </li>
-                        <li>
-                            <strong>Ações Preventivas:</strong> Implemente programas 
-                            de saúde e bem-estar baseados em dados reais
-                        </li>
-                        <li>
-                            <strong>Otimização de Recursos:</strong> Reduza horas extras 
-                            e contratações desnecessárias com planejamento inteligente
-                        </li>
-                        <li>
-                            <strong>Redução de Custos Diretos:</strong> Diminua pagamentos 
-                            de atestados, INSS e afastamentos através de prevenção
-                        </li>
-                        <li>
-                            <strong>Melhoria Contínua:</strong> Acompanhe métricas em tempo 
-                            real e ajuste estratégias para máxima eficiência
-                        </li>
-                    </ul>
+                <div class="hero-buttons">
+                    <a href="/login" class="btn-landing btn-primary-landing" style="font-size: 18px; padding: 16px 32px;">
+                        <i class="fas fa-arrow-right"></i> Acessar Sistema
+                    </a>
                 </div>
             </div>
-        </div>
+        </section>
+        
+        <!-- Features -->
+        <section class="features">
+            <div class="features-container">
+                <h2>Funcionalidades Principais</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <h3>Dashboard Interativo</h3>
+                        <p>Visualize métricas e indicadores em tempo real com gráficos interativos e análises detalhadas.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-file-upload"></i>
+                        </div>
+                        <h3>Upload Automático</h3>
+                        <p>Processamento inteligente de planilhas Excel com padronização e limpeza automática de dados.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h3>Análises IA</h3>
+                        <p>Insights automáticos e recomendações baseadas em inteligência artificial para gestão proativa.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3>Gestão de Clientes</h3>
+                        <p>Suporte multi-tenant para gerenciar múltiplos clientes com dados isolados e seguros.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-presentation"></i>
+                        </div>
+                        <h3>Apresentações</h3>
+                        <p>Modo apresentação profissional com slides automatizados e análises prontas para reuniões.</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-filter"></i>
+                        </div>
+                        <h3>Filtros Avançados</h3>
+                        <p>Filtre por período, funcionários, setores e muito mais para análises precisas e personalizadas.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Footer -->
+        <footer class="landing-footer">
+            <p>&copy; 2025 AbsenteismoController - GrupoBiomed. Todos os direitos reservados.</p>
+        </footer>
     </div>
-    
-    <script>
-        async function handleLogin(event) {
-            event.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const errorMessage = document.getElementById('errorMessage');
-            const loginButton = document.getElementById('loginButton');
-            
-            // Limpa mensagem de erro anterior
-            errorMessage.classList.remove('show');
-            errorMessage.textContent = '';
-            
-            // Desabilita botão durante login
-            loginButton.disabled = true;
-            loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
-            
-            try {
-                const formData = new FormData();
-                formData.append('username', username);
-                formData.append('password', password);
-                
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok && data.access_token) {
-                    // Salva token
-                    localStorage.setItem('access_token', data.access_token);
-                    
-                    // Salva dados do usuário se disponíveis
-                    if (data.user) {
-                        localStorage.setItem('user', JSON.stringify(data.user));
-                    } else if (data.username) {
-                        // Se não vier user completo, cria um objeto básico
-                        localStorage.setItem('user', JSON.stringify({
-                            username: data.username,
-                            email: data.email || '',
-                            nome_completo: data.nome_completo || data.username,
-                            is_admin: data.is_admin || false
-                        }));
-                    }
-                    
-                    // Verifica se tem cliente selecionado
-                    const clientId = localStorage.getItem('cliente_selecionado');
-                    if (clientId && parseInt(clientId) > 0) {
-                        // Se tem cliente, vai para dashboard
-                        window.location.href = '/dashboard';
-                    } else {
-                        // Se não tem cliente, vai para página de clientes
-                        window.location.href = '/clientes';
-                    }
-                } else {
-                    // Mostra erro
-                    errorMessage.textContent = data.detail || 'Usuário ou senha incorretos';
-                    errorMessage.classList.add('show');
-                    loginButton.disabled = false;
-                    loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
-                }
-            } catch (error) {
-                errorMessage.textContent = 'Erro ao conectar com o servidor. Tente novamente.';
-                errorMessage.classList.add('show');
-                loginButton.disabled = false;
-                loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
-            }
-        }
-        
-        // Toggle mostrar/ocultar senha
-        const togglePassword = document.getElementById('togglePassword');
-        const passwordInput = document.getElementById('password');
-        
-        if (togglePassword && passwordInput) {
-            const passwordIcon = togglePassword.querySelector('i');
-            
-            togglePassword.addEventListener('click', () => {
-                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                passwordInput.setAttribute('type', type);
-                
-                // Alterna ícone
-                if (type === 'text') {
-                    passwordIcon.classList.remove('fa-eye');
-                    passwordIcon.classList.add('fa-eye-slash');
-                    togglePassword.setAttribute('aria-label', 'Ocultar senha');
-                } else {
-                    passwordIcon.classList.remove('fa-eye-slash');
-                    passwordIcon.classList.add('fa-eye');
-                    togglePassword.setAttribute('aria-label', 'Mostrar senha');
-                }
-            });
-        }
-        
-        // Verifica se já está logado e tem cliente selecionado
-        if (localStorage.getItem('access_token')) {
-            const clientId = localStorage.getItem('cliente_selecionado');
-            if (clientId && parseInt(clientId) > 0) {
-                // Se tem token e cliente, vai para dashboard
-                window.location.href = '/dashboard';
-            } else {
-                // Se tem token mas não tem cliente, vai para clientes
-                window.location.href = '/clientes';
-            }
-        }
-    </script>
 </body>
 </html>
+

@@ -326,3 +326,5 @@ Se no futuro quiser migrar para PostgreSQL:
 
 **Status**: ✅ **BANCO DE DADOS PORTÁTIL - COPIE E USE!**
 
+
+

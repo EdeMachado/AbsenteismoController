@@ -1,6 +1,6 @@
 """
-Sistema de Logging Estruturado
-Suporta auditoria, segurança e rastreabilidade (ISO 27001, LGPD)
+Sistema de Logging Estruturado - AbsenteismoController
+Suporta auditoria LGPD, ISO 27001 e rastreabilidade completa
 """
 import logging
 import logging.handlers
@@ -10,256 +10,230 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-# Cria pasta de logs
+# Diretório de logs
 LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
-# Configuração de logs
-LOG_FORMAT = '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
-LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+# Configuração de níveis
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
-# Formato JSON para logs estruturados
-class JSONFormatter(logging.Formatter):
-    """Formatter que gera logs em formato JSON"""
+class AuditLogger:
+    """Logger especializado para auditoria (LGPD/ISO 27001)"""
     
-    def format(self, record: logging.LogRecord) -> str:
+    def __init__(self):
+        self.logger = logging.getLogger("audit")
+        self.logger.setLevel(logging.INFO)
+        
+        # Handler para arquivo de auditoria
+        audit_file = os.path.join(LOGS_DIR, "audit.log")
+        handler = logging.handlers.RotatingFileHandler(
+            audit_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=30,  # Mantém 30 arquivos de backup
+            encoding='utf-8'
+        )
+        
+        formatter = logging.Formatter(
+            '%(asctime)s | %(levelname)s | %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+        self.logger.propagate = False
+    
+    def log_access(self, user: str, action: str, resource: str, 
+                   client_id: Optional[int] = None, ip: Optional[str] = None,
+                   success: bool = True, details: Optional[Dict] = None):
+        """
+        Registra acesso a recursos (LGPD/ISO 27001)
+        
+        Args:
+            user: Usuário que realizou a ação
+            action: Ação realizada (CREATE, READ, UPDATE, DELETE, LOGIN, LOGOUT)
+            resource: Recurso acessado (cliente, upload, atestado, etc.)
+            client_id: ID do cliente (para isolamento LGPD)
+            ip: IP do usuário
+            success: Se a ação foi bem-sucedida
+            details: Detalhes adicionais
+        """
         log_data = {
-            'timestamp': datetime.fromtimestamp(record.created).isoformat(),
-            'level': record.levelname,
-            'logger': record.name,
-            'message': record.getMessage(),
-            'module': record.module,
-            'function': record.funcName,
-            'line': record.lineno,
+            "timestamp": datetime.now().isoformat(),
+            "user": user,
+            "action": action,
+            "resource": resource,
+            "client_id": client_id,
+            "ip": ip,
+            "success": success,
+            "details": details or {}
         }
         
-        # Adiciona campos extras se existirem
-        if hasattr(record, 'user_id'):
-            log_data['user_id'] = record.user_id
-        if hasattr(record, 'client_id'):
-            log_data['client_id'] = record.client_id
-        if hasattr(record, 'ip_address'):
-            log_data['ip_address'] = record.ip_address
-        if hasattr(record, 'action'):
-            log_data['action'] = record.action
-        if hasattr(record, 'resource'):
-            log_data['resource'] = record.resource
+        message = json.dumps(log_data, ensure_ascii=False)
         
-        # Adiciona exception se houver
-        if record.exc_info:
-            log_data['exception'] = self.formatException(record.exc_info)
+        if success:
+            self.logger.info(f"AUDIT | {message}")
+        else:
+            self.logger.warning(f"AUDIT_FAILED | {message}")
+    
+    def log_data_access(self, user: str, client_id: int, data_type: str,
+                       action: str, record_count: Optional[int] = None,
+                       ip: Optional[str] = None):
+        """Registra acesso a dados (crítico para LGPD)"""
+        self.log_access(
+            user=user,
+            action=action,
+            resource=f"{data_type} (client_id={client_id})",
+            client_id=client_id,
+            ip=ip,
+            details={"data_type": data_type, "record_count": record_count}
+        )
+    
+    def log_security_event(self, event_type: str, severity: str,
+                          description: str, user: Optional[str] = None,
+                          ip: Optional[str] = None, details: Optional[Dict] = None):
+        """Registra eventos de segurança (ISO 27001)"""
+        log_data = {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": event_type,
+            "severity": severity,
+            "description": description,
+            "user": user,
+            "ip": ip,
+            "details": details or {}
+        }
         
-        return json.dumps(log_data, ensure_ascii=False)
+        message = json.dumps(log_data, ensure_ascii=False)
+        
+        if severity == "CRITICAL":
+            self.logger.critical(f"SECURITY | {message}")
+        elif severity == "HIGH":
+            self.logger.error(f"SECURITY | {message}")
+        else:
+            self.logger.warning(f"SECURITY | {message}")
 
+# Instância global do audit logger
+audit_logger = AuditLogger()
 
-def setup_logger(name: str, log_file: str, level: int = logging.INFO, 
-                 use_json: bool = False, max_bytes: int = 10 * 1024 * 1024, 
-                 backup_count: int = 5) -> logging.Logger:
-    """
-    Configura um logger com rotação de arquivos
+def setup_logging():
+    """Configura sistema de logging completo"""
     
-    Args:
-        name: Nome do logger
-        log_file: Nome do arquivo de log
-        level: Nível de log
-        use_json: Se True, usa formato JSON
-        max_bytes: Tamanho máximo do arquivo antes de rotacionar (padrão: 10MB)
-        backup_count: Número de backups a manter
-    """
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+    # Logger principal da aplicação
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(getattr(logging, LOG_LEVEL))
     
-    # Remove handlers existentes para evitar duplicação
-    logger.handlers = []
+    # Logger de erros
+    error_logger = logging.getLogger("errors")
+    error_logger.setLevel(logging.ERROR)
     
-    # Handler para arquivo com rotação
-    log_path = os.path.join(LOGS_DIR, log_file)
-    file_handler = logging.handlers.RotatingFileHandler(
-        log_path,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
+    # Logger de segurança
+    security_logger = logging.getLogger("security")
+    security_logger.setLevel(logging.WARNING)
+    
+    # Formato padrão
+    formatter = logging.Formatter(
+        '%(asctime)s | %(name)s | %(levelname)s | %(funcName)s:%(lineno)d | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Handler para app.log (rotação diária)
+    app_file = os.path.join(LOGS_DIR, "app.log")
+    app_handler = logging.handlers.TimedRotatingFileHandler(
+        app_file,
+        when='midnight',
+        interval=1,
+        backupCount=30,  # 30 dias
         encoding='utf-8'
     )
+    app_handler.setLevel(logging.INFO)
+    app_handler.setFormatter(formatter)
+    app_logger.addHandler(app_handler)
     
-    if use_json:
-        file_handler.setFormatter(JSONFormatter())
-    else:
-        file_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
-    
-    logger.addHandler(file_handler)
-    
-    # Handler para console (apenas em desenvolvimento)
-    if os.getenv('ENVIRONMENT', 'development') == 'development':
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
-        logger.addHandler(console_handler)
-    
-    return logger
-
-
-# Loggers principais
-app_logger = setup_logger('app', 'app.log', logging.INFO)
-error_logger = setup_logger('error', 'errors.log', logging.ERROR)
-security_logger = setup_logger('security', 'security.log', logging.WARNING, use_json=True)
-audit_logger = setup_logger('audit', 'audit.log', logging.INFO, use_json=True)
-
-
-def log_audit(action: str, user_id: Optional[int] = None, 
-              client_id: Optional[int] = None, resource: Optional[str] = None,
-              ip_address: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
-    """
-    Registra ação de auditoria (ISO 27001, LGPD)
-    
-    Args:
-        action: Ação realizada (ex: 'login', 'upload_file', 'delete_client')
-        user_id: ID do usuário que realizou a ação
-        client_id: ID do cliente afetado (se aplicável)
-        resource: Recurso afetado (ex: 'client', 'upload', 'atestado')
-        ip_address: IP de origem
-        details: Detalhes adicionais da ação
-    """
-    # Campos reservados do LogRecord que não podem ser sobrescritos
-    RESERVED_FIELDS = {'name', 'msg', 'args', 'created', 'filename', 'funcName', 
-                      'levelname', 'levelno', 'lineno', 'module', 'msecs', 
-                      'message', 'pathname', 'process', 'processName', 'relativeCreated',
-                      'thread', 'threadName', 'exc_info', 'exc_text', 'stack_info'}
-    
-    extra = {
-        'action': action,
-        'user_id': user_id,
-        'client_id': client_id,
-        'resource': resource,
-        'ip_address': ip_address,
-    }
-    
-    if details:
-        # Filtra campos reservados do details
-        for key, value in details.items():
-            if key not in RESERVED_FIELDS:
-                extra[key] = value
-            else:
-                # Renomeia campos reservados adicionando prefixo
-                extra[f'ctx_{key}'] = value
-    
-    audit_logger.info(f"AUDIT: {action}", extra=extra)
-
-
-def log_security(event: str, level: str = 'warning', 
-                user_id: Optional[int] = None, ip_address: Optional[str] = None,
-                details: Optional[Dict[str, Any]] = None):
-    """
-    Registra evento de segurança
-    
-    Args:
-        event: Tipo de evento (ex: 'failed_login', 'rate_limit_exceeded', 'unauthorized_access')
-        level: Nível de severidade ('info', 'warning', 'error', 'critical')
-        user_id: ID do usuário (se aplicável)
-        ip_address: IP de origem
-        details: Detalhes adicionais
-    """
-    log_level = {
-        'info': logging.INFO,
-        'warning': logging.WARNING,
-        'error': logging.ERROR,
-        'critical': logging.CRITICAL
-    }.get(level, logging.WARNING)
-    
-    extra = {
-        'event': event,
-        'user_id': user_id,
-        'ip_address': ip_address,
-    }
-    
-    if details:
-        extra.update(details)
-    
-    security_logger.log(log_level, f"SECURITY: {event}", extra=extra)
-
-
-def log_error(error: Exception, context: Optional[Dict[str, Any]] = None,
-             user_id: Optional[int] = None, client_id: Optional[int] = None):
-    """
-    Registra erro com contexto
-    
-    Args:
-        error: Exceção ocorrida
-        context: Contexto adicional do erro
-        user_id: ID do usuário (se aplicável)
-        client_id: ID do cliente (se aplicável)
-    """
-    # Campos reservados do LogRecord que não podem ser sobrescritos
-    RESERVED_FIELDS = {'name', 'msg', 'args', 'created', 'filename', 'funcName', 
-                      'levelname', 'levelno', 'lineno', 'module', 'msecs', 
-                      'message', 'pathname', 'process', 'processName', 'relativeCreated',
-                      'thread', 'threadName', 'exc_info', 'exc_text', 'stack_info'}
-    
-    extra = {}
-    if user_id:
-        extra['user_id'] = user_id
-    if client_id:
-        extra['client_id'] = client_id
-    if context:
-        # Filtra campos reservados do context
-        for key, value in context.items():
-            if key not in RESERVED_FIELDS:
-                extra[key] = value
-            else:
-                # Renomeia campos reservados adicionando prefixo
-                extra[f'ctx_{key}'] = value
-    
-    error_logger.error(
-        f"ERROR: {type(error).__name__}: {str(error)}",
-        exc_info=True,
-        extra=extra
+    # Handler para errors.log
+    error_file = os.path.join(LOGS_DIR, "errors.log")
+    error_handler = logging.handlers.RotatingFileHandler(
+        error_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=10,
+        encoding='utf-8'
     )
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(formatter)
+    error_logger.addHandler(error_handler)
+    app_logger.addHandler(error_handler)  # App também escreve em errors
+    
+    # Handler para security.log
+    security_file = os.path.join(LOGS_DIR, "security.log")
+    security_handler = logging.handlers.RotatingFileHandler(
+        security_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=30,  # 30 dias (importante para auditoria)
+        encoding='utf-8'
+    )
+    security_handler.setLevel(logging.WARNING)
+    security_handler.setFormatter(formatter)
+    security_logger.addHandler(security_handler)
+    
+    # Console handler (apenas em desenvolvimento)
+    if os.getenv("ENVIRONMENT", "production") == "development":
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        console_formatter = logging.Formatter(
+            '%(asctime)s | %(levelname)s | %(message)s',
+            datefmt='%H:%M:%S'
+        )
+        console_handler.setFormatter(console_formatter)
+        app_logger.addHandler(console_handler)
+    
+    # Evita propagação para root logger
+    app_logger.propagate = False
+    error_logger.propagate = False
+    security_logger.propagate = False
+    
+    return app_logger, error_logger, security_logger
 
+# Inicializa loggers
+app_logger, error_logger, security_logger = setup_logging()
 
-# Função helper para logs de operações críticas
-def log_operation(operation: str, status: str = 'success', 
-                 duration_ms: Optional[float] = None,
-                 user_id: Optional[int] = None, 
-                 client_id: Optional[int] = None,
-                 details: Optional[Dict[str, Any]] = None):
+def get_logger(name: str = "app"):
+    """Retorna logger configurado"""
+    return logging.getLogger(name)
+
+def log_operation(operation: str, user: Optional[str] = None,
+                 client_id: Optional[int] = None, details: Optional[Dict] = None,
+                 level: str = "INFO"):
     """
-    Registra operação do sistema
+    Helper para logar operações com contexto LGPD
     
     Args:
-        operation: Nome da operação
-        status: 'success', 'failed', 'warning'
-        duration_ms: Duração em milissegundos
-        user_id: ID do usuário
-        client_id: ID do cliente
+        operation: Descrição da operação
+        user: Usuário que realizou
+        client_id: ID do cliente (para isolamento)
         details: Detalhes adicionais
+        level: Nível do log (INFO, WARNING, ERROR)
     """
-    level = logging.INFO if status == 'success' else logging.WARNING
-    
-    message = f"OPERATION: {operation} | STATUS: {status}"
-    if duration_ms:
-        message += f" | DURATION: {duration_ms:.2f}ms"
-    
-    # Campos reservados do LogRecord que não podem ser sobrescritos
-    RESERVED_FIELDS = {'name', 'msg', 'args', 'created', 'filename', 'funcName', 
-                      'levelname', 'levelno', 'lineno', 'module', 'msecs', 
-                      'message', 'pathname', 'process', 'processName', 'relativeCreated',
-                      'thread', 'threadName', 'exc_info', 'exc_text', 'stack_info'}
-    
-    extra = {
-        'operation': operation,
-        'status': status,
-        'user_id': user_id,
-        'client_id': client_id,
+    log_data = {
+        "operation": operation,
+        "user": user,
+        "client_id": client_id,
+        "details": details or {}
     }
     
-    if duration_ms:
-        extra['duration_ms'] = duration_ms
-    if details:
-        # Filtra campos reservados do details
-        for key, value in details.items():
-            if key not in RESERVED_FIELDS:
-                extra[key] = value
-            else:
-                # Renomeia campos reservados adicionando prefixo
-                extra[f'ctx_{key}'] = value
+    message = f"{operation} | user={user} | client_id={client_id} | {json.dumps(details or {}, ensure_ascii=False)}"
     
-    app_logger.log(level, message, extra=extra)
+    logger = get_logger()
+    if level == "ERROR":
+        logger.error(message)
+    elif level == "WARNING":
+        logger.warning(message)
+    else:
+        logger.info(message)
+    
+    # Se envolve dados de cliente, registra em auditoria
+    if client_id is not None:
+        audit_logger.log_access(
+            user=user or "system",
+            action=operation.split()[0].upper() if operation else "UNKNOWN",
+            resource=operation,
+            client_id=client_id,
+            success=True
+        )
 

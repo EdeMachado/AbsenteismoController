@@ -116,3 +116,5 @@ O sistema agora permite:
 - ✅ Layout otimizado para impressão
 - ✅ Funciona na apresentação também
 
+
+

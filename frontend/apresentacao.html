@@ -60,143 +60,9 @@
             gap: 16px;
         }
         
-        .filtros-apresentacao {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 8px 12px;
-            border-radius: 6px;
-        }
-        
-        .filtros-apresentacao select {
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 6px 10px;
-            border-radius: 4px;
-            font-size: 13px;
-            color: #333;
-            cursor: pointer;
-        }
-        
-        .filtros-apresentacao button {
-            background: #4CAF50;
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: background 0.3s;
-        }
-        
-        .filtros-apresentacao button:hover {
-            background: #45a049;
-        }
-        
         .slide-indicator {
             font-size: 14px;
             opacity: 0.9;
-        }
-        
-        .btn-notas {
-            background: rgba(255, 193, 7, 0.9);
-            border: none;
-            color: #333;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-weight: 500;
-        }
-        
-        .btn-notas:hover {
-            background: rgba(255, 193, 7, 1);
-        }
-        
-        .painel-notas {
-            position: fixed;
-            right: -400px;
-            top: 0;
-            bottom: 0;
-            width: 400px;
-            background: white;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.3);
-            transition: right 0.3s;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .painel-notas.aberto {
-            right: 0;
-        }
-        
-        .painel-notas-header {
-            background: #1a237e;
-            color: white;
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .painel-notas-body {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-        }
-        
-        .painel-notas textarea {
-            width: 100%;
-            min-height: 150px;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-family: inherit;
-            font-size: 14px;
-            resize: vertical;
-        }
-        
-        .painel-notas-footer {
-            padding: 16px;
-            border-top: 1px solid #eee;
-            display: flex;
-            gap: 10px;
-        }
-        
-        .painel-notas button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background 0.3s;
-        }
-        
-        .btn-salvar-nota {
-            background: #4CAF50;
-            color: white;
-            flex: 1;
-        }
-        
-        .btn-salvar-nota:hover {
-            background: #45a049;
-        }
-        
-        .btn-limpar-nota {
-            background: #f44336;
-            color: white;
-        }
-        
-        .btn-limpar-nota:hover {
-            background: #da190b;
         }
         
         .btn-export, .btn-fullscreen {
@@ -362,9 +228,8 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            padding: 20px;
-            padding-bottom: 160px; /* Aumentado para garantir espaço para faixa + botões + footer */
-            gap: 20px;
+            padding: 24px;
+            gap: 24px;
         }
         
         .slide-content {
@@ -378,10 +243,9 @@
         }
         
         .slide-header {
-            padding: 16px 20px; /* Reduzido padding */
+            padding: 20px 24px;
             border-bottom: 2px solid #e0e0e0;
             background: linear-gradient(135deg, #f8f9fa, #ffffff);
-            flex-shrink: 0; /* Não encolhe */
         }
         
         .slide-header h2 {
@@ -399,11 +263,10 @@
             flex: 1;
             display: grid;
             grid-template-columns: 1fr;
-            grid-template-rows: 1.5fr 1fr; /* Reduzido de 2fr 1fr para dar mais espaço à análise */
-            gap: 20px;
-            padding: 20px;
-            overflow-y: auto; /* Permite rolagem se necessário */
-            max-height: calc(100vh - 300px); /* Limita altura total */
+            grid-template-rows: 2fr 1fr;
+            gap: 24px;
+            padding: 24px;
+            overflow: hidden;
         }
         
         .chart-container-wrapper {
@@ -411,23 +274,22 @@
             align-items: center;
             justify-content: center;
             min-height: 0;
-            max-height: 350px; /* Reduzido de 450px */
         }
         
         .chart-container {
             width: 100%;
             height: 100%;
-            max-height: 350px; /* Reduzido de 450px */
+            max-height: 450px;
             position: relative;
         }
         
         .analise-container {
             background: #f8f9fa;
             border-left: 4px solid #556B2F;
-            padding: 16px;
+            padding: 20px;
             border-radius: 8px;
             overflow-y: auto;
-            max-height: 250px; /* Reduzido de 300px */
+            max-height: 300px;
         }
         
         .analise-container h3 {
@@ -455,39 +317,24 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
+            gap: 16px;
+            padding: 16px;
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            position: fixed;
-            bottom: 80px; /* Acima do footer */
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 200; /* Acima do footer (z-index: 100) */
-            margin: 0 auto;
-        }
-        
-        /* Ajuste para fullscreen */
-        body.fullscreen-mode .apresentacao-content {
-            padding-bottom: 100px; /* Menos espaço em fullscreen */
         }
         
         .btn-nav {
-            padding: 8px 16px;
+            padding: 12px 24px;
             border: none;
-            border-radius: 6px;
-            font-size: 13px;
+            border-radius: 8px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             transition: all 0.2s;
-        }
-        
-        .btn-nav i {
-            font-size: 14px;
         }
         
         .btn-nav:hover {
@@ -663,18 +510,6 @@
                 Apresentação Executiva - Absenteísmo
             </h1>
             <div class="apresentacao-header-right" style="position: relative;">
-                <div class="filtros-apresentacao">
-                    <i class="fas fa-filter" style="opacity: 0.8;"></i>
-                    <select id="filtroSetorApresentacao">
-                        <option value="">Todos os Setores</option>
-                    </select>
-                    <input type="month" id="filtroPeriodoInicio" style="background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.3); padding: 6px 10px; border-radius: 4px; font-size: 13px; color: #333;">
-                    <span style="opacity: 0.8;">até</span>
-                    <input type="month" id="filtroPeriodoFim" style="background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(255, 255, 255, 0.3); padding: 6px 10px; border-radius: 4px; font-size: 13px; color: #333;">
-                    <button onclick="aplicarFiltrosApresentacao()">
-                        <i class="fas fa-sync-alt"></i> Aplicar
-                    </button>
-                </div>
                 <div class="slide-indicator">
                     <span id="slideAtual">1</span> / <span id="totalSlides">0</span>
                 </div>
@@ -748,12 +583,5 @@
             }, 1000);
         });
     </script>
-    
-    <!-- Footer -->
-    <footer style="background: var(--surface); border-top: 1px solid var(--border); padding: 20px; text-align: center; color: var(--text-secondary); font-size: 13px; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;">
-        <p style="margin: 0;">
-            &copy; 2025 GrupoBiomed - Criado por Éde Carlos Viana Machado
-        </p>
-    </footer>
 </body>
 </html>
