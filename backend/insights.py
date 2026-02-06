@@ -709,8 +709,6 @@ Esta análise permite identificar padrões específicos por setor e gênero, ori
             total_dias = sum(d.get('dias_afastamento', 0) for d in dados)
             pct = (faixa_mais_dias.get('dias_afastamento', 0) / total_dias * 100) if total_dias > 0 else 0
             
-            analise = f"""⏱️ **Análise: Tempo Serviço x Atestados**
-
             faixa_tempo = faixa_mais_dias.get('faixa_tempo_servico', 'Não informado')
             if faixa_tempo == 'N/A' or not faixa_tempo:
                 faixa_tempo = 'Não informado'
@@ -894,8 +892,6 @@ Esta distribuição permite identificar a qualidade e consistência dos atestado
             multiplos = sum(d.get('quantidade', 0) for d in dados if '3' in d.get('frequencia', '') or '6' in d.get('frequencia', '') or '11' in d.get('frequencia', ''))
             pct_multiplos = (multiplos / total_funcionarios * 100) if total_funcionarios > 0 else 0
             
-            analise = f"""📊 **Análise: Frequência de Atestados por Funcionário**
-
             frequencia_nome = mais_comum.get('frequencia', 'Não informado')
             if frequencia_nome == 'N/A' or not frequencia_nome:
                 frequencia_nome = 'Não informado'
