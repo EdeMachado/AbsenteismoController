@@ -248,14 +248,14 @@
                 
                 <!-- Charts Grid - Layout Otimizado (APENAS CONVERPLAST) -->
                 <div id="graficosConverplast">
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- TOP CIDs -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">TOP 10 Doenças mais Frequentes</h3>
                             <p class="chart-subtitle">Principais causas de afastamento (exceto exames/doações)</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartCids"></canvas>
                         </div>
                     </div>
@@ -266,20 +266,20 @@
                             <h3 class="chart-title">Evolução Mensal - Últimos 12 Meses</h3>
                             <p class="chart-subtitle">Tendência de atestados e dias perdidos</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartEvolucao"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- TOP Setores -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">TOP 5 Setores</h3>
                             <p class="chart-subtitle">Setores com mais atestados</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 280px;">
+                        <div class="chart-wrapper" style="height: 220px;">
                             <canvas id="chartSetores"></canvas>
                         </div>
                     </div>
@@ -290,7 +290,7 @@
                             <h3 class="chart-title">Por Gênero</h3>
                             <p class="chart-subtitle">Masculino vs Feminino</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 280px;">
+                        <div class="chart-wrapper" style="height: 220px;">
                             <canvas id="chartGenero"></canvas>
                         </div>
                     </div>
@@ -301,20 +301,20 @@
                             <h3 class="chart-title">Dias por Doença</h3>
                             <p class="chart-subtitle">Total de dias perdidos</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 280px;">
+                        <div class="chart-wrapper" style="height: 220px;">
                             <canvas id="chartMediaCid"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Dias Perdidos por Funcionários -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Dias Perdidos por Funcionários</h3>
                             <p class="chart-subtitle">TOP 10 funcionários com mais dias perdidos</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartFuncionariosDias"></canvas>
                         </div>
                     </div>
@@ -325,20 +325,20 @@
                             <h3 class="chart-title">Evolução de Dias Perdidos por Setor</h3>
                             <p class="chart-subtitle">Tendência dos principais setores</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartEvolucaoSetor"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Escalas com mais Atestados -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Escalas (Horários) com mais Atestados</h3>
                             <p class="chart-subtitle">TOP 10 escalas com maior incidência</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartEscalas"></canvas>
                         </div>
                     </div>
@@ -349,20 +349,20 @@
                             <h3 class="chart-title">Motivos de Incidência com mais Atestados</h3>
                             <p class="chart-subtitle">Distribuição percentual dos motivos</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartMotivos"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Comparativo entre Períodos -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Comparativo Mensal</h3>
                             <p class="chart-subtitle">Mês atual vs mês anterior</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartComparativoMensal"></canvas>
                         </div>
                     </div>
@@ -373,20 +373,20 @@
                             <h3 class="chart-title">Comparativo Trimestral</h3>
                             <p class="chart-subtitle">Trimestre atual vs anterior</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartComparativoTrimestral"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Comparativo Ano Anterior -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Comparativo Ano Anterior</h3>
                             <p class="chart-subtitle">Ano atual vs mesmo período do ano anterior</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartComparativoAnoAnterior"></canvas>
                         </div>
                     </div>
@@ -397,20 +397,20 @@
                             <h3 class="chart-title">Mapa de Calor</h3>
                             <p class="chart-subtitle">Dias perdidos por setor e mês</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px; overflow: auto;">
+                        <div class="chart-wrapper" style="height: 280px; overflow: auto;">
                             <div id="chartHeatmap" style="width: 100%; height: 100%;"></div>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Dias Perdidos por Centro de Custo (Setor) -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Dias Perdidos por Centro de Custo</h3>
                             <p class="chart-subtitle">TOP 10 setores</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartCentroCusto"></canvas>
                         </div>
                     </div>
@@ -421,20 +421,20 @@
                             <h3 class="chart-title">Distribuição de Dias por Atestado</h3>
                             <p class="chart-subtitle">Histograma de frequência</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartDistribuicaoDias"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Média de Dias por CID -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Média de Dias por CID</h3>
                             <p class="chart-subtitle">Doenças com maior média de dias</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartMediaCidDias"></canvas>
                         </div>
                     </div>
@@ -445,20 +445,20 @@
                             <h3 class="chart-title">Dias Perdidos por Setor e Gênero</h3>
                             <p class="chart-subtitle">Comparativo entre gêneros por setor</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartSetorGenero"></canvas>
                         </div>
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Comparativo Dias vs Horas -->
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Comparativo: Dias vs Horas Perdidas</h3>
                             <p class="chart-subtitle">Por setor</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartComparativoDiasHoras"></canvas>
                         </div>
                     </div>
@@ -469,20 +469,20 @@
                             <h3 class="chart-title">Frequência de Atestados por Funcionário</h3>
                             <p class="chart-subtitle">Distribuição de funcionários por número de atestados</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartFrequenciaAtestados"></canvas>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Produtividade -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Produtividade - Consultas por Categoria</h3>
                             <p class="chart-subtitle">Distribuição de consultas por tipo (último mês cadastrado)</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartProdutividade"></canvas>
                         </div>
                     </div>
@@ -491,19 +491,19 @@
                             <h3 class="chart-title">Produtividade - Evolução Mensal</h3>
                             <p class="chart-subtitle">Evolução do total de consultas mês a mês</p>
                         </div>
-                        <div class="chart-wrapper" style="height: 350px;">
+                        <div class="chart-wrapper" style="height: 280px;">
                             <canvas id="chartProdutividadeEvolucao"></canvas>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Produtividade por Mês e Categoria -->
-                <div class="chart-container" style="margin-bottom: 16px;">
+                <div class="chart-container" style="margin-bottom: 12px;">
                     <div class="chart-header">
                         <h3 class="chart-title">Produtividade - Distribuição Anual (Mês a Mês) por Categoria</h3>
                         <p class="chart-subtitle">Barras empilhadas mostrando a distribuição percentual mês a mês</p>
                     </div>
-                    <div class="chart-wrapper" style="height: 400px;">
+                    <div class="chart-wrapper" style="height: 300px;">
                         <canvas id="chartProdutividadeMensalCategoria"></canvas>
                     </div>
                 </div>
@@ -518,14 +518,14 @@
                     </h2>
                     
                     <!-- Grid 2x3 para os 6 gráficos -->
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                         <!-- 1. Classificação por Funcionário -->
                         <div class="chart-container">
                             <div class="chart-header">
                                 <h3 class="chart-title">Classificação por Funcionário</h3>
                                 <p class="chart-subtitle">Funcionários com mais atestados</p>
                             </div>
-                            <div class="chart-wrapper" style="height: 400px;">
+                            <div class="chart-wrapper" style="height: 300px;">
                                 <canvas id="chartClassificacaoFuncionariosRO"></canvas>
                             </div>
                         </div>
@@ -536,7 +536,7 @@
                                 <h3 class="chart-title">Classificação Por Setor</h3>
                                 <p class="chart-subtitle">Setores com mais dias de afastamento</p>
                             </div>
-                            <div class="chart-wrapper" style="height: 400px;">
+                            <div class="chart-wrapper" style="height: 300px;">
                                 <canvas id="chartClassificacaoSetoresRO"></canvas>
                             </div>
                         </div>
