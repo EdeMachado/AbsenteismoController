@@ -2595,12 +2595,18 @@ async def buscar_cnpj(cnpj: str):
 @app.get("/clientes")
 async def pagina_clientes():
     """Página de gerenciamento de clientes"""
-    return FileResponse("frontend/clientes.html")
+    file_path = os.path.join(FRONTEND_DIR, "clientes.html")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Página não encontrada")
+    return FileResponse(file_path)
 
 @app.get("/apresentacao")
 async def pagina_apresentacao():
     """Página de apresentação de gráficos"""
-    return FileResponse("frontend/apresentacao.html")
+    file_path = os.path.join(FRONTEND_DIR, "apresentacao.html")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Página não encontrada")
+    return FileResponse(file_path)
 
 @app.get("/api/apresentacao")
 async def dados_apresentacao(
