@@ -1883,8 +1883,14 @@ class Analytics:
                     return 100.0 if atual > 0 else 0.0
                 return ((atual - anterior) / anterior) * 100
             
-            variacao_dias = calcular_variacao(metricas_atual.get('total_dias', 0), metricas_anterior.get('total_dias', 0))
-            variacao_horas = calcular_variacao(metricas_atual.get('total_horas', 0), metricas_anterior.get('total_horas', 0))
+            # CORREÇÃO: Usa os nomes corretos dos campos retornados por metricas_gerais
+            dias_atual = metricas_atual.get('total_dias_perdidos', 0) or metricas_atual.get('total_dias', 0) or 0
+            horas_atual = metricas_atual.get('total_horas_perdidas', 0) or metricas_atual.get('total_horas', 0) or 0
+            dias_anterior = metricas_anterior.get('total_dias_perdidos', 0) or metricas_anterior.get('total_dias', 0) or 0
+            horas_anterior = metricas_anterior.get('total_horas_perdidas', 0) or metricas_anterior.get('total_horas', 0) or 0
+            
+            variacao_dias = calcular_variacao(dias_atual, dias_anterior)
+            variacao_horas = calcular_variacao(horas_atual, horas_anterior)
             variacao_registros = calcular_variacao(metricas_atual.get('total_registros', 0), metricas_anterior.get('total_registros', 0))
             
             # Traduz nomes dos meses para português
@@ -1903,15 +1909,15 @@ class Analytics:
                 'periodo_atual': {
                     'mes': mes_atual,
                     'label': f"{mes_atual_nome}/{mes_atual_date.strftime('%Y')}",
-                    'dias_perdidos': round(metricas_atual.get('total_dias', 0), 2),
-                    'horas_perdidas': round(metricas_atual.get('total_horas', 0), 2),
+                    'dias_perdidos': round(dias_atual, 2),
+                    'horas_perdidas': round(horas_atual, 2),
                     'total_registros': metricas_atual.get('total_registros', 0)
                 },
                 'periodo_anterior': {
                     'mes': mes_anterior,
                     'label': f"{mes_anterior_nome}/{mes_anterior_date.strftime('%Y')}",
-                    'dias_perdidos': round(metricas_anterior.get('total_dias', 0), 2),
-                    'horas_perdidas': round(metricas_anterior.get('total_horas', 0), 2),
+                    'dias_perdidos': round(dias_anterior, 2),
+                    'horas_perdidas': round(horas_anterior, 2),
                     'total_registros': metricas_anterior.get('total_registros', 0)
                 },
                 'variacao': {
@@ -1945,8 +1951,14 @@ class Analytics:
                     return 100.0 if atual > 0 else 0.0
                 return ((atual - anterior) / anterior) * 100
             
-            variacao_dias = calcular_variacao(metricas_atual.get('total_dias', 0), metricas_anterior.get('total_dias', 0))
-            variacao_horas = calcular_variacao(metricas_atual.get('total_horas', 0), metricas_anterior.get('total_horas', 0))
+            # CORREÇÃO: Usa os nomes corretos dos campos retornados por metricas_gerais
+            dias_atual = metricas_atual.get('total_dias_perdidos', 0) or metricas_atual.get('total_dias', 0) or 0
+            horas_atual = metricas_atual.get('total_horas_perdidas', 0) or metricas_atual.get('total_horas', 0) or 0
+            dias_anterior = metricas_anterior.get('total_dias_perdidos', 0) or metricas_anterior.get('total_dias', 0) or 0
+            horas_anterior = metricas_anterior.get('total_horas_perdidas', 0) or metricas_anterior.get('total_horas', 0) or 0
+            
+            variacao_dias = calcular_variacao(dias_atual, dias_anterior)
+            variacao_horas = calcular_variacao(horas_atual, horas_anterior)
             variacao_registros = calcular_variacao(metricas_atual.get('total_registros', 0), metricas_anterior.get('total_registros', 0))
             
             return {
@@ -1955,16 +1967,16 @@ class Analytics:
                     'mes_inicio': mes_inicio_trimestre,
                     'mes_fim': mes_fim_trimestre,
                     'label': f"{mes_inicio_trimestre_date.strftime('%b/%Y')} a {hoje.strftime('%b/%Y')}",
-                    'dias_perdidos': round(metricas_atual.get('total_dias', 0), 2),
-                    'horas_perdidas': round(metricas_atual.get('total_horas', 0), 2),
+                    'dias_perdidos': round(dias_atual, 2),
+                    'horas_perdidas': round(horas_atual, 2),
                     'total_registros': metricas_atual.get('total_registros', 0)
                 },
                 'periodo_anterior': {
                     'mes_inicio': mes_inicio_anterior,
                     'mes_fim': mes_fim_anterior,
                     'label': f"{mes_inicio_anterior_date.strftime('%b/%Y')} a {mes_fim_anterior_date.strftime('%b/%Y')}",
-                    'dias_perdidos': round(metricas_anterior.get('total_dias', 0), 2),
-                    'horas_perdidas': round(metricas_anterior.get('total_horas', 0), 2),
+                    'dias_perdidos': round(dias_anterior, 2),
+                    'horas_perdidas': round(horas_anterior, 2),
                     'total_registros': metricas_anterior.get('total_registros', 0)
                 },
                 'variacao': {
