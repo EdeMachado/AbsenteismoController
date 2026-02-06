@@ -372,6 +372,17 @@ async def configuracoes_page():
 async def index():
     """Página principal - Dashboard"""
     file_path = os.path.join(FRONTEND_DIR, "index.html")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Arquivo index.html não encontrado")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/index.html", response_class=HTMLResponse)
+async def index_html():
+    """Página principal - Dashboard (alias para /)"""
+    file_path = os.path.join(FRONTEND_DIR, "index.html")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Arquivo index.html não encontrado")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
