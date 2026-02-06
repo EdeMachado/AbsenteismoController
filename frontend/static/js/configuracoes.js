@@ -426,12 +426,12 @@ async function salvarEdicaoUsuario() {
             formData.append('password', password);
         }
         
-        formData.append('nome_completo', document.getElementById('editar_nome_completo').value);
-        formData.append('is_admin', document.getElementById('editar_is_admin').checked.toString());
-        formData.append('is_active', document.getElementById('editar_is_active').checked.toString());
+        formData.append('nome_completo', document.getElementById('editar_nome_completo').value || '');
+        formData.append('is_admin', document.getElementById('editar_is_admin').checked ? 'true' : 'false');
+        formData.append('is_active', document.getElementById('editar_is_active').checked ? 'true' : 'false');
         
         const clientId = document.getElementById('editar_client_id').value;
-        if (clientId) {
+        if (clientId && clientId !== '') {
             formData.append('client_id', clientId);
         } else {
             formData.append('client_id', '');
