@@ -3007,6 +3007,153 @@ async def dados_apresentacao(
                     "dados": dias_setor_genero,
                     "analise": analise_setor_gen
                 })
+            
+            # Slide 14: Evolução por Setor
+            try:
+                evolucao_setor = analytics.evolucao_por_setor(client_id, 12, mes_inicio, mes_fim, funcionario, setor)
+                if evolucao_setor and len(evolucao_setor) > 0:
+                    try:
+                        analise_evol_setor = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_setor, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise evolução setor: {e}")
+                        analise_evol_setor = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "evolucao_setor",
+                        "titulo": "Evolução de Dias Perdidos por Setor",
+                        "subtitulo": "Tendência dos principais setores",
+                        "dados": evolucao_setor,
+                        "analise": analise_evol_setor
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular evolução por setor para apresentação: {e}")
+            
+            # Slide 15: Comparativo Mensal
+            try:
+                comparativo_mensal = analytics.comparativo_periodos(client_id, tipo_comparacao='mes', funcionario=funcionario, setor=setor)
+                if comparativo_mensal and comparativo_mensal.get('periodo_atual') and comparativo_mensal.get('periodo_anterior'):
+                    try:
+                        analise_comp_mensal = insights_engine.gerar_analise_grafico('kpis', None, comparativo_mensal)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise comparativo mensal: {e}")
+                        analise_comp_mensal = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_mensal",
+                        "titulo": "Comparativo Mensal",
+                        "subtitulo": "Mês atual vs mês anterior",
+                        "dados": comparativo_mensal,
+                        "analise": analise_comp_mensal
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo mensal para apresentação: {e}")
+            
+            # Slide 16: Comparativo Trimestral
+            try:
+                comparativo_trimestral = analytics.comparativo_periodos(client_id, tipo_comparacao='trimestre', funcionario=funcionario, setor=setor)
+                if comparativo_trimestral and comparativo_trimestral.get('periodo_atual') and comparativo_trimestral.get('periodo_anterior'):
+                    try:
+                        analise_comp_trim = insights_engine.gerar_analise_grafico('kpis', None, comparativo_trimestral)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise comparativo trimestral: {e}")
+                        analise_comp_trim = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_trimestral",
+                        "titulo": "Comparativo Trimestral",
+                        "subtitulo": "Trimestre atual vs anterior",
+                        "dados": comparativo_trimestral,
+                        "analise": analise_comp_trim
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo trimestral para apresentação: {e}")
+            
+            # Slide 17: Comparativo Ano Anterior
+            try:
+                comparativo_ano = analytics.comparativo_ano_anterior(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
+                if comparativo_ano and len(comparativo_ano) > 0:
+                    try:
+                        analise_comp_ano = insights_engine.gerar_analise_grafico('evolucao_mensal', comparativo_ano, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise comparativo ano anterior: {e}")
+                        analise_comp_ano = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_ano_anterior",
+                        "titulo": "Comparativo Ano Anterior",
+                        "subtitulo": "Ano atual vs mesmo período do ano anterior",
+                        "dados": comparativo_ano,
+                        "analise": analise_comp_ano
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo ano anterior para apresentação: {e}")
+            
+            # Slide 18: Heatmap (Mapa de Calor)
+            try:
+                heatmap_data = analytics.heatmap_setores_meses(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario)
+                if heatmap_data and (heatmap_data.get('setores') or heatmap_data.get('meses') or heatmap_data.get('dados')):
+                    try:
+                        analise_heatmap = insights_engine.gerar_analise_grafico('top_setores', None, heatmap_data)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise heatmap: {e}")
+                        analise_heatmap = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "heatmap",
+                        "titulo": "Mapa de Calor",
+                        "subtitulo": "Dias perdidos por setor e mês",
+                        "dados": heatmap_data,
+                        "analise": analise_heatmap
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular heatmap para apresentação: {e}")
+            
+            # Slide 19: Comparativo Dias vs Horas
+            try:
+                comparativo_dias_horas = analytics.comparativo_dias_horas(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if comparativo_dias_horas and len(comparativo_dias_horas) > 0:
+                    try:
+                        analise_comp_dh = insights_engine.gerar_analise_grafico('setor_genero', comparativo_dias_horas, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise comparativo dias/horas: {e}")
+                        analise_comp_dh = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_dias_horas",
+                        "titulo": "Comparativo: Dias vs Horas Perdidas",
+                        "subtitulo": "Por setor",
+                        "dados": comparativo_dias_horas,
+                        "analise": analise_comp_dh
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo dias/horas para apresentação: {e}")
+            
+            # Slide 20: Frequência de Atestados por Funcionário
+            try:
+                frequencia_atestados = analytics.frequencia_atestados_por_funcionario(client_id, mes_inicio, mes_fim, funcionario, setor)
+                if frequencia_atestados and len(frequencia_atestados) > 0:
+                    try:
+                        analise_freq = insights_engine.gerar_analise_grafico('funcionarios_dias', frequencia_atestados, metricas)
+                    except Exception as e:
+                        print(f"Erro ao gerar análise frequência atestados: {e}")
+                        analise_freq = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "frequencia_atestados",
+                        "titulo": "Frequência de Atestados por Funcionário",
+                        "subtitulo": "Distribuição de funcionários por número de atestados",
+                        "dados": frequencia_atestados,
+                        "analise": analise_freq
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular frequência atestados para apresentação: {e}")
         
         # ==================== RODA DE OURO (client_id = 4) - ISOLADO ====================
         elif client_id == 4:

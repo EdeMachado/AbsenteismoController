@@ -1906,6 +1906,242 @@ function renderizarGrafico(slide) {
             }
             break;
         
+        case 'evolucao_setor':
+            // Evolução de dias perdidos por setor ao longo do tempo
+            if (dados && typeof dados === 'object' && !Array.isArray(dados)) {
+                const setores = Object.keys(dados);
+                const meses = dados[setores[0]] ? dados[setores[0]].map(d => d.mes || 'N/A') : [];
+                
+                const datasets = setores.slice(0, 5).map((setor, idx) => {
+                    const cores = [CORES_EMPRESA.primary, CORES_EMPRESA.secondary, CORES_EMPRESA.primaryLight, CORES_EMPRESA.secondaryLight, '#5c6bc0'];
+                    return {
+                        label: truncate(setor, 20),
+                        data: dados[setor] ? dados[setor].map(d => d.dias_perdidos || 0) : [],
+                        borderColor: cores[idx % cores.length],
+                        backgroundColor: cores[idx % cores.length] + '40',
+                        fill: false,
+                        tension: 0.4
+                    };
+                });
+                
+                config = {
+                    type: 'line',
+                    data: {
+                        labels: meses,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Dias Perdidos' } }
+                        }
+                    }
+                };
+            }
+            break;
+        
+        case 'comparativo_mensal':
+        case 'comparativo_trimestral':
+            // Gráfico de barras comparando dois períodos
+            if (dados && dados.periodo_atual && dados.periodo_anterior) {
+                const labels = ['Atestados', 'Dias Perdidos', 'Horas Perdidas'];
+                const atual = [
+                    dados.periodo_atual.total_atestados || 0,
+                    dados.periodo_atual.total_dias_perdidos || 0,
+                    dados.periodo_atual.total_horas_perdidas || 0
+                ];
+                const anterior = [
+                    dados.periodo_anterior.total_atestados || 0,
+                    dados.periodo_anterior.total_dias_perdidos || 0,
+                    dados.periodo_anterior.total_horas_perdidas || 0
+                ];
+                
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: tipo === 'comparativo_mensal' ? 'Mês Atual' : 'Trimestre Atual',
+                                data: atual,
+                                backgroundColor: CORES_EMPRESA.primary
+                            },
+                            {
+                                label: tipo === 'comparativo_mensal' ? 'Mês Anterior' : 'Trimestre Anterior',
+                                data: anterior,
+                                backgroundColor: CORES_EMPRESA.secondary
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                };
+            }
+            break;
+        
+        case 'comparativo_ano_anterior':
+            // Gráfico de linha comparando mês a mês do ano atual vs anterior
+            if (Array.isArray(dados) && dados.length > 0) {
+                const labels = dados.map(d => d.mes || 'N/A');
+                const atual = dados.map(d => d.atual || 0);
+                const anterior = dados.map(d => d.anterior || 0);
+                
+                config = {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Ano Atual',
+                                data: atual,
+                                borderColor: CORES_EMPRESA.primary,
+                                backgroundColor: CORES_EMPRESA.primaryLight + '40',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Ano Anterior',
+                                data: anterior,
+                                borderColor: CORES_EMPRESA.secondary,
+                                backgroundColor: CORES_EMPRESA.secondaryLight + '40',
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Dias Perdidos' } }
+                        }
+                    }
+                };
+            }
+            break;
+        
+        case 'heatmap':
+            // Heatmap será renderizado como tabela HTML (similar ao dashboard)
+            if (dados && (dados.setores || dados.meses || dados.dados)) {
+                // Se tiver dados estruturados, tenta criar visualização
+                const container = document.getElementById('chartSlide');
+                if (container && container.parentElement) {
+                    // Limpa container anterior
+                    container.parentElement.innerHTML = '';
+                    
+                    // Cria div para heatmap HTML
+                    const heatmapDiv = document.createElement('div');
+                    heatmapDiv.id = 'heatmapApresentacao';
+                    heatmapDiv.style.width = '100%';
+                    heatmapDiv.style.height = '100%';
+                    heatmapDiv.style.overflow = 'auto';
+                    container.parentElement.appendChild(heatmapDiv);
+                    
+                    // Renderiza tabela HTML (similar ao dashboard)
+                    setTimeout(() => {
+                        renderizarHeatmapTabela(dados, heatmapDiv);
+                    }, 100);
+                }
+                // Não cria config Chart.js para heatmap
+                return;
+            }
+            break;
+        
+        case 'comparativo_dias_horas':
+            // Gráfico de barras agrupadas comparando dias vs horas por setor
+            if (Array.isArray(dados) && dados.length > 0) {
+                const setores = dados.slice(0, 10).map(d => truncate(d.setor || 'Sem setor', 20));
+                const dias = dados.slice(0, 10).map(d => d.dias_perdidos || 0);
+                const horas = dados.slice(0, 10).map(d => d.horas_perdidas || 0);
+                
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: setores,
+                        datasets: [
+                            {
+                                label: 'Dias Perdidos',
+                                data: dias,
+                                backgroundColor: CORES_EMPRESA.primary
+                            },
+                            {
+                                label: 'Horas Perdidas',
+                                data: horas,
+                                backgroundColor: CORES_EMPRESA.secondary
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                };
+            }
+            break;
+        
+        case 'frequencia_atestados':
+            // Histograma de frequência de atestados por funcionário
+            if (Array.isArray(dados) && dados.length > 0) {
+                const labels = dados.map(d => `${d.num_atestados || 0} atestado(s)`);
+                const valores = dados.map(d => d.num_funcionarios || 0);
+                
+                config = {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Número de Funcionários',
+                            data: valores,
+                            backgroundColor: CORES_EMPRESA.primary
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.parsed.y} funcionário(s)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Número de Funcionários' } },
+                            x: { title: { display: true, text: 'Número de Atestados' } }
+                        }
+                    }
+                };
+            }
+            break;
+        
         default:
             console.warn(`[APRESENTACAO] Tipo de gráfico não reconhecido: ${tipo}`);
             // Tenta renderizar como gráfico genérico se tiver dados
