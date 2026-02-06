@@ -4103,37 +4103,30 @@ let chartHeatmap = null;
 
 function renderizarChartHeatmap(dados) {
     console.log('[HEATMAP] Iniciando renderização:', dados);
-    const ctx = document.getElementById('chartHeatmap');
-    if (!ctx) {
-        console.error('[HEATMAP] Canvas não encontrado!');
+    const container = document.getElementById('chartHeatmap')?.closest('.chart-wrapper');
+    if (!container) {
+        console.error('[HEATMAP] Container não encontrado!');
         return;
     }
     
     if (!dados || !dados.setores || dados.setores.length === 0) {
         console.warn('[HEATMAP] Dados inválidos ou vazios');
-        ctx.style.display = 'none';
         return;
     }
     
     if (!dados.dados || !Array.isArray(dados.dados) || dados.dados.length === 0) {
         console.warn('[HEATMAP] Matriz de dados vazia');
-        ctx.style.display = 'none';
         return;
     }
     
-    console.log('[HEATMAP] Dados válidos:', {
-        setores: dados.setores.length,
-        meses: dados.meses ? dados.meses.length : 0,
-        dados: dados.dados.length
-    });
+    // Remove canvas antigo se existir
+    const canvas = document.getElementById('chartHeatmap');
+    if (canvas) {
+        canvas.remove();
+    }
     
-    destruirGraficoSeguro('chartHeatmap', chartHeatmap);
-    chartHeatmap = null;
-    
-    // Garante que o canvas está visível
-    ctx.style.display = 'block';
-    
-    const cores = getCores();
+    // Limpa container
+    container.innerHTML = '';
     
     // Encontra o valor máximo para normalizar as cores
     let maxValor = 0;
@@ -4147,117 +4140,167 @@ function renderizarChartHeatmap(dados) {
         }
     }
     
-    console.log('[HEATMAP] Valor máximo encontrado:', maxValor);
-    
-    // Cria função para gerar cor baseada no valor
+    // Cria função para gerar cor baseada no valor (gradiente de claro para escuro)
     function getColorForValue(valor) {
-        if (maxValor === 0) return 'rgba(200, 200, 200, 0.3)';
+        if (maxValor === 0) return '#f0f0f0';
         const intensity = Math.min(valor / maxValor, 1);
-        // Gradiente de azul claro para azul escuro
-        const r = Math.floor(33 + (26 - 33) * intensity);
-        const g = Math.floor(150 + (58 - 150) * intensity);
-        const b = Math.floor(243 + (118 - 243) * intensity);
-        const alpha = 0.6 + (0.9 - 0.6) * intensity;
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-    
-    // Prepara datasets
-    let datasets = [];
-    const meses = dados.meses || [];
-    
-    if (meses.length > 12) {
-        // Agrupa meses em trimestres
-        const mesesPorTrimestre = Math.ceil(meses.length / 4);
         
-        for (let t = 0; t < 4; t++) {
-            const inicio = t * mesesPorTrimestre;
-            const fim = Math.min((t + 1) * mesesPorTrimestre, meses.length);
-            const mesesTrimestre = meses.slice(inicio, fim);
-            
-            const dadosTrimestre = [];
-            for (let i = 0; i < dados.setores.length; i++) {
-                let soma = 0;
-                if (Array.isArray(dados.dados[i])) {
-                    for (let j = inicio; j < fim && j < dados.dados[i].length; j++) {
-                        soma += (parseFloat(dados.dados[i][j]) || 0);
-                    }
-                }
-                dadosTrimestre.push(soma);
-            }
-            
-            const label = mesesTrimestre.length > 0 
-                ? `${mesesTrimestre[0]} - ${mesesTrimestre[mesesTrimestre.length - 1]}`
-                : `Trimestre ${t + 1}`;
-            
-            datasets.push({
-                label: label,
-                data: dadosTrimestre,
-                backgroundColor: dadosTrimestre.map(v => getColorForValue(v)),
-                borderColor: dadosTrimestre.map(v => getColorForValue(v)),
-                borderWidth: 1
-            });
-        }
-    } else {
-        // Usa todos os meses
-        for (let j = 0; j < meses.length; j++) {
-            const mesData = dados.dados.map((linha) => {
-                if (!Array.isArray(linha)) return 0;
-                return parseFloat(linha[j]) || 0;
-            });
-            
-            datasets.push({
-                label: meses[j] || `Mês ${j + 1}`,
-                data: mesData,
-                backgroundColor: mesData.map(v => getColorForValue(v)),
-                borderColor: mesData.map(v => getColorForValue(v)),
-                borderWidth: 1
-            });
+        // Gradiente: branco -> amarelo claro -> laranja -> vermelho -> vermelho escuro
+        if (intensity === 0) return '#ffffff';
+        if (intensity < 0.2) {
+            // Branco para amarelo claro
+            const factor = intensity / 0.2;
+            return `rgb(255, ${255 - Math.floor(100 * factor)}, ${255 - Math.floor(150 * factor)})`;
+        } else if (intensity < 0.4) {
+            // Amarelo para laranja
+            const factor = (intensity - 0.2) / 0.2;
+            return `rgb(255, ${255 - Math.floor(155 * factor)}, ${155 - Math.floor(155 * factor)})`;
+        } else if (intensity < 0.6) {
+            // Laranja para vermelho
+            const factor = (intensity - 0.4) / 0.2;
+            return `rgb(255, ${100 - Math.floor(100 * factor)}, 0)`;
+        } else if (intensity < 0.8) {
+            // Vermelho para vermelho escuro
+            const factor = (intensity - 0.6) / 0.2;
+            return `rgb(${255 - Math.floor(55 * factor)}, ${0}, 0)`;
+        } else {
+            // Vermelho escuro para quase preto
+            const factor = (intensity - 0.8) / 0.2;
+            return `rgb(${200 - Math.floor(150 * factor)}, 0, 0)`;
         }
     }
     
-    console.log('[HEATMAP] Criando gráfico com', datasets.length, 'datasets');
+    const meses = dados.meses || [];
+    const setores = dados.setores || [];
     
-    try {
-        chartHeatmap = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: dados.setores.map(s => truncate(s || 'Sem setor', 20)),
-                datasets: datasets
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: { font: { size: 10 }, maxWidth: 100 }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const valor = context.parsed.x;
-                                return `${context.dataset.label}: ${valor.toFixed(2)} dias`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { 
-                        beginAtZero: true,
-                        stacked: true
-                    },
-                    y: { 
-                        stacked: true,
-                        ticks: { font: { size: 10 } }
-                    }
-                }
-            }
-        });
-        console.log('[HEATMAP] Gráfico criado com sucesso!');
-    } catch (error) {
-        console.error('[HEATMAP] Erro ao criar gráfico:', error);
+    // Cria tabela HTML para o heatmap
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.height = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '11px';
+    table.style.tableLayout = 'fixed';
+    
+    // Cabeçalho com meses
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    
+    // Primeira célula vazia (canto superior esquerdo)
+    const emptyHeader = document.createElement('th');
+    emptyHeader.style.border = '1px solid #ddd';
+    emptyHeader.style.padding = '4px';
+    emptyHeader.style.backgroundColor = '#f5f5f5';
+    emptyHeader.style.position = 'sticky';
+    emptyHeader.style.left = '0';
+    emptyHeader.style.zIndex = '10';
+    headerRow.appendChild(emptyHeader);
+    
+    // Cabeçalhos dos meses
+    meses.forEach(mes => {
+        const th = document.createElement('th');
+        th.textContent = mes;
+        th.style.border = '1px solid #ddd';
+        th.style.padding = '4px';
+        th.style.backgroundColor = '#f5f5f5';
+        th.style.textAlign = 'center';
+        th.style.fontWeight = 'bold';
+        th.style.minWidth = '60px';
+        headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Corpo com setores e dados
+    const tbody = document.createElement('tbody');
+    
+    setores.forEach((setor, i) => {
+        const row = document.createElement('tr');
+        
+        // Nome do setor (primeira coluna)
+        const setorCell = document.createElement('td');
+        setorCell.textContent = truncate(setor || 'Sem setor', 25);
+        setorCell.style.border = '1px solid #ddd';
+        setorCell.style.padding = '4px';
+        setorCell.style.backgroundColor = '#f5f5f5';
+        setorCell.style.position = 'sticky';
+        setorCell.style.left = '0';
+        setorCell.style.zIndex = '5';
+        setorCell.style.fontWeight = '500';
+        setorCell.style.textAlign = 'left';
+        row.appendChild(setorCell);
+        
+        // Células de dados (meses)
+        if (Array.isArray(dados.dados[i])) {
+            dados.dados[i].forEach((valor, j) => {
+                const cell = document.createElement('td');
+                const valorNum = parseFloat(valor) || 0;
+                cell.textContent = valorNum > 0 ? valorNum.toFixed(1) : '';
+                cell.style.border = '1px solid #ddd';
+                cell.style.padding = '4px';
+                cell.style.backgroundColor = getColorForValue(valorNum);
+                cell.style.textAlign = 'center';
+                cell.style.cursor = 'pointer';
+                cell.style.transition = 'opacity 0.2s';
+                
+                // Tooltip
+                cell.title = `${setor} - ${meses[j] || 'Mês ' + (j + 1)}: ${valorNum.toFixed(2)} dias perdidos`;
+                
+                // Efeito hover
+                cell.addEventListener('mouseenter', function() {
+                    this.style.opacity = '0.8';
+                    this.style.border = '2px solid #333';
+                });
+                cell.addEventListener('mouseleave', function() {
+                    this.style.opacity = '1';
+                    this.style.border = '1px solid #ddd';
+                });
+                
+                row.appendChild(cell);
+            });
+        }
+        
+        tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    
+    // Adiciona tabela ao container
+    container.appendChild(table);
+    
+    // Adiciona legenda de cores
+    const legend = document.createElement('div');
+    legend.style.marginTop = '10px';
+    legend.style.display = 'flex';
+    legend.style.alignItems = 'center';
+    legend.style.justifyContent = 'center';
+    legend.style.gap = '10px';
+    legend.style.fontSize = '11px';
+    
+    const legendLabel = document.createElement('span');
+    legendLabel.textContent = 'Intensidade: ';
+    legendLabel.style.fontWeight = 'bold';
+    legend.appendChild(legendLabel);
+    
+    // Cria gradiente de cores na legenda
+    for (let i = 0; i <= 10; i++) {
+        const intensity = i / 10;
+        const colorBox = document.createElement('div');
+        colorBox.style.width = '20px';
+        colorBox.style.height = '20px';
+        colorBox.style.backgroundColor = getColorForValue(intensity * maxValor);
+        colorBox.style.border = '1px solid #ddd';
+        colorBox.style.borderRadius = '2px';
+        legend.appendChild(colorBox);
     }
+    
+    const legendMax = document.createElement('span');
+    legendMax.textContent = ` (Máx: ${maxValor.toFixed(1)} dias)`;
+    legend.appendChild(legendMax);
+    
+    container.appendChild(legend);
+    
+    console.log('[HEATMAP] Heatmap visual criado com sucesso!');
 }
 
 // Torna funções globais
