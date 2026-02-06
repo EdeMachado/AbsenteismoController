@@ -1016,7 +1016,7 @@ async def update_user(
     nome_completo: Optional[str] = Form(None),
     is_admin: Optional[bool] = Form(None),
     is_active: Optional[bool] = Form(None),
-    client_id: Optional[int] = Form(None),
+    client_id: Optional[str] = Form(None),  # Recebe como string para tratar vazio
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -1051,20 +1051,35 @@ async def update_user(
         user.nome_completo = nome_completo
     
     if is_admin is not None:
+        # Converte string para bool se necessário
+        if isinstance(is_admin, str):
+            is_admin = is_admin.lower() in ('true', '1', 'yes', 'on')
         user.is_admin = is_admin
     
     if is_active is not None:
+        # Converte string para bool se necessário
+        if isinstance(is_active, str):
+            is_active = is_active.lower() in ('true', '1', 'yes', 'on')
         user.is_active = is_active
     
+    # Trata client_id (pode vir como string vazia, None, ou número)
     if client_id is not None:
-        if client_id > 0:
-            validar_client_id(db, client_id)
-            user.client_id = client_id
-        else:
+        if client_id == '' or client_id == 'null' or client_id == 'None':
             user.client_id = None
+        else:
+            try:
+                client_id_int = int(client_id)
+                if client_id_int > 0:
+                    validar_client_id(db, client_id_int)
+                    user.client_id = client_id_int
+                else:
+                    user.client_id = None
+            except (ValueError, TypeError):
+                user.client_id = None
     
     db.commit()
-    return {"message": "Usuário atualizado com sucesso"}
+    db.refresh(user)
+    return {"message": "Usuário atualizado com sucesso", "user_id": user.id}
 
 @app.post("/api/upload")
 async def upload_file(
