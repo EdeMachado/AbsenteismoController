@@ -1,0 +1,48 @@
+========================================
+  COMANDOS PARA ENCONTRAR O SISTEMA DE ABSENTEÍSMO
+========================================
+
+Execute estes comandos no servidor:
+
+1. PROCURAR POR ARQUIVOS ESPECÍFICOS DO SISTEMA:
+-------------------------------------------------
+find ~ -name "dashboard.js" 2>/dev/null
+find ~ -name "analytics.py" 2>/dev/null
+find ~ -name "index.html" -path "*/frontend/*" 2>/dev/null
+find ~ -name "requirements.txt" 2>/dev/null
+
+2. PROCURAR POR PASTA "frontend":
+-------------------------------------------------
+find ~ -type d -name "frontend" 2>/dev/null
+
+3. VERIFICAR O QUE TEM EM cashflowpro:
+-------------------------------------------------
+ls -la /root/cashflowpro/
+
+4. PROCURAR POR REPOSITÓRIO GIT:
+-------------------------------------------------
+find ~ -name ".git" -type d 2>/dev/null
+
+5. LISTAR TUDO QUE TEM EM /root:
+-------------------------------------------------
+ls -la /root/ | head -20
+
+========================================
+  COMANDO COMPLETO (copie e cole):
+========================================
+
+echo "=== Procurando dashboard.js ==="
+find ~ -name "dashboard.js" 2>/dev/null
+echo ""
+echo "=== Procurando analytics.py ==="
+find ~ -name "analytics.py" 2>/dev/null
+echo ""
+echo "=== Procurando frontend ==="
+find ~ -type d -name "frontend" 2>/dev/null
+echo ""
+echo "=== Procurando .git ==="
+find ~ -name ".git" -type d 2>/dev/null
+echo ""
+echo "=== Listando /root ==="
+ls -la /root/ | head -20
+

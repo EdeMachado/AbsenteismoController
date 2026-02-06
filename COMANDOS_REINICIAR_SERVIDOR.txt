@@ -1,0 +1,58 @@
+========================================
+  COMANDOS PARA REINICIAR O SERVIDOR
+========================================
+
+Execute estes comandos no servidor:
+
+1. VERIFICAR PROCESSOS RODANDO:
+--------------------------------
+ps aux | grep uvicorn
+ps aux | grep gunicorn
+ps aux | grep python | grep main
+
+2. VERIFICAR SE HÁ SERVIÇO SYSTEMD:
+--------------------------------
+systemctl list-units | grep absenteismo
+systemctl list-units | grep uvicorn
+systemctl list-units | grep gunicorn
+
+3. REINICIAR SE FOR SYSTEMD:
+--------------------------------
+sudo systemctl restart absenteismo
+# OU
+sudo systemctl restart gunicorn
+# OU
+sudo systemctl restart uvicorn
+
+4. SE FOR PROCESSO MANUAL, MATAR E REINICIAR:
+--------------------------------
+# Encontrar PID
+ps aux | grep "uvicorn.*main" | grep -v grep
+
+# Matar processo (substitua PID pelo número encontrado)
+kill -HUP PID
+
+# OU matar todos os processos uvicorn
+pkill -HUP uvicorn
+
+5. VERIFICAR SE ESTÁ RODANDO:
+--------------------------------
+ps aux | grep uvicorn | grep -v grep
+netstat -tlnp | grep 8000
+
+========================================
+  COMANDO RÁPIDO (copie e cole):
+========================================
+
+echo "=== Processos Python ==="
+ps aux | grep python | grep -v grep
+echo ""
+echo "=== Processos Uvicorn/Gunicorn ==="
+ps aux | grep -E "uvicorn|gunicorn" | grep -v grep
+echo ""
+echo "=== Serviços Systemd ==="
+systemctl list-units | grep -E "absenteismo|uvicorn|gunicorn"
+echo ""
+echo "=== Porta 8000 ==="
+netstat -tlnp | grep 8000
+

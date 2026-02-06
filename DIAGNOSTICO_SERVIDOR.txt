@@ -1,0 +1,58 @@
+========================================
+  DIAGNÓSTICO E CORREÇÃO DO SERVIDOR
+========================================
+
+Execute estes comandos no servidor para diagnosticar:
+
+1. VERIFICAR SE O SERVIDOR ESTÁ RODANDO:
+----------------------------------------
+ps aux | grep -E "uvicorn|gunicorn|python.*main" | grep -v grep
+
+2. VERIFICAR LOGS DE ERRO:
+----------------------------------------
+cd /var/www/absenteismo
+tail -50 nohup.out
+# OU
+journalctl -u absenteismo -n 50
+# OU
+tail -50 /var/log/absenteismo.log
+
+3. VERIFICAR DEPENDÊNCIAS:
+----------------------------------------
+cd /var/www/absenteismo
+source venv/bin/activate  # se usar venv
+pip list | grep -E "fastapi|uvicorn|sqlalchemy"
+
+4. TENTAR INICIAR MANUALMENTE PARA VER ERROS:
+----------------------------------------
+cd /var/www/absenteismo
+source venv/bin/activate  # se usar venv
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+5. VERIFICAR SE A PORTA ESTÁ EM USO:
+----------------------------------------
+netstat -tlnp | grep 8000
+lsof -i :8000
+
+6. VERIFICAR PERMISSÕES:
+----------------------------------------
+ls -la /var/www/absenteismo/backend/main.py
+ls -la /var/www/absenteismo/database/
+
+========================================
+  COMANDOS RÁPIDOS (copie e cole):
+========================================
+
+cd /var/www/absenteismo
+echo "=== Processos ==="
+ps aux | grep -E "uvicorn|gunicorn|python.*main" | grep -v grep
+echo ""
+echo "=== Porta 8000 ==="
+netstat -tlnp | grep 8000
+echo ""
+echo "=== Últimos logs ==="
+tail -30 nohup.out 2>/dev/null || echo "Sem nohup.out"
+echo ""
+echo "=== Dependências ==="
+source venv/bin/activate 2>/dev/null && pip list | grep -E "fastapi|uvicorn" || echo "Sem venv ou erro"
+

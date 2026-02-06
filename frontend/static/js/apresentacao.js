@@ -191,9 +191,12 @@ async function carregarApresentacao(forceClientId = null) {
         }
         
         if (slides.length > 0) {
-            slideAtual = 0;
-            console.log('[APRESENTACAO] Renderizando slide 0:', slides[0]);
-            renderizarSlide(slides[0]);
+            // CORREÇÃO: Não reseta slideAtual se já estiver em um slide válido
+            if (slideAtual >= slides.length || slideAtual < 0) {
+                slideAtual = 0;
+            }
+            console.log('[APRESENTACAO] Renderizando slide', slideAtual, ':', slides[slideAtual]);
+            renderizarSlide(slides[slideAtual]);
             atualizarBotoes();
         } else {
             console.error('[APRESENTACAO] Nenhum slide retornado!');

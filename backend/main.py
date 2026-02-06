@@ -3020,7 +3020,29 @@ async def dados_apresentacao(
                     )
                     if tem_dados:
                         try:
-                            analise_evol_setor = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_setor, metricas)
+                            # Gera análise específica para evolução por setor
+                            setores_ordenados = sorted(
+                                evolucao_setor.items(),
+                                key=lambda x: sum(d.get('dias_perdidos', 0) for d in x[1] if isinstance(x[1], list)),
+                                reverse=True
+                            )
+                            
+                            if setores_ordenados:
+                                setor_maior = setores_ordenados[0][0]
+                                total_setor_maior = sum(d.get('dias_perdidos', 0) for d in setores_ordenados[0][1] if isinstance(setores_ordenados[0][1], list))
+                                total_geral = sum(
+                                    sum(d.get('dias_perdidos', 0) for d in dados if isinstance(dados, list))
+                                    for _, dados in setores_ordenados
+                                )
+                                pct = (total_setor_maior / total_geral * 100) if total_geral > 0 else 0
+                                
+                                analise_evol_setor = f"""📈 **Análise: Evolução de Dias Perdidos por Setor**
+
+O setor **{setor_maior}** apresenta a maior evolução de dias perdidos, com **{int(total_setor_maior)} dias ({pct:.1f}% do total)** no período analisado.
+
+Esta análise permite identificar tendências de absenteísmo por setor ao longo do tempo, facilitando a identificação de períodos críticos e setores que demandam maior atenção.
+
+💡 **Recomendação**: Implementar ações preventivas específicas para o setor com maior impacto, incluindo avaliações periódicas de saúde ocupacional e programas de gestão de absenteísmo direcionados."""
                         except Exception as e:
                             print(f"Erro ao gerar análise evolução setor: {e}")
                             analise_evol_setor = "Análise não disponível."
@@ -3041,7 +3063,33 @@ async def dados_apresentacao(
                 comparativo_mensal = analytics.comparativo_periodos(client_id, tipo_comparacao='mes', funcionario=funcionario, setor=setor)
                 if comparativo_mensal and comparativo_mensal.get('periodo_atual') and comparativo_mensal.get('periodo_anterior'):
                     try:
-                        analise_comp_mensal = insights_engine.gerar_analise_grafico('kpis', None, comparativo_mensal)
+                        # Gera análise específica para comparativo mensal
+                        atual = comparativo_mensal.get('periodo_atual', {})
+                        anterior = comparativo_mensal.get('periodo_anterior', {})
+                        
+                        dias_atual = atual.get('total_dias_perdidos', 0) or 0
+                        dias_anterior = anterior.get('total_dias_perdidos', 0) or 0
+                        horas_atual = atual.get('total_horas_perdidas', 0) or 0
+                        horas_anterior = anterior.get('total_horas_perdidas', 0) or 0
+                        registros_atual = atual.get('total_registros', 0) or 0
+                        registros_anterior = anterior.get('total_registros', 0) or 0
+                        
+                        variacao_dias = ((dias_atual - dias_anterior) / dias_anterior * 100) if dias_anterior > 0 else (100 if dias_atual > 0 else 0)
+                        variacao_horas = ((horas_atual - horas_anterior) / horas_anterior * 100) if horas_anterior > 0 else (100 if horas_atual > 0 else 0)
+                        variacao_registros = ((registros_atual - registros_anterior) / registros_anterior * 100) if registros_anterior > 0 else (100 if registros_atual > 0 else 0)
+                        
+                        analise_comp_mensal = f"""📊 **Análise: Comparativo Mensal**
+
+O mês atual apresenta **{int(dias_atual)} dias perdidos** e **{int(horas_atual)} horas perdidas**, comparado ao mês anterior com **{int(dias_anterior)} dias** e **{int(horas_anterior)} horas**.
+
+**Variações observadas:**
+- Dias perdidos: **{"+" if variacao_dias > 0 else ""}{variacao_dias:.1f}%**
+- Horas perdidas: **{"+" if variacao_horas > 0 else ""}{variacao_horas:.1f}%**
+- Total de registros: **{"+" if variacao_registros > 0 else ""}{variacao_registros:.1f}%**
+
+Esta comparação permite avaliar a evolução do absenteísmo mês a mês, identificando tendências e orientando ações preventivas.
+
+💡 **Recomendação**: {"Investigar causas do aumento observado e intensificar ações preventivas" if variacao_dias > 0 else "Manter as ações atuais e buscar consolidar a redução observada"}."""
                     except Exception as e:
                         print(f"Erro ao gerar análise comparativo mensal: {e}")
                         analise_comp_mensal = "Análise não disponível."
@@ -3062,7 +3110,33 @@ async def dados_apresentacao(
                 comparativo_trimestral = analytics.comparativo_periodos(client_id, tipo_comparacao='trimestre', funcionario=funcionario, setor=setor)
                 if comparativo_trimestral and comparativo_trimestral.get('periodo_atual') and comparativo_trimestral.get('periodo_anterior'):
                     try:
-                        analise_comp_trim = insights_engine.gerar_analise_grafico('kpis', None, comparativo_trimestral)
+                        # Gera análise específica para comparativo trimestral
+                        atual = comparativo_trimestral.get('periodo_atual', {})
+                        anterior = comparativo_trimestral.get('periodo_anterior', {})
+                        
+                        dias_atual = atual.get('total_dias_perdidos', 0) or 0
+                        dias_anterior = anterior.get('total_dias_perdidos', 0) or 0
+                        horas_atual = atual.get('total_horas_perdidas', 0) or 0
+                        horas_anterior = anterior.get('total_horas_perdidas', 0) or 0
+                        registros_atual = atual.get('total_registros', 0) or 0
+                        registros_anterior = anterior.get('total_registros', 0) or 0
+                        
+                        variacao_dias = ((dias_atual - dias_anterior) / dias_anterior * 100) if dias_anterior > 0 else (100 if dias_atual > 0 else 0)
+                        variacao_horas = ((horas_atual - horas_anterior) / horas_anterior * 100) if horas_anterior > 0 else (100 if horas_atual > 0 else 0)
+                        variacao_registros = ((registros_atual - registros_anterior) / registros_anterior * 100) if registros_anterior > 0 else (100 if registros_atual > 0 else 0)
+                        
+                        analise_comp_trim = f"""📊 **Análise: Comparativo Trimestral**
+
+O trimestre atual apresenta **{int(dias_atual)} dias perdidos** e **{int(horas_atual)} horas perdidas**, comparado ao trimestre anterior com **{int(dias_anterior)} dias** e **{int(horas_anterior)} horas**.
+
+**Variações observadas:**
+- Dias perdidos: **{"+" if variacao_dias > 0 else ""}{variacao_dias:.1f}%**
+- Horas perdidas: **{"+" if variacao_horas > 0 else ""}{variacao_horas:.1f}%**
+- Total de registros: **{"+" if variacao_registros > 0 else ""}{variacao_registros:.1f}%**
+
+Esta comparação permite avaliar a evolução do absenteísmo trimestre a trimestre, identificando tendências de médio prazo e orientando estratégias de gestão.
+
+💡 **Recomendação**: {"Investigar causas do aumento observado e intensificar ações preventivas de médio prazo" if variacao_dias > 0 else "Manter as ações atuais e buscar consolidar a redução observada"}."""
                     except Exception as e:
                         print(f"Erro ao gerar análise comparativo trimestral: {e}")
                         analise_comp_trim = "Análise não disponível."

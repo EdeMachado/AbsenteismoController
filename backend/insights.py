@@ -596,7 +596,12 @@ Esta distribuição permite identificar padrões nas causas de afastamento, orie
             total_dias = sum(d.get('dias_perdidos', 0) for d in dados)
             pct = (top.get('dias_perdidos', 0) / total_dias * 100) if total_dias > 0 else 0
             
-            setor_nome = top.get('setor', 'Não informado')
+            # CORREÇÃO: O campo é 'centro_custo', não 'setor'
+            setor_nome = top.get('centro_custo', top.get('setor', 'Não informado'))
+            if setor_nome == 'N/A' or not setor_nome or setor_nome == 'Não informado':
+                # Tenta pegar do campo setor se centro_custo não tiver
+                setor_nome = top.get('setor', 'Não informado')
+            
             if setor_nome == 'N/A' or not setor_nome:
                 setor_nome = 'Não informado'
             
@@ -615,9 +620,38 @@ Esta análise permite identificar os setores que demandam maior atenção em ter
             if isinstance(dados, list) and len(dados) == 0:
                 return "📊 **Análise: Distribuição de Dias por Atestado**\n\nDados ainda não disponíveis para este período."
             
-            # Encontra a faixa mais comum
+            # Encontra a faixa mais comum (dados vêm como: [{dias: '1 dia', quantidade: 10}, ...])
             mais_comum = max(dados, key=lambda x: x.get('quantidade', 0))
-            media = sum(d.get('dias', 0) * d.get('quantidade', 0) for d in dados) / sum(d.get('quantidade', 0) for d in dados) if sum(d.get('quantidade', 0) for d in dados) > 0 else 0
+            total_atestados = sum(d.get('quantidade', 0) for d in dados)
+            pct_mais_comum = (mais_comum.get('quantidade', 0) / total_atestados * 100) if total_atestados > 0 else 0
+            
+            # Calcula média ponderada: extrai número de dias da string (ex: '3-5 dias' -> 4, '1 dia' -> 1)
+            def extrair_media_dias(faixa_str):
+                if not faixa_str or not isinstance(faixa_str, str):
+                    return 0
+                # Remove 'dias' e espaços
+                faixa_limpa = faixa_str.replace('dias', '').replace('dia', '').strip()
+                if '-' in faixa_limpa:
+                    # Faixa como '3-5'
+                    partes = faixa_limpa.split('-')
+                    if len(partes) == 2:
+                        try:
+                            return (float(partes[0]) + float(partes[1])) / 2
+                        except:
+                            return 0
+                elif '+' in faixa_limpa:
+                    # Faixa como '31+'
+                    try:
+                        return float(faixa_limpa.replace('+', '')) + 5  # Aproximação
+                    except:
+                        return 0
+                else:
+                    try:
+                        return float(faixa_limpa)
+                    except:
+                        return 0
+            
+            media = sum(extrair_media_dias(d.get('dias', '')) * d.get('quantidade', 0) for d in dados) / total_atestados if total_atestados > 0 else 0
             
             dias_faixa = mais_comum.get('dias', 'Não informado')
             if dias_faixa == 'N/A' or not dias_faixa:
@@ -625,7 +659,7 @@ Esta análise permite identificar os setores que demandam maior atenção em ter
             
             analise = f"""📊 **Análise: Distribuição de Dias por Atestado**
 
-A maioria dos atestados concentra-se na faixa de **{dias_faixa} dias**, com média geral de **{media:.1f} dias por atestado**.
+A maioria dos atestados concentra-se na faixa de **{dias_faixa}**, representando **{pct_mais_comum:.1f}%** do total ({mais_comum.get('quantidade', 0)} atestados), com média geral de **{media:.1f} dias por atestado**.
 
 Esta distribuição permite entender o padrão de duração dos afastamentos, orientando estratégias de gestão e acompanhamento.
 
@@ -914,17 +948,21 @@ Esta distribuição permite identificar funcionários com padrão recorrente de 
             if isinstance(dados, list) and len(dados) == 0:
                 return "📊 **Análise: Comparativo Dias vs Horas Perdidas**\n\nDados ainda não disponíveis para este período."
             
-            # Encontra setor com maior impacto
-            setor_maior = max(dados, key=lambda x: (x.get('dias_perdidos', 0) + x.get('horas_perdidas', 0) / 8))
+            # Encontra setor com maior impacto (considera dias + horas convertidas)
+            setor_maior = max(dados, key=lambda x: (x.get('dias_perdidos', 0) + (x.get('horas_perdidas', 0) / 8)))
             total_dias = sum(d.get('dias_perdidos', 0) for d in dados)
             total_horas = sum(d.get('horas_perdidas', 0) for d in dados)
             
             pct_dias = (setor_maior.get('dias_perdidos', 0) / total_dias * 100) if total_dias > 0 else 0
             pct_horas = (setor_maior.get('horas_perdidas', 0) / total_horas * 100) if total_horas > 0 else 0
             
-            # Converte horas para dias equivalentes
+            # Converte horas para dias equivalentes (8 horas = 1 dia)
             horas_equivalente = setor_maior.get('horas_perdidas', 0) / 8
             dias_totais_equivalente = setor_maior.get('dias_perdidos', 0) + horas_equivalente
+            
+            # Converte total de horas para dias equivalentes
+            total_horas_equivalente = total_horas / 8
+            total_geral_equivalente = total_dias + total_horas_equivalente
             
             setor_nome = setor_maior.get('setor', 'Não informado')
             if setor_nome == 'N/A' or not setor_nome:
@@ -932,9 +970,15 @@ Esta distribuição permite identificar funcionários com padrão recorrente de 
             
             analise = f"""📊 **Análise: Comparativo Dias vs Horas Perdidas**
 
-O setor **{setor_nome}** apresenta o maior impacto combinado, com **{int(setor_maior.get('dias_perdidos', 0))} dias perdidos ({pct_dias:.1f}% do total)** e **{int(setor_maior.get('horas_perdidas', 0))} horas perdidas ({pct_horas:.1f}% do total)**, equivalente a aproximadamente **{dias_totais_equivalente:.1f} dias** de impacto total.
+O setor **{setor_nome}** apresenta o maior impacto combinado:
+- **{int(setor_maior.get('dias_perdidos', 0))} dias perdidos** ({pct_dias:.1f}% do total de dias)
+- **{int(setor_maior.get('horas_perdidas', 0))} horas perdidas** ({pct_horas:.1f}% do total de horas)
+- **Total equivalente: {dias_totais_equivalente:.1f} dias** (dias + horas convertidas)
 
-**Total geral:** {int(total_dias)} dias e {int(total_horas)} horas perdidas no período analisado.
+**Total geral do período:**
+- {int(total_dias)} dias perdidos
+- {int(total_horas)} horas perdidas (equivalente a {total_horas_equivalente:.1f} dias)
+- **Total geral: {total_geral_equivalente:.1f} dias equivalentes**
 
 Esta análise permite identificar setores que demandam maior atenção tanto em afastamentos completos (dias) quanto em afastamentos parciais (horas), orientando estratégias de gestão diferenciadas.
 

@@ -1,0 +1,53 @@
+========================================
+  COMANDOS PARA ENCONTRAR O SISTEMA
+========================================
+
+Execute estes comandos no servidor para encontrar onde está o sistema:
+
+1. LISTAR DIRETÓRIOS PRINCIPAIS:
+----------------------------------
+ls -la ~/
+
+2. PROCURAR PASTA "absenteismo":
+----------------------------------
+find ~ -type d -name "absenteismo" 2>/dev/null
+
+3. PROCURAR PASTA "backend":
+----------------------------------
+find ~ -type d -name "backend" 2>/dev/null
+
+4. PROCURAR ARQUIVO "main.py":
+----------------------------------
+find ~ -name "main.py" -path "*/backend/*" 2>/dev/null
+
+5. LISTAR CONTEÚDO DE public_html:
+----------------------------------
+ls -la ~/public_html/
+
+6. LISTAR CONTEÚDO DE domains:
+----------------------------------
+ls -la ~/domains/
+
+7. VERIFICAR ONDE ESTÁ O .git:
+----------------------------------
+find ~ -name ".git" -type d 2>/dev/null
+
+========================================
+  COMANDO RÁPIDO (copie e cole tudo):
+========================================
+
+echo "=== Procurando sistema ==="
+find ~ -type d -name "absenteismo" 2>/dev/null
+echo ""
+echo "=== Procurando backend ==="
+find ~ -type d -name "backend" 2>/dev/null
+echo ""
+echo "=== Procurando main.py ==="
+find ~ -name "main.py" -path "*/backend/*" 2>/dev/null
+echo ""
+echo "=== Listando public_html ==="
+ls -la ~/public_html/ 2>/dev/null
+echo ""
+echo "=== Listando domains ==="
+ls -la ~/domains/ 2>/dev/null
+
