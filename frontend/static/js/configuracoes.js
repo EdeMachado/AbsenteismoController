@@ -396,10 +396,18 @@ function editarUsuario(userId) {
     console.log('✅ Modal exibido');
 }
 
-// Garantir que função está disponível globalmente
-window.editarUsuario = editarUsuario;
+// Garantir que função está disponível globalmente e sobrescrever qualquer versão antiga
+window.editarUsuario = function(userId) {
+    console.log('🔧 Editar usuário chamado (versão nova):', userId);
+    editarUsuario(userId);
+};
 window.salvarEdicaoUsuario = salvarEdicaoUsuario;
 window.fecharModalEditarUsuario = fecharModalEditarUsuario;
+
+// Força sobrescrever qualquer função antiga que possa existir
+if (typeof window.editarUsuario === 'function') {
+    console.log('✅ Função editarUsuario registrada globalmente');
+}
 
 // Fecha modal de edição
 function fecharModalEditarUsuario() {
