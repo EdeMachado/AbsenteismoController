@@ -1908,19 +1908,45 @@ function renderizarGrafico(slide) {
         
         case 'evolucao_setor':
             // Evolução de dias perdidos por setor ao longo do tempo
+            // Dados vêm como: {setor1: [{mes, dias_perdidos}, ...], setor2: [...], ...}
             if (dados && typeof dados === 'object' && !Array.isArray(dados)) {
-                const setores = Object.keys(dados);
-                const meses = dados[setores[0]] ? dados[setores[0]].map(d => d.mes || 'N/A') : [];
+                const setores = Object.keys(dados).filter(s => dados[s] && Array.isArray(dados[s]) && dados[s].length > 0);
                 
-                const datasets = setores.slice(0, 5).map((setor, idx) => {
-                    const cores = [CORES_EMPRESA.primary, CORES_EMPRESA.secondary, CORES_EMPRESA.primaryLight, CORES_EMPRESA.secondaryLight, '#5c6bc0'];
+                if (setores.length === 0) {
+                    console.warn('[APRESENTACAO] evolucao_setor: Nenhum setor com dados');
+                    break;
+                }
+                
+                // Pega os meses do primeiro setor (todos devem ter os mesmos meses)
+                const meses = dados[setores[0]] ? dados[setores[0]].map(d => {
+                    // Formata o mês para exibição
+                    if (d.mes && d.mes.includes('-')) {
+                        const [ano, mes] = d.mes.split('-');
+                        const mesesPt = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                        return `${mesesPt[parseInt(mes) - 1]}/${ano.substring(2)}`;
+                    }
+                    return d.mes || 'N/A';
+                }) : [];
+                
+                // Ordena setores por total de dias perdidos (maior primeiro)
+                const setoresOrdenados = setores.sort((a, b) => {
+                    const totalA = dados[a].reduce((sum, d) => sum + (d.dias_perdidos || 0), 0);
+                    const totalB = dados[b].reduce((sum, d) => sum + (d.dias_perdidos || 0), 0);
+                    return totalB - totalA;
+                }).slice(0, 5); // TOP 5 setores
+                
+                const cores = [CORES_EMPRESA.primary, CORES_EMPRESA.secondary, CORES_EMPRESA.primaryLight, CORES_EMPRESA.secondaryLight, '#5c6bc0'];
+                
+                const datasets = setoresOrdenados.map((setor, idx) => {
                     return {
                         label: truncate(setor, 20),
                         data: dados[setor] ? dados[setor].map(d => d.dias_perdidos || 0) : [],
                         borderColor: cores[idx % cores.length],
                         backgroundColor: cores[idx % cores.length] + '40',
                         fill: false,
-                        tension: 0.4
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
                     };
                 });
                 
@@ -1935,10 +1961,21 @@ function renderizarGrafico(slide) {
                         maintainAspectRatio: false,
                         plugins: {
                             legend: { display: true, position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
+                            tooltip: { 
+                                mode: 'index', 
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.parsed.y.toFixed(2)} dias`;
+                                    }
+                                }
+                            }
                         },
                         scales: {
-                            y: { beginAtZero: true, title: { display: true, text: 'Dias Perdidos' } }
+                            y: { 
+                                beginAtZero: true, 
+                                title: { display: true, text: 'Dias Perdidos' }
+                            }
                         }
                     }
                 };
@@ -1948,18 +1985,26 @@ function renderizarGrafico(slide) {
         case 'comparativo_mensal':
         case 'comparativo_trimestral':
             // Gráfico de barras comparando dois períodos
+            // Dados vêm como: {periodo_atual: {total_registros, dias_perdidos, horas_perdidas}, periodo_anterior: {...}}
             if (dados && dados.periodo_atual && dados.periodo_anterior) {
-                const labels = ['Atestados', 'Dias Perdidos', 'Horas Perdidas'];
+                const labels = ['Registros', 'Dias Perdidos', 'Horas Perdidas'];
                 const atual = [
-                    dados.periodo_atual.total_atestados || 0,
-                    dados.periodo_atual.total_dias_perdidos || 0,
-                    dados.periodo_atual.total_horas_perdidas || 0
+                    dados.periodo_atual.total_registros || 0,
+                    dados.periodo_atual.dias_perdidos || 0,
+                    dados.periodo_atual.horas_perdidas || 0
                 ];
                 const anterior = [
-                    dados.periodo_anterior.total_atestados || 0,
-                    dados.periodo_anterior.total_dias_perdidos || 0,
-                    dados.periodo_anterior.total_horas_perdidas || 0
+                    dados.periodo_anterior.total_registros || 0,
+                    dados.periodo_anterior.dias_perdidos || 0,
+                    dados.periodo_anterior.horas_perdidas || 0
                 ];
+                
+                const periodoAtualLabel = tipo === 'comparativo_mensal' 
+                    ? (dados.periodo_atual.label || 'Mês Atual')
+                    : (dados.periodo_atual.label || 'Trimestre Atual');
+                const periodoAnteriorLabel = tipo === 'comparativo_mensal'
+                    ? (dados.periodo_anterior.label || 'Mês Anterior')
+                    : (dados.periodo_anterior.label || 'Trimestre Anterior');
                 
                 config = {
                     type: 'bar',
@@ -1967,12 +2012,12 @@ function renderizarGrafico(slide) {
                         labels: labels,
                         datasets: [
                             {
-                                label: tipo === 'comparativo_mensal' ? 'Mês Atual' : 'Trimestre Atual',
+                                label: periodoAtualLabel,
                                 data: atual,
                                 backgroundColor: CORES_EMPRESA.primary
                             },
                             {
-                                label: tipo === 'comparativo_mensal' ? 'Mês Anterior' : 'Trimestre Anterior',
+                                label: periodoAnteriorLabel,
                                 data: anterior,
                                 backgroundColor: CORES_EMPRESA.secondary
                             }
@@ -1983,7 +2028,28 @@ function renderizarGrafico(slide) {
                         maintainAspectRatio: false,
                         plugins: {
                             legend: { display: true, position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
+                            tooltip: { 
+                                mode: 'index', 
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            if (context.dataIndex === 0) {
+                                                label += context.parsed.y + ' registros';
+                                            } else if (context.dataIndex === 1) {
+                                                label += context.parsed.y.toFixed(2) + ' dias';
+                                            } else {
+                                                label += context.parsed.y.toFixed(2) + ' horas';
+                                            }
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
                         },
                         scales: {
                             y: { beginAtZero: true }
@@ -1995,10 +2061,13 @@ function renderizarGrafico(slide) {
         
         case 'comparativo_ano_anterior':
             // Gráfico de linha comparando mês a mês do ano atual vs anterior
+            // Dados vêm como: [{mes, mes_label, ano_atual: {dias_perdidos, horas_perdidas}, ano_anterior: {...}}, ...]
             if (Array.isArray(dados) && dados.length > 0) {
-                const labels = dados.map(d => d.mes || 'N/A');
-                const atual = dados.map(d => d.atual || 0);
-                const anterior = dados.map(d => d.anterior || 0);
+                const labels = dados.map(d => d.mes_label || d.mes || 'N/A');
+                const diasAtual = dados.map(d => (d.ano_atual && d.ano_atual.dias_perdidos) || 0);
+                const diasAnterior = dados.map(d => (d.ano_anterior && d.ano_anterior.dias_perdidos) || 0);
+                const horasAtual = dados.map(d => (d.ano_atual && d.ano_atual.horas_perdidas) || 0);
+                const horasAnterior = dados.map(d => (d.ano_anterior && d.ano_anterior.horas_perdidas) || 0);
                 
                 config = {
                     type: 'line',
@@ -2006,20 +2075,42 @@ function renderizarGrafico(slide) {
                         labels: labels,
                         datasets: [
                             {
-                                label: 'Ano Atual',
-                                data: atual,
+                                label: 'Dias Perdidos - Ano Atual',
+                                data: diasAtual,
                                 borderColor: CORES_EMPRESA.primary,
                                 backgroundColor: CORES_EMPRESA.primaryLight + '40',
                                 fill: true,
-                                tension: 0.4
+                                tension: 0.4,
+                                yAxisID: 'y'
                             },
                             {
-                                label: 'Ano Anterior',
-                                data: anterior,
+                                label: 'Dias Perdidos - Ano Anterior',
+                                data: diasAnterior,
                                 borderColor: CORES_EMPRESA.secondary,
                                 backgroundColor: CORES_EMPRESA.secondaryLight + '40',
                                 fill: true,
-                                tension: 0.4
+                                tension: 0.4,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Horas Perdidas - Ano Atual',
+                                data: horasAtual,
+                                borderColor: CORES_EMPRESA.primaryLight,
+                                backgroundColor: CORES_EMPRESA.primaryLight + '20',
+                                fill: false,
+                                tension: 0.4,
+                                yAxisID: 'y1',
+                                borderDash: [5, 5]
+                            },
+                            {
+                                label: 'Horas Perdidas - Ano Anterior',
+                                data: horasAnterior,
+                                borderColor: CORES_EMPRESA.secondaryLight,
+                                backgroundColor: CORES_EMPRESA.secondaryLight + '20',
+                                fill: false,
+                                tension: 0.4,
+                                yAxisID: 'y1',
+                                borderDash: [5, 5]
                             }
                         ]
                     },
@@ -2031,7 +2122,17 @@ function renderizarGrafico(slide) {
                             tooltip: { mode: 'index', intersect: false }
                         },
                         scales: {
-                            y: { beginAtZero: true, title: { display: true, text: 'Dias Perdidos' } }
+                            y: { 
+                                beginAtZero: true, 
+                                title: { display: true, text: 'Dias Perdidos' },
+                                position: 'left'
+                            },
+                            y1: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Horas Perdidas' },
+                                position: 'right',
+                                grid: { drawOnChartArea: false }
+                            }
                         }
                     }
                 };
@@ -2040,7 +2141,10 @@ function renderizarGrafico(slide) {
         
         case 'heatmap':
             // Heatmap será renderizado como tabela HTML (similar ao dashboard)
-            if (dados && (dados.setores || dados.meses || dados.dados)) {
+            if (dados && dados.setores && dados.meses && dados.dados && 
+                Array.isArray(dados.setores) && dados.setores.length > 0 &&
+                Array.isArray(dados.meses) && dados.meses.length > 0 &&
+                Array.isArray(dados.dados) && dados.dados.length > 0) {
                 // Se tiver dados estruturados, tenta criar visualização
                 const container = document.getElementById('chartSlide');
                 if (container && container.parentElement) {
@@ -2062,6 +2166,8 @@ function renderizarGrafico(slide) {
                 }
                 // Não cria config Chart.js para heatmap
                 return;
+            } else {
+                console.warn('[APRESENTACAO] Heatmap sem dados válidos:', dados);
             }
             break;
         
@@ -2106,9 +2212,10 @@ function renderizarGrafico(slide) {
         
         case 'frequencia_atestados':
             // Histograma de frequência de atestados por funcionário
+            // Dados vêm como: [{frequencia: '1 atestado', quantidade: 10}, ...]
             if (Array.isArray(dados) && dados.length > 0) {
-                const labels = dados.map(d => `${d.num_atestados || 0} atestado(s)`);
-                const valores = dados.map(d => d.num_funcionarios || 0);
+                const labels = dados.map(d => d.frequencia || 'N/A');
+                const valores = dados.map(d => d.quantidade || 0);
                 
                 config = {
                     type: 'bar',
@@ -2135,7 +2242,7 @@ function renderizarGrafico(slide) {
                         },
                         scales: {
                             y: { beginAtZero: true, title: { display: true, text: 'Número de Funcionários' } },
-                            x: { title: { display: true, text: 'Número de Atestados' } }
+                            x: { title: { display: true, text: 'Frequência de Atestados' } }
                         }
                     }
                 };

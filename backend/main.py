@@ -3011,21 +3011,28 @@ async def dados_apresentacao(
             # Slide 14: Evolução por Setor
             try:
                 evolucao_setor = analytics.evolucao_por_setor(client_id, 12, mes_inicio, mes_fim, funcionario, setor)
-                if evolucao_setor and len(evolucao_setor) > 0:
-                    try:
-                        analise_evol_setor = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_setor, metricas)
-                    except Exception as e:
-                        print(f"Erro ao gerar análise evolução setor: {e}")
-                        analise_evol_setor = "Análise não disponível."
-                    
-                    slides.append({
-                        "id": len(slides),
-                        "tipo": "evolucao_setor",
-                        "titulo": "Evolução de Dias Perdidos por Setor",
-                        "subtitulo": "Tendência dos principais setores",
-                        "dados": evolucao_setor,
-                        "analise": analise_evol_setor
-                    })
+                # evolucao_setor é um dicionário {setor: [{mes, dias_perdidos}, ...]}
+                if evolucao_setor and isinstance(evolucao_setor, dict) and len(evolucao_setor) > 0:
+                    # Verifica se há pelo menos um setor com dados
+                    tem_dados = any(
+                        isinstance(v, list) and len(v) > 0 
+                        for v in evolucao_setor.values()
+                    )
+                    if tem_dados:
+                        try:
+                            analise_evol_setor = insights_engine.gerar_analise_grafico('evolucao_mensal', evolucao_setor, metricas)
+                        except Exception as e:
+                            print(f"Erro ao gerar análise evolução setor: {e}")
+                            analise_evol_setor = "Análise não disponível."
+                        
+                        slides.append({
+                            "id": len(slides),
+                            "tipo": "evolucao_setor",
+                            "titulo": "Evolução de Dias Perdidos por Setor",
+                            "subtitulo": "Tendência dos principais setores",
+                            "dados": evolucao_setor,
+                            "analise": analise_evol_setor
+                        })
             except Exception as e:
                 print(f"Erro ao calcular evolução por setor para apresentação: {e}")
             
@@ -3095,21 +3102,26 @@ async def dados_apresentacao(
             # Slide 18: Heatmap (Mapa de Calor)
             try:
                 heatmap_data = analytics.heatmap_setores_meses(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario)
-                if heatmap_data and (heatmap_data.get('setores') or heatmap_data.get('meses') or heatmap_data.get('dados')):
-                    try:
-                        analise_heatmap = insights_engine.gerar_analise_grafico('top_setores', None, heatmap_data)
-                    except Exception as e:
-                        print(f"Erro ao gerar análise heatmap: {e}")
-                        analise_heatmap = "Análise não disponível."
-                    
-                    slides.append({
-                        "id": len(slides),
-                        "tipo": "heatmap",
-                        "titulo": "Mapa de Calor",
-                        "subtitulo": "Dias perdidos por setor e mês",
-                        "dados": heatmap_data,
-                        "analise": analise_heatmap
-                    })
+                # Verifica se tem dados válidos: setores, meses e dados não vazios
+                if heatmap_data and isinstance(heatmap_data, dict):
+                    setores = heatmap_data.get('setores', [])
+                    meses = heatmap_data.get('meses', [])
+                    dados_array = heatmap_data.get('dados', [])
+                    if setores and len(setores) > 0 and meses and len(meses) > 0 and dados_array and len(dados_array) > 0:
+                        try:
+                            analise_heatmap = insights_engine.gerar_analise_grafico('top_setores', None, heatmap_data)
+                        except Exception as e:
+                            print(f"Erro ao gerar análise heatmap: {e}")
+                            analise_heatmap = "Análise não disponível."
+                        
+                        slides.append({
+                            "id": len(slides),
+                            "tipo": "heatmap",
+                            "titulo": "Mapa de Calor",
+                            "subtitulo": "Dias perdidos por setor e mês",
+                            "dados": heatmap_data,
+                            "analise": analise_heatmap
+                        })
             except Exception as e:
                 print(f"Erro ao calcular heatmap para apresentação: {e}")
             
