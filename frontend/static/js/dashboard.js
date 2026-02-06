@@ -4103,30 +4103,52 @@ let chartHeatmap = null;
 
 function renderizarChartHeatmap(dados) {
     console.log('[HEATMAP] Iniciando renderização:', dados);
+    
+    // Busca o container (div chart-wrapper)
     const container = document.getElementById('chartHeatmap')?.closest('.chart-wrapper');
     if (!container) {
-        console.error('[HEATMAP] Container não encontrado!');
-        return;
+        console.error('[HEATMAP] Container não encontrado! Procurando por chartHeatmap...');
+        const div = document.getElementById('chartHeatmap');
+        if (!div) {
+            console.error('[HEATMAP] Elemento chartHeatmap não encontrado no DOM!');
+            return;
+        }
+        // Se encontrou o div mas não o container, usa o div diretamente
+        const wrapper = div.closest('.chart-wrapper') || div.parentElement;
+        if (wrapper) {
+            wrapper.innerHTML = '';
+            renderizarHeatmapTabela(dados, wrapper);
+            return;
+        }
     }
     
     if (!dados || !dados.setores || dados.setores.length === 0) {
-        console.warn('[HEATMAP] Dados inválidos ou vazios');
+        console.warn('[HEATMAP] Dados inválidos ou vazios:', dados);
+        if (container) container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Sem dados para exibir</p>';
         return;
     }
     
     if (!dados.dados || !Array.isArray(dados.dados) || dados.dados.length === 0) {
         console.warn('[HEATMAP] Matriz de dados vazia');
+        if (container) container.innerHTML = '<p style="padding: 20px; text-align: center; color: #666;">Sem dados para exibir</p>';
         return;
     }
     
-    // Remove canvas antigo se existir
-    const canvas = document.getElementById('chartHeatmap');
-    if (canvas) {
-        canvas.remove();
-    }
-    
     // Limpa container
-    container.innerHTML = '';
+    if (container) {
+        container.innerHTML = '';
+        renderizarHeatmapTabela(dados, container);
+    } else {
+        const div = document.getElementById('chartHeatmap');
+        if (div) {
+            div.innerHTML = '';
+            renderizarHeatmapTabela(dados, div);
+        }
+    }
+}
+
+function renderizarHeatmapTabela(dados, container) {
+    console.log('[HEATMAP] Criando tabela com', dados.setores.length, 'setores e', dados.meses.length, 'meses');
     
     // Encontra o valor máximo para normalizar as cores
     let maxValor = 0;
@@ -4173,38 +4195,43 @@ function renderizarChartHeatmap(dados) {
     const meses = dados.meses || [];
     const setores = dados.setores || [];
     
-    // Cria tabela HTML para o heatmap
+    // Cria tabela HTML para o heatmap (estilo similar ao exemplo)
     const table = document.createElement('table');
     table.style.width = '100%';
-    table.style.height = '100%';
     table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '11px';
-    table.style.tableLayout = 'fixed';
+    table.style.fontSize = '12px';
+    table.style.fontFamily = 'Arial, sans-serif';
+    table.style.border = '1px solid #ddd';
+    table.style.backgroundColor = '#fff';
     
     // Cabeçalho com meses
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     
-    // Primeira célula vazia (canto superior esquerdo)
-    const emptyHeader = document.createElement('th');
-    emptyHeader.style.border = '1px solid #ddd';
-    emptyHeader.style.padding = '4px';
-    emptyHeader.style.backgroundColor = '#f5f5f5';
-    emptyHeader.style.position = 'sticky';
-    emptyHeader.style.left = '0';
-    emptyHeader.style.zIndex = '10';
-    headerRow.appendChild(emptyHeader);
+    // Primeira célula com label "Row Labels" (similar ao exemplo)
+    const rowLabelHeader = document.createElement('th');
+    rowLabelHeader.textContent = 'Setores';
+    rowLabelHeader.style.border = '1px solid #ddd';
+    rowLabelHeader.style.padding = '8px';
+    rowLabelHeader.style.backgroundColor = '#f0f0f0';
+    rowLabelHeader.style.fontWeight = 'bold';
+    rowLabelHeader.style.textAlign = 'left';
+    rowLabelHeader.style.minWidth = '150px';
+    rowLabelHeader.style.position = 'sticky';
+    rowLabelHeader.style.left = '0';
+    rowLabelHeader.style.zIndex = '10';
+    headerRow.appendChild(rowLabelHeader);
     
     // Cabeçalhos dos meses
     meses.forEach(mes => {
         const th = document.createElement('th');
         th.textContent = mes;
         th.style.border = '1px solid #ddd';
-        th.style.padding = '4px';
-        th.style.backgroundColor = '#f5f5f5';
+        th.style.padding = '8px';
+        th.style.backgroundColor = '#f0f0f0';
         th.style.textAlign = 'center';
         th.style.fontWeight = 'bold';
-        th.style.minWidth = '60px';
+        th.style.minWidth = '70px';
         headerRow.appendChild(th);
     });
     
@@ -4219,43 +4246,63 @@ function renderizarChartHeatmap(dados) {
         
         // Nome do setor (primeira coluna)
         const setorCell = document.createElement('td');
-        setorCell.textContent = truncate(setor || 'Sem setor', 25);
+        setorCell.textContent = setor || 'Sem setor';
         setorCell.style.border = '1px solid #ddd';
-        setorCell.style.padding = '4px';
-        setorCell.style.backgroundColor = '#f5f5f5';
+        setorCell.style.padding = '8px';
+        setorCell.style.backgroundColor = '#f9f9f9';
         setorCell.style.position = 'sticky';
         setorCell.style.left = '0';
         setorCell.style.zIndex = '5';
-        setorCell.style.fontWeight = '500';
+        setorCell.style.fontWeight = 'normal';
         setorCell.style.textAlign = 'left';
+        setorCell.style.minWidth = '150px';
         row.appendChild(setorCell);
         
-        // Células de dados (meses)
+        // Células de dados (meses) - estilo similar ao exemplo
         if (Array.isArray(dados.dados[i])) {
             dados.dados[i].forEach((valor, j) => {
                 const cell = document.createElement('td');
                 const valorNum = parseFloat(valor) || 0;
+                
+                // Mostra valor numérico dentro da célula (como no exemplo)
                 cell.textContent = valorNum > 0 ? valorNum.toFixed(1) : '';
                 cell.style.border = '1px solid #ddd';
-                cell.style.padding = '4px';
+                cell.style.padding = '8px';
                 cell.style.backgroundColor = getColorForValue(valorNum);
                 cell.style.textAlign = 'center';
+                cell.style.fontWeight = '500';
+                cell.style.minWidth = '70px';
                 cell.style.cursor = 'pointer';
-                cell.style.transition = 'opacity 0.2s';
+                cell.style.transition = 'all 0.2s';
                 
                 // Tooltip
                 cell.title = `${setor} - ${meses[j] || 'Mês ' + (j + 1)}: ${valorNum.toFixed(2)} dias perdidos`;
                 
-                // Efeito hover
+                // Efeito hover (destaca a célula)
                 cell.addEventListener('mouseenter', function() {
-                    this.style.opacity = '0.8';
-                    this.style.border = '2px solid #333';
+                    this.style.transform = 'scale(1.05)';
+                    this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                    this.style.zIndex = '1';
+                    this.style.position = 'relative';
                 });
                 cell.addEventListener('mouseleave', function() {
-                    this.style.opacity = '1';
-                    this.style.border = '1px solid #ddd';
+                    this.style.transform = 'scale(1)';
+                    this.style.boxShadow = 'none';
+                    this.style.zIndex = 'auto';
+                    this.style.position = 'static';
                 });
                 
+                row.appendChild(cell);
+            });
+        } else {
+            // Se não há dados para este setor, cria células vazias
+            meses.forEach(() => {
+                const cell = document.createElement('td');
+                cell.textContent = '';
+                cell.style.border = '1px solid #ddd';
+                cell.style.padding = '8px';
+                cell.style.backgroundColor = '#ffffff';
+                cell.style.minWidth = '70px';
                 row.appendChild(cell);
             });
         }
