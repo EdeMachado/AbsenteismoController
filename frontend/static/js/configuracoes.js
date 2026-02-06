@@ -404,8 +404,28 @@ function editarUsuario(userId) {
     }
     
     // Mostra modal
-    modal.style.display = 'flex';
-    console.log('✅ Modal exibido');
+    try {
+        // Remove display: none inline se existir
+        modal.removeAttribute('style');
+        // Adiciona display flex
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+        console.log('✅ Modal exibido - display:', modal.style.display);
+        
+        // Verifica se realmente está visível
+        setTimeout(() => {
+            const isVisible = modal.offsetParent !== null || modal.style.display !== 'none';
+            if (!isVisible) {
+                console.error('❌ Modal não está visível após tentativa de exibir');
+                alert('Erro: Modal não está aparecendo. Verifique o console (F12) para mais detalhes.');
+            } else {
+                console.log('✅ Modal confirmado como visível');
+            }
+        }, 100);
+    } catch (e) {
+        console.error('❌ Erro ao exibir modal:', e);
+        alert('Erro ao abrir modal de edição: ' + e.message);
+    }
 }
 
 // Garantir que função está disponível globalmente e sobrescrever qualquer versão antiga
