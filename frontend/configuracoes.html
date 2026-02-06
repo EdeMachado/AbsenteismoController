@@ -249,18 +249,29 @@
     </div>
     
     <script src="/static/js/auth.js"></script>
-    <script src="/static/js/configuracoes.js?v=3.0"></script>
+    <script src="/static/js/configuracoes.js?v=4.0"></script>
     <script>
-        // Força sobrescrever função antiga se existir
-        if (typeof editarUsuario === 'function') {
-            console.log('✅ Função editarUsuario carregada');
-        }
-        // Garante que window.editarUsuario está disponível
-        if (typeof window.editarUsuario === 'function') {
-            console.log('✅ window.editarUsuario disponível');
-        } else {
-            console.error('❌ window.editarUsuario não encontrada');
-        }
+        // Aguarda carregamento completo
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                // Verifica se funções estão disponíveis
+                console.log('🔍 Verificando funções disponíveis:');
+                console.log('  - window.editarUsuario:', typeof window.editarUsuario);
+                console.log('  - window.salvarEdicaoUsuario:', typeof window.salvarEdicaoUsuario);
+                console.log('  - window.excluirUsuario:', typeof window.excluirUsuario);
+                
+                // Testa se modal existe
+                const modal = document.getElementById('modalEditarUsuario');
+                console.log('  - Modal existe:', !!modal);
+                
+                if (typeof window.editarUsuario !== 'function') {
+                    console.error('❌ ERRO CRÍTICO: window.editarUsuario não está disponível!');
+                    alert('ERRO: Função de edição não carregada. Recarregue a página (Ctrl+F5)');
+                } else {
+                    console.log('✅ Todas as funções estão disponíveis');
+                }
+            }, 1000);
+        });
     </script>
 </body>
 </html>
