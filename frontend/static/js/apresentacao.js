@@ -2583,6 +2583,170 @@ function renderizarAcoesSaudeSocial(tipo) {
     `;
 }
 
+// ==================== HEATMAP ====================
+function renderizarHeatmapTabela(dados, container) {
+    console.log('[HEATMAP] Criando tabela com', dados.setores?.length || 0, 'setores e', dados.meses?.length || 0, 'meses');
+    
+    // Encontra o valor máximo para normalizar as cores
+    let maxValor = 0;
+    if (dados.dados && Array.isArray(dados.dados)) {
+        for (let i = 0; i < dados.dados.length; i++) {
+            if (!Array.isArray(dados.dados[i])) continue;
+            for (let j = 0; j < dados.dados[i].length; j++) {
+                const valor = parseFloat(dados.dados[i][j]) || 0;
+                if (valor > maxValor) {
+                    maxValor = valor;
+                }
+            }
+        }
+    }
+    
+    // Cria função para gerar cor baseada no valor
+    function getColorForValue(valor) {
+        if (maxValor === 0) return '#f0f0f0';
+        const intensity = Math.min(valor / maxValor, 1);
+        
+        if (intensity === 0) return '#ffffff';
+        if (intensity < 0.2) {
+            const factor = intensity / 0.2;
+            return `rgb(255, ${255 - Math.floor(100 * factor)}, ${255 - Math.floor(150 * factor)})`;
+        } else if (intensity < 0.4) {
+            const factor = (intensity - 0.2) / 0.2;
+            return `rgb(255, ${255 - Math.floor(155 * factor)}, ${155 - Math.floor(155 * factor)})`;
+        } else if (intensity < 0.6) {
+            const factor = (intensity - 0.4) / 0.2;
+            return `rgb(255, ${100 - Math.floor(100 * factor)}, 0)`;
+        } else if (intensity < 0.8) {
+            const factor = (intensity - 0.6) / 0.2;
+            return `rgb(${255 - Math.floor(55 * factor)}, ${0}, 0)`;
+        } else {
+            const factor = (intensity - 0.8) / 0.2;
+            return `rgb(${200 - Math.floor(150 * factor)}, 0, 0)`;
+        }
+    }
+    
+    const meses = dados.meses || [];
+    const setores = dados.setores || [];
+    
+    // Cria tabela HTML
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '10px';
+    table.style.fontFamily = 'Arial, sans-serif';
+    table.style.border = '1px solid #ddd';
+    table.style.backgroundColor = '#fff';
+    
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    
+    const rowLabelHeader = document.createElement('th');
+    rowLabelHeader.textContent = 'Setores';
+    rowLabelHeader.style.border = '1px solid #ddd';
+    rowLabelHeader.style.padding = '4px';
+    rowLabelHeader.style.backgroundColor = '#f0f0f0';
+    rowLabelHeader.style.fontWeight = 'bold';
+    rowLabelHeader.style.textAlign = 'left';
+    rowLabelHeader.style.minWidth = '120px';
+    rowLabelHeader.style.position = 'sticky';
+    rowLabelHeader.style.left = '0';
+    rowLabelHeader.style.zIndex = '10';
+    headerRow.appendChild(rowLabelHeader);
+    
+    meses.forEach(mes => {
+        const th = document.createElement('th');
+        th.textContent = mes;
+        th.style.border = '1px solid #ddd';
+        th.style.padding = '4px';
+        th.style.backgroundColor = '#f0f0f0';
+        th.style.textAlign = 'center';
+        th.style.fontWeight = 'bold';
+        th.style.minWidth = '50px';
+        headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    const tbody = document.createElement('tbody');
+    
+    setores.forEach((setor, i) => {
+        const row = document.createElement('tr');
+        
+        const setorCell = document.createElement('td');
+        setorCell.textContent = truncate(setor || 'Sem setor', 20);
+        setorCell.style.border = '1px solid #ddd';
+        setorCell.style.padding = '4px';
+        setorCell.style.backgroundColor = '#f9f9f9';
+        setorCell.style.position = 'sticky';
+        setorCell.style.left = '0';
+        setorCell.style.zIndex = '5';
+        setorCell.style.minWidth = '120px';
+        row.appendChild(setorCell);
+        
+        if (Array.isArray(dados.dados[i])) {
+            dados.dados[i].forEach((valor, j) => {
+                const cell = document.createElement('td');
+                const valorNum = parseFloat(valor) || 0;
+                
+                cell.textContent = valorNum > 0 ? valorNum.toFixed(1) : '';
+                cell.style.border = '1px solid #ddd';
+                cell.style.padding = '4px';
+                cell.style.backgroundColor = getColorForValue(valorNum);
+                cell.style.textAlign = 'center';
+                cell.style.minWidth = '50px';
+                cell.title = `${setor} - ${meses[j] || 'Mês ' + (j + 1)}: ${valorNum.toFixed(2)} dias perdidos`;
+                row.appendChild(cell);
+            });
+        } else {
+            meses.forEach(() => {
+                const cell = document.createElement('td');
+                cell.style.border = '1px solid #ddd';
+                cell.style.padding = '4px';
+                cell.style.backgroundColor = '#ffffff';
+                cell.style.minWidth = '50px';
+                row.appendChild(cell);
+            });
+        }
+        
+        tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    container.appendChild(table);
+    
+    // Legenda
+    const legend = document.createElement('div');
+    legend.style.marginTop = '10px';
+    legend.style.display = 'flex';
+    legend.style.alignItems = 'center';
+    legend.style.justifyContent = 'center';
+    legend.style.gap = '10px';
+    legend.style.fontSize = '11px';
+    
+    const legendLabel = document.createElement('span');
+    legendLabel.textContent = 'Intensidade: ';
+    legendLabel.style.fontWeight = 'bold';
+    legend.appendChild(legendLabel);
+    
+    for (let i = 0; i <= 10; i++) {
+        const intensity = i / 10;
+        const colorBox = document.createElement('div');
+        colorBox.style.width = '20px';
+        colorBox.style.height = '20px';
+        colorBox.style.backgroundColor = getColorForValue(intensity * maxValor);
+        colorBox.style.border = '1px solid #ddd';
+        colorBox.style.borderRadius = '2px';
+        legend.appendChild(colorBox);
+    }
+    
+    const legendMax = document.createElement('span');
+    legendMax.textContent = ` (Máx: ${maxValor.toFixed(1)} dias)`;
+    legend.appendChild(legendMax);
+    
+    container.appendChild(legend);
+}
+
 // ==================== PRODUTIVIDADE ====================
 function renderizarProdutividade(slide) {
     const dados = slide.dados || [];
