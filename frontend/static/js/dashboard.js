@@ -531,11 +531,25 @@ async function carregarDashboard() {
         
         // Heatmap de Setores x Meses
         console.log('[DEBUG] Verificando heatmap:', data.heatmap_setores_meses);
-        if (data.heatmap_setores_meses && data.heatmap_setores_meses.setores && data.heatmap_setores_meses.setores.length > 0) {
+        console.log('[DEBUG] Tipo de dados:', typeof data.heatmap_setores_meses);
+        console.log('[DEBUG] É objeto?', data.heatmap_setores_meses && typeof data.heatmap_setores_meses === 'object');
+        console.log('[DEBUG] Tem setores?', data.heatmap_setores_meses?.setores);
+        console.log('[DEBUG] Quantidade de setores:', data.heatmap_setores_meses?.setores?.length);
+        
+        if (data.heatmap_setores_meses && data.heatmap_setores_meses.setores && Array.isArray(data.heatmap_setores_meses.setores) && data.heatmap_setores_meses.setores.length > 0) {
             console.log('[DEBUG] Renderizando heatmap com', data.heatmap_setores_meses.setores.length, 'setores');
-            renderizarChartHeatmap(data.heatmap_setores_meses);
+            try {
+                renderizarChartHeatmap(data.heatmap_setores_meses);
+            } catch (error) {
+                console.error('[DEBUG] Erro ao renderizar heatmap:', error);
+            }
         } else {
-            console.log('[DEBUG] Heatmap não renderizado - dados:', data.heatmap_setores_meses);
+            console.log('[DEBUG] Heatmap não renderizado - dados inválidos:', {
+                existe: !!data.heatmap_setores_meses,
+                temSetores: !!data.heatmap_setores_meses?.setores,
+                setoresArray: Array.isArray(data.heatmap_setores_meses?.setores),
+                quantidade: data.heatmap_setores_meses?.setores?.length
+            });
         }
         
         // Carrega e renderiza gráficos personalizados configurados pelo usuário
