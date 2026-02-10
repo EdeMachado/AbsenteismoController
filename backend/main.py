@@ -284,6 +284,27 @@ def validar_client_id(db: Session, client_id: int) -> Client:
     
     return client
 
+def validar_acesso_client_id(current_user: User, client_id: int) -> None:
+    """
+    Valida se o usuário tem permissão para acessar o client_id especificado.
+    
+    Regras:
+    - Admin OU usuário sem client_id (NULL) → pode acessar qualquer cliente
+    - Usuário com client_id definido → só pode acessar seu próprio cliente
+    
+    Raises HTTPException 403 se não tiver permissão.
+    """
+    # Admin ou usuário sem restrição (client_id = NULL) pode acessar qualquer cliente
+    if current_user.is_admin or not current_user.client_id:
+        return
+    
+    # Usuário comum só pode acessar seu próprio cliente
+    if current_user.client_id != client_id:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Acesso negado: você só tem permissão para acessar o cliente ID {current_user.client_id}"
+        )
+
 # Initialize database
 @app.on_event("startup")
 async def startup_event():
@@ -1449,11 +1470,13 @@ async def upload_file(
 @app.get("/api/uploads")
 async def list_uploads(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Lista uploads"""
-    # Valida client_id
+    # Valida client_id e permissão de acesso
     validar_client_id(db, client_id)
+    validar_acesso_client_id(current_user, client_id)
     
     uploads = db.query(Upload).filter(Upload.client_id == client_id).order_by(Upload.data_upload.desc()).all()
     
@@ -1475,12 +1498,14 @@ async def dashboard(
     mes_fim: Optional[str] = None,
     funcionario: Optional[List[str]] = Query(None),
     setor: Optional[List[str]] = Query(None),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Dashboard principal"""
     try:
-        # Valida client_id
+        # Valida client_id e permissão de acesso
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         analytics = Analytics(db)
         insights_engine = InsightsEngine(db)
@@ -3039,6 +3064,7 @@ async def dados_apresentacao(
     mes_fim: Optional[str] = None,
     funcionario: Optional[List[str]] = Query(None),
     setor: Optional[List[str]] = Query(None),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Retorna todos os dados necessários para a apresentação com análises IA"""
@@ -3047,9 +3073,10 @@ async def dados_apresentacao(
         import time
         inicio = time.time()
         
-        # Valida client_id
+        # Valida client_id e permissão de acesso
         client = validar_client_id(db, client_id)
-        print(f"[APRESENTACAO] Cliente validado: {client.nome}")
+        validar_acesso_client_id(current_user, client_id)
+        print(f"[APRESENTACAO] Cliente validado: {client.nome} - Usuário: {current_user.username} (client_id: {current_user.client_id})")
         
         analytics = Analytics(db)
         insights_engine = InsightsEngine(db)
