@@ -2814,10 +2814,12 @@ function renderizarHeatmapTabela(dados, container) {
     const table = document.createElement('table');
     table.style.width = '100%';
     table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '10px';
+    table.style.fontSize = '11px';
     table.style.fontFamily = 'Arial, sans-serif';
     table.style.border = '1px solid #ddd';
     table.style.backgroundColor = '#fff';
+    table.style.maxHeight = '100%';
+    table.style.overflow = 'auto';
     
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
@@ -2825,11 +2827,12 @@ function renderizarHeatmapTabela(dados, container) {
     const rowLabelHeader = document.createElement('th');
     rowLabelHeader.textContent = 'Setores';
     rowLabelHeader.style.border = '1px solid #ddd';
-    rowLabelHeader.style.padding = '4px';
+    rowLabelHeader.style.padding = '6px';
     rowLabelHeader.style.backgroundColor = '#f0f0f0';
     rowLabelHeader.style.fontWeight = 'bold';
     rowLabelHeader.style.textAlign = 'left';
-    rowLabelHeader.style.minWidth = '120px';
+    rowLabelHeader.style.minWidth = '150px';
+    rowLabelHeader.style.maxWidth = '150px';
     rowLabelHeader.style.position = 'sticky';
     rowLabelHeader.style.left = '0';
     rowLabelHeader.style.zIndex = '10';
@@ -2839,11 +2842,12 @@ function renderizarHeatmapTabela(dados, container) {
         const th = document.createElement('th');
         th.textContent = mes;
         th.style.border = '1px solid #ddd';
-        th.style.padding = '4px';
+        th.style.padding = '6px';
         th.style.backgroundColor = '#f0f0f0';
         th.style.textAlign = 'center';
         th.style.fontWeight = 'bold';
-        th.style.minWidth = '50px';
+        th.style.minWidth = '60px';
+        th.style.maxWidth = '60px';
         headerRow.appendChild(th);
     });
     
@@ -2856,14 +2860,17 @@ function renderizarHeatmapTabela(dados, container) {
         const row = document.createElement('tr');
         
         const setorCell = document.createElement('td');
-        setorCell.textContent = truncate(setor || 'Sem setor', 20);
+        setorCell.textContent = truncate(setor || 'Sem setor', 25);
         setorCell.style.border = '1px solid #ddd';
-        setorCell.style.padding = '4px';
+        setorCell.style.padding = '6px';
         setorCell.style.backgroundColor = '#f9f9f9';
         setorCell.style.position = 'sticky';
         setorCell.style.left = '0';
         setorCell.style.zIndex = '5';
-        setorCell.style.minWidth = '120px';
+        setorCell.style.fontWeight = 'normal';
+        setorCell.style.textAlign = 'left';
+        setorCell.style.minWidth = '150px';
+        setorCell.style.maxWidth = '150px';
         row.appendChild(setorCell);
         
         if (Array.isArray(dados.dados[i])) {
@@ -2873,20 +2880,41 @@ function renderizarHeatmapTabela(dados, container) {
                 
                 cell.textContent = valorNum > 0 ? valorNum.toFixed(1) : '';
                 cell.style.border = '1px solid #ddd';
-                cell.style.padding = '4px';
+                cell.style.padding = '6px';
                 cell.style.backgroundColor = getColorForValue(valorNum);
                 cell.style.textAlign = 'center';
-                cell.style.minWidth = '50px';
+                cell.style.fontWeight = '500';
+                cell.style.minWidth = '60px';
+                cell.style.maxWidth = '60px';
+                cell.style.cursor = 'pointer';
+                cell.style.transition = 'all 0.2s';
                 cell.title = `${setor} - ${meses[j] || 'Mês ' + (j + 1)}: ${valorNum.toFixed(2)} dias perdidos`;
+                
+                // Efeito hover
+                cell.addEventListener('mouseenter', function() {
+                    this.style.transform = 'scale(1.05)';
+                    this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                    this.style.zIndex = '1';
+                    this.style.position = 'relative';
+                });
+                cell.addEventListener('mouseleave', function() {
+                    this.style.transform = 'scale(1)';
+                    this.style.boxShadow = 'none';
+                    this.style.zIndex = 'auto';
+                    this.style.position = 'static';
+                });
+                
                 row.appendChild(cell);
             });
         } else {
             meses.forEach(() => {
                 const cell = document.createElement('td');
+                cell.textContent = '';
                 cell.style.border = '1px solid #ddd';
-                cell.style.padding = '4px';
+                cell.style.padding = '6px';
                 cell.style.backgroundColor = '#ffffff';
-                cell.style.minWidth = '50px';
+                cell.style.minWidth = '60px';
+                cell.style.maxWidth = '60px';
                 row.appendChild(cell);
             });
         }
