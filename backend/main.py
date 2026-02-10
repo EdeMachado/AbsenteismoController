@@ -1819,28 +1819,45 @@ async def dashboard(
             "comparativo_ano_anterior": []
         }
         
-        # Calcula comparativo entre períodos
+        # Calcula comparativo entre períodos (para TODOS os clientes, incluindo Roda de Ouro)
+        print(f"[DASHBOARD] Calculando comparativos para client_id={client_id}")
         try:
-            resultado["comparativo_periodos_mes"] = analytics.comparativo_periodos(client_id, tipo_comparacao='mes', funcionario=funcionario, setor=setor)
+            comparativo_mes = analytics.comparativo_periodos(client_id, tipo_comparacao='mes', funcionario=funcionario, setor=setor)
+            resultado["comparativo_periodos_mes"] = comparativo_mes
+            print(f"[DASHBOARD] Comparativo mensal calculado: {comparativo_mes is not None}, periodo_atual: {comparativo_mes.get('periodo_atual') if comparativo_mes else None}")
         except Exception as e:
-            print(f"Erro ao calcular comparativo mensal: {e}")
+            print(f"[DASHBOARD] Erro ao calcular comparativo mensal: {e}")
+            import traceback
+            traceback.print_exc()
+            resultado["comparativo_periodos_mes"] = {}
         
         try:
-            resultado["comparativo_periodos_trimestre"] = analytics.comparativo_periodos(client_id, tipo_comparacao='trimestre', funcionario=funcionario, setor=setor)
+            comparativo_trimestre = analytics.comparativo_periodos(client_id, tipo_comparacao='trimestre', funcionario=funcionario, setor=setor)
+            resultado["comparativo_periodos_trimestre"] = comparativo_trimestre
+            print(f"[DASHBOARD] Comparativo trimestral calculado: {comparativo_trimestre is not None}, periodo_atual: {comparativo_trimestre.get('periodo_atual') if comparativo_trimestre else None}")
         except Exception as e:
-            print(f"Erro ao calcular comparativo trimestral: {e}")
+            print(f"[DASHBOARD] Erro ao calcular comparativo trimestral: {e}")
+            import traceback
+            traceback.print_exc()
+            resultado["comparativo_periodos_trimestre"] = {}
         
         # Calcula comparativo com ano anterior
         try:
             resultado["comparativo_ano_anterior"] = analytics.comparativo_ano_anterior(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario, setor=setor)
         except Exception as e:
-            print(f"Erro ao calcular comparativo ano anterior: {e}")
+            print(f"[DASHBOARD] Erro ao calcular comparativo ano anterior: {e}")
+            resultado["comparativo_ano_anterior"] = []
         
-        # Calcula heatmap de setores por meses
+        # Calcula heatmap de setores por meses (para TODOS os clientes, incluindo Roda de Ouro)
+        print(f"[DASHBOARD] Calculando heatmap para client_id={client_id}")
         try:
-            resultado["heatmap_setores_meses"] = analytics.heatmap_setores_meses(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario)
+            heatmap = analytics.heatmap_setores_meses(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario)
+            resultado["heatmap_setores_meses"] = heatmap
+            print(f"[DASHBOARD] Heatmap calculado: {heatmap is not None}, setores: {len(heatmap.get('setores', [])) if heatmap else 0}")
         except Exception as e:
-            print(f"Erro ao calcular heatmap: {e}")
+            print(f"[DASHBOARD] Erro ao calcular heatmap: {e}")
+            import traceback
+            traceback.print_exc()
             resultado["heatmap_setores_meses"] = {}
         
         # Corrige encoding antes de retornar
