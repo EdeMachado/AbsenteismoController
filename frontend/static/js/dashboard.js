@@ -519,32 +519,62 @@ async function carregarDashboard() {
         }
         
         // Comparativo entre períodos (todos os clientes)
-        if (data.comparativo_periodos_mes && Object.keys(data.comparativo_periodos_mes).length > 0) {
-            renderizarChartComparativoMensal(data.comparativo_periodos_mes);
+        console.log('[DASHBOARD] Comparativo mensal recebido:', data.comparativo_periodos_mes);
+        if (data.comparativo_periodos_mes && data.comparativo_periodos_mes.periodo_atual && data.comparativo_periodos_mes.periodo_anterior) {
+            console.log('[DASHBOARD] Renderizando comparativo mensal');
+            try {
+                renderizarChartComparativoMensal(data.comparativo_periodos_mes);
+            } catch (error) {
+                console.error('[DASHBOARD] Erro ao renderizar comparativo mensal:', error);
+            }
+        } else {
+            console.log('[DASHBOARD] Comparativo mensal não renderizado - dados:', {
+                existe: !!data.comparativo_periodos_mes,
+                temPeriodoAtual: !!data.comparativo_periodos_mes?.periodo_atual,
+                temPeriodoAnterior: !!data.comparativo_periodos_mes?.periodo_anterior
+            });
         }
-        if (data.comparativo_periodos_trimestre && Object.keys(data.comparativo_periodos_trimestre).length > 0) {
-            renderizarChartComparativoTrimestral(data.comparativo_periodos_trimestre);
+        
+        console.log('[DASHBOARD] Comparativo trimestral recebido:', data.comparativo_periodos_trimestre);
+        if (data.comparativo_periodos_trimestre && data.comparativo_periodos_trimestre.periodo_atual && data.comparativo_periodos_trimestre.periodo_anterior) {
+            console.log('[DASHBOARD] Renderizando comparativo trimestral');
+            try {
+                renderizarChartComparativoTrimestral(data.comparativo_periodos_trimestre);
+            } catch (error) {
+                console.error('[DASHBOARD] Erro ao renderizar comparativo trimestral:', error);
+            }
+        } else {
+            console.log('[DASHBOARD] Comparativo trimestral não renderizado - dados:', {
+                existe: !!data.comparativo_periodos_trimestre,
+                temPeriodoAtual: !!data.comparativo_periodos_trimestre?.periodo_atual,
+                temPeriodoAnterior: !!data.comparativo_periodos_trimestre?.periodo_anterior
+            });
         }
+        
         if (data.comparativo_ano_anterior && Array.isArray(data.comparativo_ano_anterior) && data.comparativo_ano_anterior.length > 0) {
-            renderizarChartComparativoAnoAnterior(data.comparativo_ano_anterior);
+            try {
+                renderizarChartComparativoAnoAnterior(data.comparativo_ano_anterior);
+            } catch (error) {
+                console.error('[DASHBOARD] Erro ao renderizar comparativo ano anterior:', error);
+            }
         }
         
         // Heatmap de Setores x Meses
-        console.log('[DEBUG] Verificando heatmap:', data.heatmap_setores_meses);
-        console.log('[DEBUG] Tipo de dados:', typeof data.heatmap_setores_meses);
-        console.log('[DEBUG] É objeto?', data.heatmap_setores_meses && typeof data.heatmap_setores_meses === 'object');
-        console.log('[DEBUG] Tem setores?', data.heatmap_setores_meses?.setores);
-        console.log('[DEBUG] Quantidade de setores:', data.heatmap_setores_meses?.setores?.length);
+        console.log('[DASHBOARD] Verificando heatmap:', data.heatmap_setores_meses);
+        console.log('[DASHBOARD] Tipo de dados:', typeof data.heatmap_setores_meses);
+        console.log('[DASHBOARD] É objeto?', data.heatmap_setores_meses && typeof data.heatmap_setores_meses === 'object');
+        console.log('[DASHBOARD] Tem setores?', data.heatmap_setores_meses?.setores);
+        console.log('[DASHBOARD] Quantidade de setores:', data.heatmap_setores_meses?.setores?.length);
         
         if (data.heatmap_setores_meses && data.heatmap_setores_meses.setores && Array.isArray(data.heatmap_setores_meses.setores) && data.heatmap_setores_meses.setores.length > 0) {
-            console.log('[DEBUG] Renderizando heatmap com', data.heatmap_setores_meses.setores.length, 'setores');
+            console.log('[DASHBOARD] Renderizando heatmap com', data.heatmap_setores_meses.setores.length, 'setores');
             try {
                 renderizarChartHeatmap(data.heatmap_setores_meses);
             } catch (error) {
-                console.error('[DEBUG] Erro ao renderizar heatmap:', error);
+                console.error('[DASHBOARD] Erro ao renderizar heatmap:', error);
             }
         } else {
-            console.log('[DEBUG] Heatmap não renderizado - dados inválidos:', {
+            console.log('[DASHBOARD] Heatmap não renderizado - dados inválidos:', {
                 existe: !!data.heatmap_setores_meses,
                 temSetores: !!data.heatmap_setores_meses?.setores,
                 setoresArray: Array.isArray(data.heatmap_setores_meses?.setores),
