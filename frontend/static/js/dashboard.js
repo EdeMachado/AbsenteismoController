@@ -4148,22 +4148,20 @@ let chartHeatmap = null;
 function renderizarChartHeatmap(dados) {
     console.log('[HEATMAP] Iniciando renderização:', dados);
     
-    // Busca o container (div chart-wrapper)
-    const container = document.getElementById('chartHeatmap')?.closest('.chart-wrapper');
+    // Busca o elemento chartHeatmap diretamente
+    const div = document.getElementById('chartHeatmap');
+    if (!div) {
+        console.error('[HEATMAP] Elemento chartHeatmap não encontrado no DOM!');
+        return;
+    }
+    
+    // Busca o container (div chart-wrapper) que contém o chartHeatmap
+    const container = div.closest('.chart-wrapper');
     if (!container) {
-        console.error('[HEATMAP] Container não encontrado! Procurando por chartHeatmap...');
-        const div = document.getElementById('chartHeatmap');
-        if (!div) {
-            console.error('[HEATMAP] Elemento chartHeatmap não encontrado no DOM!');
-            return;
-        }
-        // Se encontrou o div mas não o container, usa o div diretamente
-        const wrapper = div.closest('.chart-wrapper') || div.parentElement;
-        if (wrapper) {
-            wrapper.innerHTML = '';
-            renderizarHeatmapTabela(dados, wrapper);
-            return;
-        }
+        console.error('[HEATMAP] Container chart-wrapper não encontrado! Usando div diretamente...');
+        div.innerHTML = '';
+        renderizarHeatmapTabela(dados, div);
+        return;
     }
     
     if (!dados || !dados.setores || dados.setores.length === 0) {

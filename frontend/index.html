@@ -356,54 +356,6 @@
                 </div>
                 
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
-                    <!-- Comparativo entre Períodos -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Comparativo Mensal</h3>
-                            <p class="chart-subtitle">Mês atual vs mês anterior</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 280px;">
-                            <canvas id="chartComparativoMensal"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Comparativo Trimestral -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Comparativo Trimestral</h3>
-                            <p class="chart-subtitle">Trimestre atual vs anterior</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 280px;">
-                            <canvas id="chartComparativoTrimestral"></canvas>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
-                    <!-- Comparativo Ano Anterior -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Comparativo Ano Anterior</h3>
-                            <p class="chart-subtitle">Ano atual vs mesmo período do ano anterior</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 280px;">
-                            <canvas id="chartComparativoAnoAnterior"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Heatmap Setores x Meses -->
-                    <div class="chart-container">
-                        <div class="chart-header">
-                            <h3 class="chart-title">Mapa de Calor</h3>
-                            <p class="chart-subtitle">Dias perdidos por setor e mês</p>
-                        </div>
-                        <div class="chart-wrapper" style="height: 280px; overflow: auto;">
-                            <div id="chartHeatmap" style="width: 100%; height: 100%;"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
                     <!-- Dias Perdidos por Centro de Custo (Setor) -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -509,6 +461,63 @@
                 </div>
                 </div>
                 <!-- FIM GRÁFICOS CONVERPLAST -->
+                
+                <!-- GRÁFICOS COMPARATIVOS E HEATMAP (TODOS OS CLIENTES) -->
+                <div id="graficosComparativos" style="margin-top: 32px; padding-top: 32px; border-top: 2px solid #e0e0e0;">
+                    <h2 style="font-size: 24px; font-weight: 600; color: #333; margin-bottom: 24px; text-align: center;">
+                        <i class="fas fa-chart-line" style="margin-right: 8px; color: #1a237e;"></i>
+                        Análises Comparativas
+                    </h2>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                        <!-- Comparativo entre Períodos -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Comparativo Mensal</h3>
+                                <p class="chart-subtitle">Mês atual vs mês anterior</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 280px;">
+                                <canvas id="chartComparativoMensal"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Comparativo Trimestral -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Comparativo Trimestral</h3>
+                                <p class="chart-subtitle">Trimestre atual vs anterior</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 280px;">
+                                <canvas id="chartComparativoTrimestral"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                        <!-- Comparativo Ano Anterior -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Comparativo Ano Anterior</h3>
+                                <p class="chart-subtitle">Ano atual vs mesmo período do ano anterior</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 280px;">
+                                <canvas id="chartComparativoAnoAnterior"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Heatmap Setores x Meses -->
+                        <div class="chart-container">
+                            <div class="chart-header">
+                                <h3 class="chart-title">Mapa de Calor</h3>
+                                <p class="chart-subtitle">Dias perdidos por setor e mês</p>
+                            </div>
+                            <div class="chart-wrapper" style="height: 280px; overflow: auto;">
+                                <div id="chartHeatmap" style="width: 100%; height: 100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- FIM GRÁFICOS COMPARATIVOS -->
                 
                 <!-- GRÁFICOS ESPECÍFICOS RODA DE OURO -->
                 <div id="graficosRodaOuro" style="display: none; margin-top: 32px; padding-top: 32px; border-top: 2px solid #e0e0e0;">
