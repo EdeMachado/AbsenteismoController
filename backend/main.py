@@ -4063,6 +4063,164 @@ Esta análise detalhada permite identificar padrões específicos de absenteísm
                     })
             except Exception as e:
                 print(f"Erro ao calcular análise detalhada gênero para apresentação: {e}")
+            
+            # ==================== GRÁFICOS COPIADOS DA CONVERPLAST ====================
+            # Slide: Comparativo Mensal
+            try:
+                comparativo_mensal = analytics.comparativo_periodos(client_id, tipo_comparacao='mes', funcionario=funcionario, setor=setor)
+                if comparativo_mensal and comparativo_mensal.get('periodo_atual') and comparativo_mensal.get('periodo_anterior'):
+                    try:
+                        # Gera análise específica para comparativo mensal
+                        atual = comparativo_mensal.get('periodo_atual', {})
+                        anterior = comparativo_mensal.get('periodo_anterior', {})
+                        
+                        # CORREÇÃO: analytics retorna 'dias_perdidos', não 'total_dias_perdidos'
+                        dias_atual = atual.get('dias_perdidos', 0) or atual.get('total_dias_perdidos', 0) or 0
+                        dias_anterior = anterior.get('dias_perdidos', 0) or anterior.get('total_dias_perdidos', 0) or 0
+                        horas_atual = atual.get('horas_perdidas', 0) or atual.get('total_horas_perdidas', 0) or 0
+                        horas_anterior = anterior.get('horas_perdidas', 0) or anterior.get('total_horas_perdidas', 0) or 0
+                        registros_atual = atual.get('total_registros', 0) or 0
+                        registros_anterior = anterior.get('total_registros', 0) or 0
+                        
+                        variacao_dias = ((dias_atual - dias_anterior) / dias_anterior * 100) if dias_anterior > 0 else (100 if dias_atual > 0 else 0)
+                        variacao_horas = ((horas_atual - horas_anterior) / horas_anterior * 100) if horas_anterior > 0 else (100 if horas_atual > 0 else 0)
+                        variacao_registros = ((registros_atual - registros_anterior) / registros_anterior * 100) if registros_anterior > 0 else (100 if registros_atual > 0 else 0)
+                        
+                        analise_comp_mensal = f"""📊 **Análise: Comparativo Mensal**
+
+**Período Atual ({atual.get('label', 'Mês Atual')}):**
+- {int(dias_atual)} dias perdidos
+- {int(horas_atual)} horas perdidas
+- {int(registros_atual)} registros de atestados
+
+**Período Anterior ({anterior.get('label', 'Mês Anterior')}):**
+- {int(dias_anterior)} dias perdidos
+- {int(horas_anterior)} horas perdidas
+- {int(registros_anterior)} registros de atestados
+
+**Variação:**
+- Dias: {variacao_dias:+.1f}%
+- Horas: {variacao_horas:+.1f}%
+- Registros: {variacao_registros:+.1f}%
+
+Esta comparação permite identificar tendências de melhoria ou piora no absenteísmo mês a mês."""
+                    except Exception as e:
+                        print(f"Erro ao gerar análise comparativo mensal: {e}")
+                        analise_comp_mensal = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_mensal",
+                        "titulo": "Comparativo Mensal",
+                        "subtitulo": "Mês atual vs mês anterior",
+                        "dados": comparativo_mensal,
+                        "analise": analise_comp_mensal
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo mensal para apresentação: {e}")
+            
+            # Slide: Comparativo Trimestral
+            try:
+                comparativo_trimestral = analytics.comparativo_periodos(client_id, tipo_comparacao='trimestre', funcionario=funcionario, setor=setor)
+                if comparativo_trimestral and comparativo_trimestral.get('periodo_atual') and comparativo_trimestral.get('periodo_anterior'):
+                    try:
+                        # Gera análise específica para comparativo trimestral
+                        atual = comparativo_trimestral.get('periodo_atual', {})
+                        anterior = comparativo_trimestral.get('periodo_anterior', {})
+                        
+                        # CORREÇÃO: analytics retorna 'dias_perdidos', não 'total_dias_perdidos'
+                        dias_atual = atual.get('dias_perdidos', 0) or atual.get('total_dias_perdidos', 0) or 0
+                        dias_anterior = anterior.get('dias_perdidos', 0) or anterior.get('total_dias_perdidos', 0) or 0
+                        horas_atual = atual.get('horas_perdidas', 0) or atual.get('total_horas_perdidas', 0) or 0
+                        horas_anterior = anterior.get('horas_perdidas', 0) or anterior.get('total_horas_perdidas', 0) or 0
+                        registros_atual = atual.get('total_registros', 0) or 0
+                        registros_anterior = anterior.get('total_registros', 0) or 0
+                        
+                        variacao_dias = ((dias_atual - dias_anterior) / dias_anterior * 100) if dias_anterior > 0 else (100 if dias_atual > 0 else 0)
+                        variacao_horas = ((horas_atual - horas_anterior) / horas_anterior * 100) if horas_anterior > 0 else (100 if horas_atual > 0 else 0)
+                        variacao_registros = ((registros_atual - registros_anterior) / registros_anterior * 100) if registros_anterior > 0 else (100 if registros_atual > 0 else 0)
+                        
+                        analise_comp_trim = f"""📊 **Análise: Comparativo Trimestral**
+
+**Trimestre Atual ({atual.get('label', 'Trimestre Atual')}):**
+- {int(dias_atual)} dias perdidos
+- {int(horas_atual)} horas perdidas
+- {int(registros_atual)} registros de atestados
+
+**Trimestre Anterior ({anterior.get('label', 'Trimestre Anterior')}):**
+- {int(dias_anterior)} dias perdidos
+- {int(horas_anterior)} horas perdidas
+- {int(registros_anterior)} registros de atestados
+
+**Variação:**
+- Dias: {variacao_dias:+.1f}%
+- Horas: {variacao_horas:+.1f}%
+- Registros: {variacao_registros:+.1f}%
+
+Esta comparação trimestral permite identificar tendências de médio prazo no absenteísmo."""
+                    except Exception as e:
+                        print(f"Erro ao gerar análise comparativo trimestral: {e}")
+                        analise_comp_trim = "Análise não disponível."
+                    
+                    slides.append({
+                        "id": len(slides),
+                        "tipo": "comparativo_trimestral",
+                        "titulo": "Comparativo Trimestral",
+                        "subtitulo": "Trimestre atual vs anterior",
+                        "dados": comparativo_trimestral,
+                        "analise": analise_comp_trim
+                    })
+            except Exception as e:
+                print(f"Erro ao calcular comparativo trimestral para apresentação: {e}")
+            
+            # Slide: Heatmap (Mapa de Calor)
+            try:
+                heatmap_data = analytics.heatmap_setores_meses(client_id, mes_inicio=mes_inicio, mes_fim=mes_fim, funcionario=funcionario)
+                # Verifica se tem dados válidos: setores, meses e dados não vazios
+                if heatmap_data and isinstance(heatmap_data, dict):
+                    setores = heatmap_data.get('setores', [])
+                    meses = heatmap_data.get('meses', [])
+                    dados_array = heatmap_data.get('dados', [])
+                    if setores and len(setores) > 0 and meses and len(meses) > 0 and dados_array and len(dados_array) > 0:
+                        try:
+                            # Calcula análise específica para heatmap
+                            total_dias = 0
+                            max_setor = None
+                            max_valor = 0
+                            max_mes = None
+                            
+                            for i, setor in enumerate(setores):
+                                for j, mes in enumerate(meses):
+                                    if i < len(dados_array) and j < len(dados_array[i]):
+                                        valor = dados_array[i][j] or 0
+                                        total_dias += valor
+                                        if valor > max_valor:
+                                            max_valor = valor
+                                            max_setor = setor
+                                            max_mes = mes
+                            
+                            analise_heatmap = f"""🔥 **Análise: Mapa de Calor - Setores x Meses**
+
+O mapa de calor mostra a distribuição de **{int(total_dias)} dias perdidos** ao longo dos meses analisados, distribuídos entre **{len(setores)} setores**.
+
+**Maior concentração:**
+O setor **{max_setor}** apresentou o maior número de dias perdidos no mês **{max_mes}**, com **{int(max_valor)} dias**.
+
+Esta visualização permite identificar padrões sazonais e setores que demandam atenção específica em determinados períodos."""
+                        except Exception as e:
+                            print(f"Erro ao gerar análise heatmap: {e}")
+                            analise_heatmap = "Análise não disponível."
+                        
+                        slides.append({
+                            "id": len(slides),
+                            "tipo": "heatmap",
+                            "titulo": "Mapa de Calor",
+                            "subtitulo": "Dias perdidos por setor e mês",
+                            "dados": heatmap_data,
+                            "analise": analise_heatmap
+                        })
+            except Exception as e:
+                print(f"Erro ao calcular heatmap para apresentação: {e}")
         
         # REMOVIDO: Slides de Ações vazios causavam páginas em branco no PDF
         # Se precisar adicionar slides de ações no futuro, devem ter conteúdo real (dados ou análise)
