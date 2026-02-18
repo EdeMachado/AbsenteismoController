@@ -156,3 +156,10 @@ class IntegrityChecker:
                 "lgpd_compliant": False
             }
 
+
+
+
+
+
+
+

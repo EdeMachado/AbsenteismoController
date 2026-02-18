@@ -160,3 +160,10 @@ Resposta: "Temos verificação automática de integridade que valida isolamento 
 
 **O que você prefere fazer?**
 
+
+
+
+
+
+
+

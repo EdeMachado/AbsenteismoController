@@ -149,3 +149,10 @@ def invalidate_client_cache(client_id: int):
     """Invalida cache de um cliente"""
     cache_service.invalidate_prefix(f"client:{client_id}")
 
+
+
+
+
+
+
+

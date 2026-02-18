@@ -170,3 +170,10 @@ class NotificationService:
 # Instância global
 notification_service = NotificationService()
 
+
+
+
+
+
+
+

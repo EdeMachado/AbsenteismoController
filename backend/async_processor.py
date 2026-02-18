@@ -117,3 +117,10 @@ class AsyncTaskManager:
 # Instância global
 task_manager = AsyncTaskManager()
 
+
+
+
+
+
+
+

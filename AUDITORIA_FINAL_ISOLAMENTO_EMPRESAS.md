@@ -318,3 +318,10 @@ O sistema garante isolamento total através de:
 
 **Cada empresa é um sistema completamente independente, sem vínculos ou mistura de dados.**
 
+
+
+
+
+
+
+
