@@ -38,7 +38,11 @@ from backend.services.metric_service import (
 )
 from backend.services.shadow_compare import (
     _PRODUCTION_DB_HINT,
+    PiiGuardError,
+    assert_no_pii_in_payload,
     compare_shadow,
+    cpf_check_digits_valid,
+    find_pii_issues,
     open_sqlite_readonly,
 )
 
@@ -750,6 +754,119 @@ class TestCanonicalMetrics(unittest.TestCase):
         r = svc.compute(client_id=2, periodo_inicio="2026-01", periodo_fim="2026-01")
         self.assertEqual(r.metricas.eventos_com_horas_invalidas, 1)
         db.close()
+
+
+class TestShadowPiiGuard(unittest.TestCase):
+    """Guard anti-PII estruturado — sem falso positivo em agregados."""
+
+    VALID_CPF_FORMATTED = "529.982.247-25"
+    VALID_CPF_DIGITS = "52998224725"
+    INVALID_11 = "12345678901"
+
+    def test_01_valid_formatted_cpf_blocked(self) -> None:
+        with self.assertRaises(PiiGuardError) as ctx:
+            assert_no_pii_in_payload({"obs": self.VALID_CPF_FORMATTED})
+        self.assertIn("possivel_pii_detectado_em=obs", str(ctx.exception))
+        self.assertNotIn(self.VALID_CPF_DIGITS, str(ctx.exception))
+        self.assertNotIn(self.VALID_CPF_FORMATTED, str(ctx.exception))
+
+    def test_02_valid_unformatted_cpf_blocked(self) -> None:
+        with self.assertRaises(PiiGuardError):
+            assert_no_pii_in_payload({"obs": self.VALID_CPF_DIGITS})
+
+    def test_03_invalid_11_digits_not_false_positive(self) -> None:
+        assert_no_pii_in_payload({"obs": self.INVALID_11})
+
+    def test_04_aggregate_int_11_digits_allowed(self) -> None:
+        assert_no_pii_in_payload({"metricas": {"eventos": 12345678901}})
+
+    def test_05_aggregate_float_allowed(self) -> None:
+        # Caso do falso positivo original: float serializado parece CPF no JSON cego
+        assert_no_pii_in_payload(
+            {"canonico": {"metricas": {"dias_perdidos": 123.45678901}}}
+        )
+        assert_no_pii_in_payload({"metricas": {"horas": 100.12345678}})
+
+    def test_06_hours_days_deltas_allowed(self) -> None:
+        assert_no_pii_in_payload(
+            {
+                "legado": {"total_dias_perdidos": 9876.5432, "total_horas_perdidas": 12345.6789},
+                "diferencas": [{"delta": -1234.5678, "chave": "dias_perdidos"}],
+            }
+        )
+
+    def test_07_internal_cpf_prefix_blocked(self) -> None:
+        with self.assertRaises(PiiGuardError) as ctx:
+            assert_no_pii_in_payload({"k": "cpf:12345678901"})
+        self.assertEqual(ctx.exception.finding.category, "chave_interna")
+
+    def test_08_internal_mat_prefix_blocked(self) -> None:
+        with self.assertRaises(PiiGuardError) as ctx:
+            assert_no_pii_in_payload({"k": "mat:ABC123"})
+        self.assertEqual(ctx.exception.finding.category, "chave_interna")
+        self.assertIn("mat:***", str(ctx.exception))
+
+    def test_09_internal_nome_prefix_blocked(self) -> None:
+        with self.assertRaises(PiiGuardError) as ctx:
+            assert_no_pii_in_payload({"k": "nome:FULANO"})
+        self.assertEqual(ctx.exception.finding.category, "chave_interna")
+
+    def test_10_suspicious_cpf_field_blocked(self) -> None:
+        with self.assertRaises(PiiGuardError) as ctx:
+            assert_no_pii_in_payload({"cpf": "qualquer"})
+        self.assertEqual(ctx.exception.finding.category, "campo_suspeito")
+        self.assertIn("possivel_pii_detectado_em=cpf", str(ctx.exception))
+
+    def test_11_methodology_mentions_cpf_column_allowed(self) -> None:
+        assert_no_pii_in_payload(
+            {
+                "metodologia": {
+                    "identidade_trabalhador": (
+                        "aproximado — usa campo cpf se presente; "
+                        "não expõe o valor individual."
+                    ),
+                    "campo_dias": "dias_atestados",
+                },
+                "qualidade_identidade": {"por_cpf": 3, "metodo": "aproximado"},
+            }
+        )
+
+    def test_12_full_synthetic_canonical_payload_allowed(self) -> None:
+        db = make_test_session()
+        seed_canonical_fixture(db)
+        report = compare_shadow(
+            db, client_id=2, periodo_inicio="2026-01", periodo_fim="2026-06"
+        )
+        assert_no_pii_in_payload(report.to_dict())
+        # floats que antes quebravam o guard cego
+        payload = report.to_dict()
+        payload["canonico"]["metricas"]["dias_perdidos"] = 123.45678901
+        payload["legado"]["total_horas_perdidas"] = 100.12345678
+        assert_no_pii_in_payload(payload)
+        db.close()
+
+    def test_13_distribution_with_individual_name_blocked(self) -> None:
+        with self.assertRaises(PiiGuardError) as ctx:
+            assert_no_pii_in_payload(
+                {
+                    "distribuicao_setor": [
+                        {"setor": "PRODUCAO", "eventos": 1, "nome": "FULANO DE TAL"}
+                    ]
+                }
+            )
+        self.assertIn("nome", ctx.exception.finding.path)
+
+    def test_14_detector_masks_without_revealing_pii(self) -> None:
+        findings = find_pii_issues({"dado": self.VALID_CPF_FORMATTED})
+        self.assertEqual(len(findings), 1)
+        msg = findings[0].as_message()
+        self.assertIn("possivel_pii_detectado_em=dado", msg)
+        self.assertIn("categoria=", msg)
+        self.assertIn("tipo=str", msg)
+        self.assertIn("valor_mascarado=***.***.***-**", msg)
+        self.assertNotIn("529", msg)
+        self.assertNotIn(self.VALID_CPF_DIGITS, msg)
+        self.assertTrue(cpf_check_digits_valid(self.VALID_CPF_DIGITS))
 
 
 if __name__ == "__main__":

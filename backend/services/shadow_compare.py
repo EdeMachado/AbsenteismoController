@@ -12,11 +12,10 @@ Não aponta para caminhos de produção por padrão.
 """
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -26,12 +25,258 @@ from backend.services.metric_service import MetricService
 # Caminho conhecido de produção — nunca é default; exige path explícito.
 _PRODUCTION_DB_HINT = "/var/www/absenteismo/database/absenteismo.db"
 
-_PII_PATTERNS = [
-    re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b"),
-    re.compile(r"\bmat:", re.I),
-    re.compile(r"\bcpf:", re.I),
-    re.compile(r"\bnome:", re.I),
-]
+_SUSPICIOUS_KEYS = frozenset(
+    {
+        "cpf",
+        "matricula",
+        "nome",
+        "nomecompleto",
+        "nome_funcionario",
+        "email",
+        "telefone",
+        "documento",
+        "worker_key",
+        "identity_key",
+    }
+)
+
+_INTERNAL_KEY_PREFIXES = ("cpf:", "mat:", "nome:")
+
+# CPF formatado ou 11 dígitos contínuos (candidatos textuais)
+_CPF_FORMAT_RE = re.compile(
+    r"(?<!\d)(\d{3}\.?\d{3}\.?\d{3}-?\d{2})(?!\d)"
+)
+
+
+@dataclass(frozen=True)
+class PiiFinding:
+    """Achado anti-PII sem expor o valor bruto."""
+
+    path: str
+    value_type: str
+    category: str
+    masked: str = "***"
+
+    def as_message(self) -> str:
+        return (
+            f"possivel_pii_detectado_em={self.path} "
+            f"tipo={self.value_type} "
+            f"categoria={self.category} "
+            f"valor_mascarado={self.masked}"
+        )
+
+
+class PiiGuardError(ValueError):
+    """Erro de guard anti-PII com metadados seguros (sem valor bruto)."""
+
+    def __init__(self, finding: PiiFinding):
+        self.finding = finding
+        super().__init__(finding.as_message())
+
+
+def _mask_cpf_shape() -> str:
+    return "***.***.***-**"
+
+
+def _mask_internal(prefix: str) -> str:
+    return f"{prefix}***"
+
+
+def _digits_only(text: str) -> str:
+    return "".join(ch for ch in text if ch.isdigit())
+
+
+def is_repeated_digit_sequence(digits: str) -> bool:
+    return len(digits) > 0 and digits == digits[0] * len(digits)
+
+
+def cpf_check_digits_valid(digits: str) -> bool:
+    """Valida os dois dígitos verificadores do CPF (11 dígitos)."""
+    if len(digits) != 11 or not digits.isdigit():
+        return False
+    if is_repeated_digit_sequence(digits):
+        return False
+
+    def _digit(slice_digits: str, weight_start: int) -> str:
+        total = sum(
+            int(d) * w
+            for d, w in zip(slice_digits, range(weight_start, 1, -1))
+        )
+        rest = total % 11
+        return "0" if rest < 2 else str(11 - rest)
+
+    d1 = _digit(digits[:9], 10)
+    d2 = _digit(digits[:10], 11)
+    return digits[-2:] == d1 + d2
+
+
+def _looks_unequivocal_cpf_format(text: str) -> bool:
+    """Formato com pontuação típica de CPF: 000.000.000-00."""
+    return bool(re.fullmatch(r"\d{3}\.\d{3}\.\d{3}-\d{2}", text.strip()))
+
+
+def _cpf_textual_should_block(text: str, *, suspicious_field: bool) -> bool:
+    """
+    Decide se uma string candidata a CPF deve ser bloqueada.
+    Não trata qualquer sequência de 11 dígitos como PII automaticamente.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+
+    for match in _CPF_FORMAT_RE.finditer(stripped):
+        raw = match.group(1)
+        digits = _digits_only(raw)
+        if len(digits) != 11:
+            continue
+        if is_repeated_digit_sequence(digits):
+            continue
+        unequivocal = _looks_unequivocal_cpf_format(raw)
+        valid = cpf_check_digits_valid(digits)
+        if suspicious_field or unequivocal or valid:
+            return True
+    return False
+
+
+def _has_internal_identity_prefix(text: str) -> Optional[str]:
+    lower = text.lstrip().lower()
+    for prefix in _INTERNAL_KEY_PREFIXES:
+        if lower.startswith(prefix):
+            return prefix
+    return None
+
+
+def _is_suspicious_key(key: Any) -> bool:
+    if not isinstance(key, str):
+        return False
+    return key.strip().lower() in _SUSPICIOUS_KEYS
+
+
+def _type_name(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int):
+        return "int"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, str):
+        return "str"
+    if isinstance(value, dict):
+        return "dict"
+    if isinstance(value, (list, tuple)):
+        return "list"
+    return type(value).__name__
+
+
+def iter_pii_findings(
+    obj: Any,
+    *,
+    path: str = "$",
+    parent_key: Optional[str] = None,
+) -> Iterator[PiiFinding]:
+    """
+    Travessia recursiva estruturada.
+    int/float agregados NÃO são convertidos em string para regex de CPF.
+    """
+    suspicious = _is_suspicious_key(parent_key) if parent_key is not None else False
+
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            child_path = f"{path}.{key}" if path != "$" else str(key)
+            # Chave suspeita com qualquer valor (exceto ausência total) → bloqueio
+            if _is_suspicious_key(key):
+                if value is not None and value != "":
+                    yield PiiFinding(
+                        path=child_path,
+                        value_type=_type_name(value),
+                        category="campo_suspeito",
+                        masked=_mask_cpf_shape()
+                        if str(key).lower() == "cpf"
+                        else "***",
+                    )
+                    continue
+            yield from iter_pii_findings(
+                value, path=child_path, parent_key=str(key) if key is not None else None
+            )
+        return
+
+    if isinstance(obj, (list, tuple)):
+        for idx, item in enumerate(obj):
+            yield from iter_pii_findings(
+                item, path=f"{path}[{idx}]", parent_key=parent_key
+            )
+        return
+
+    # Números agregados: nunca aplicar regex de CPF
+    if isinstance(obj, bool):
+        return
+    if isinstance(obj, (int, float)):
+        if suspicious:
+            yield PiiFinding(
+                path=path,
+                value_type=_type_name(obj),
+                category="campo_suspeito",
+                masked="***",
+            )
+        return
+
+    if obj is None:
+        return
+
+    if not isinstance(obj, str):
+        # Tipos não escalares já tratados; demais ignorados com segurança
+        return
+
+    text = obj
+    prefix = _has_internal_identity_prefix(text)
+    if prefix:
+        yield PiiFinding(
+            path=path,
+            value_type="str",
+            category="chave_interna",
+            masked=_mask_internal(prefix),
+        )
+        return
+
+    if suspicious:
+        # Qualquer valor textual em campo suspeito
+        yield PiiFinding(
+            path=path,
+            value_type="str",
+            category="campo_suspeito",
+            masked="***",
+        )
+        return
+
+    if _cpf_textual_should_block(text, suspicious_field=False):
+        digits = _digits_only(text)
+        category = "cpf_formatado" if _looks_unequivocal_cpf_format(text.strip()) else "cpf_valido"
+        if len(digits) == 11 and cpf_check_digits_valid(digits):
+            category = "cpf_valido"
+        elif _looks_unequivocal_cpf_format(text.strip()):
+            category = "cpf_formatado"
+        yield PiiFinding(
+            path=path,
+            value_type="str",
+            category=category,
+            masked=_mask_cpf_shape(),
+        )
+
+
+def find_pii_issues(payload: Any) -> List[PiiFinding]:
+    return list(iter_pii_findings(payload))
+
+
+def assert_no_pii_in_payload(payload: Dict[str, Any]) -> None:
+    """
+    Guard anti-PII estruturado.
+    Em falha, informa apenas caminho, tipo, categoria e valor mascarado.
+    """
+    findings = find_pii_issues(payload)
+    if findings:
+        raise PiiGuardError(findings[0])
 
 
 @dataclass
@@ -71,26 +316,6 @@ class ShadowCompareReport:
             ],
             "avisos": list(self.avisos),
         }
-
-
-def assert_no_pii_in_payload(payload: Dict[str, Any]) -> None:
-    """Garante que agregados não carregam chaves internas nem CPF formatado."""
-    blob = json.dumps(payload, ensure_ascii=False)
-    for pat in _PII_PATTERNS:
-        if pat.search(blob):
-            raise ValueError(f"PII ou chave interna detectada na saída shadow: {pat.pattern}")
-    for banned in ("nomecompleto", "matricula", "cpf", "diagnostico"):
-        # Valores de campos de metodologia podem citar nomes de colunas — ok em chaves de texto
-        # de documentação; bloqueamos estruturas de distribuição com esses nomes como keys de item.
-        pass
-    for key in (
-        "distribuicao_setor",
-        "distribuicao_centro_custo",
-        "distribuicao_grupo_alfabetico_cid",
-    ):
-        for item in payload.get("canonico", {}).get(key, []) if "canonico" in payload else payload.get(key, []):
-            if any(b in item for b in ("nomecompleto", "matricula", "cpf", "nome")):
-                raise ValueError("Distribuição contém campo identificável")
 
 
 def open_sqlite_readonly(db_path: str) -> Session:
@@ -187,10 +412,8 @@ def compare_shadow(
     ).to_dict()
     m = canonico["metricas"]
 
-    # Sanidade: chave interna de trabalhador não pode vazar
-    blob = json.dumps(canonico, ensure_ascii=False)
-    if "mat:" in blob or "cpf:" in blob or '"nome:' in blob:
-        raise ValueError("chave interna de trabalhador vazou no resultado canônico")
+    # Guard estruturado (sem json.dumps + regex cego)
+    assert_no_pii_in_payload(canonico)
 
     diffs: List[ShadowDiff] = []
     avisos: List[str] = [
@@ -251,5 +474,10 @@ __all__ = [
     "compare_shadow",
     "open_sqlite_readonly",
     "assert_no_pii_in_payload",
+    "find_pii_issues",
+    "iter_pii_findings",
+    "PiiFinding",
+    "PiiGuardError",
+    "cpf_check_digits_valid",
     "_PRODUCTION_DB_HINT",
 ]

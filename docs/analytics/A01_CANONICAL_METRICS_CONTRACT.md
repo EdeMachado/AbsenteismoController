@@ -146,7 +146,7 @@ Taxa oficial de absenteísmo **não** implementada (horas previstas não comprov
 - Não registra endpoint; não é importado por `backend/main.py`; não roda no import.
 - Script exige `--fixtures` **ou** `--db-path` explícito (sem default de produção).
 - SQLite via path: modo leitura (`mode=ro` + `PRAGMA query_only`).
-- Saída só agregados; assertiva anti-PII; chaves internas bloqueadas.
+- Saída só agregados; guard anti-PII **estruturado** (travessia recursiva — não aplica regex de CPF sobre `json.dumps` de agregados numéricos); chaves internas `cpf:`/`mat:`/`nome:` bloqueadas; CPF textual só bloqueia com formato inequívoco, dígitos verificadores válidos ou campo suspeito.
 
 ```bash
 PYTHONPATH=. python3 scripts/shadow_compare_metrics.py --fixtures --client-id 2 --inicio 2026-01 --fim 2026-06
