@@ -247,6 +247,16 @@ def remover_logo_arquivo(caminho: Optional[str]):
 # Mount static files
 app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static")), name="static")
 
+# Epic 1 experimental ingestion — registered ONLY when ENABLE_INTELLIGENT_INGESTION=true.
+# Default off: no new endpoints, no menu entry, no startup migration.
+try:
+    from backend.ingestion.api import register_ingestion_routes
+
+    register_ingestion_routes(app, FRONTEND_DIR)
+except Exception:
+    # Never break legacy app if experimental package import fails
+    pass
+
 # ==================== HELPER FUNCTIONS ====================
 
 def validar_client_id(db: Session, client_id: int) -> Client:
