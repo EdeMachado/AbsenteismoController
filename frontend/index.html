@@ -18,8 +18,9 @@
 </head>
 <body>
     <div class="container">
+        <div class="sidebar-overlay" onclick="closeSidebar()"></div>
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo">
                     <i class="fas fa-chart-line"></i> AbsenteismoController
@@ -77,7 +78,12 @@
         <!-- Main Content -->
         <main class="main-content">
             <header class="header">
-                <h1 class="header-title">Dashboard</h1>
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                    <button type="button" class="menu-toggle" onclick="toggleSidebar()" aria-label="Abrir menu">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="header-title">Dashboard</h1>
+                </div>
                 <div class="header-actions" style="display: flex; align-items: center; gap: 16px; position: relative;">
                     <button onclick="window.print()" class="btn-print-header" title="Imprimir / Salvar como PDF" style="padding: 8px 16px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
                         <i class="fas fa-print"></i>
@@ -144,7 +150,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="filters-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: end;">
+                    <div class="filters-grid" style="align-items: end;">
                         <div class="filter-group" style="margin: 0;">
                             <label class="filter-label" style="font-size: 13px; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
                                 <i class="fas fa-calendar-alt" style="font-size: 12px; color: var(--primary);"></i>
@@ -220,7 +226,7 @@
                 </div>
                 
                 <!-- KPI Cards (só aparecem se houver dados) -->
-                <div class="cards-grid" id="cardsGridContainer" style="display: none; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
+                <div class="cards-grid" id="cardsGridContainer" style="display: none; margin-bottom: 24px;">
                     <div class="card">
                         <div class="card-header">
                             <div>
@@ -248,7 +254,7 @@
                 
                 <!-- Charts Grid - Layout Otimizado (APENAS CONVERPLAST) -->
                 <div id="graficosConverplast">
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-2">
                     <!-- TOP CIDs -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -272,7 +278,7 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-3">
                     <!-- TOP Setores -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -307,7 +313,7 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-2">
                     <!-- Dias Perdidos por Funcionários -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -331,7 +337,7 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-2">
                     <!-- Escalas com mais Atestados -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -355,7 +361,7 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-2">
                     <!-- Dias Perdidos por Centro de Custo (Setor) -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -379,7 +385,7 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-2">
                     <!-- Média de Dias por CID -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -403,7 +409,7 @@
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-2">
                     <!-- Comparativo Dias vs Horas -->
                     <div class="chart-container">
                         <div class="chart-header">
@@ -428,7 +434,7 @@
                 </div>
                 
                 <!-- Produtividade -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="charts-grid charts-grid-2">
                     <div class="chart-container">
                         <div class="chart-header">
                             <h3 class="chart-title">Produtividade - Consultas por Categoria</h3>
@@ -469,7 +475,7 @@
                         Análises Comparativas
                     </h2>
                     
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                    <div class="charts-grid charts-grid-2">
                         <!-- Comparativo entre Períodos -->
                         <div class="chart-container">
                             <div class="chart-header">
@@ -493,7 +499,7 @@
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                    <div class="charts-grid charts-grid-2">
                         <!-- Comparativo Ano Anterior -->
                         <div class="chart-container">
                             <div class="chart-header">
@@ -527,7 +533,7 @@
                     </h2>
                     
                     <!-- Grid 2x3 para os 6 gráficos -->
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                    <div class="charts-grid charts-grid-2">
                         <!-- 1. Classificação por Funcionário -->
                         <div class="chart-container">
                             <div class="chart-header">
@@ -602,7 +608,7 @@
                     </h3>
                     
                     <!-- Grid 2x3 para os novos gráficos de horas -->
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px;">
+                    <div class="charts-grid charts-grid-2">
                         <!-- 1. Horas Perdidas por Gênero -->
                         <div class="chart-container">
                             <div class="chart-header">
@@ -675,6 +681,7 @@
     </div>
     
     <script src="/static/js/menu.js"></script>
+    <script src="/static/js/mobile-menu.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script>
         // Aguarda cores do cliente carregarem antes de inicializar dashboard
