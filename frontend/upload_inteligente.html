@@ -332,6 +332,26 @@
             color: #0c5460;
             border: 1px solid #bee5eb;
         }
+
+        @media (max-width: 1024px) {
+            .powerbi-container {
+                height: auto;
+                min-height: 100vh;
+            }
+            .sidebar {
+                position: fixed;
+                z-index: 1001;
+            }
+            .main-content {
+                width: 100%;
+                padding: 16px;
+                padding-top: 64px;
+            }
+            .upload-container {
+                padding: 20px;
+                max-width: 100%;
+            }
+        }
     </style>
 </head>
 <body>

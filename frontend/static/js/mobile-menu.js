@@ -6,7 +6,11 @@
  */
 
 function getSidebar() {
-    return document.getElementById('sidebar') || document.querySelector('aside.sidebar, .container > .sidebar');
+    return document.getElementById('sidebar')
+        || document.querySelector('aside.sidebar')
+        || document.querySelector('.container > .sidebar')
+        || document.querySelector('.powerbi-container > .sidebar')
+        || document.querySelector('div.sidebar');
 }
 
 function ensureSidebarId(sidebar) {
@@ -38,8 +42,6 @@ function ensureMenuToggle() {
     if (document.querySelector('.menu-toggle')) return;
 
     const header = document.querySelector('.header');
-    if (!header) return;
-
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'menu-toggle';
@@ -51,22 +53,30 @@ function ensureMenuToggle() {
         toggleSidebar();
     });
 
-    let leading = header.querySelector('.header-leading');
-    if (!leading) {
-        leading = document.createElement('div');
-        leading.className = 'header-leading';
-        const title = header.querySelector('.header-title');
-        if (title && title.parentElement === header) {
-            header.insertBefore(leading, title);
-            leading.appendChild(btn);
-            leading.appendChild(title);
-        } else {
-            header.insertBefore(leading, header.firstChild);
-            leading.appendChild(btn);
+    if (header) {
+        let leading = header.querySelector('.header-leading');
+        if (!leading) {
+            leading = document.createElement('div');
+            leading.className = 'header-leading';
+            const title = header.querySelector('.header-title');
+            if (title && title.parentElement === header) {
+                header.insertBefore(leading, title);
+                leading.appendChild(btn);
+                leading.appendChild(title);
+            } else {
+                header.insertBefore(leading, header.firstChild);
+                leading.appendChild(btn);
+            }
+        } else if (!leading.querySelector('.menu-toggle')) {
+            leading.insertBefore(btn, leading.firstChild);
         }
-    } else if (!leading.querySelector('.menu-toggle')) {
-        leading.insertBefore(btn, leading.firstChild);
+        return;
     }
+
+    // Shells custom (ex.: upload inteligente) sem .header padrão
+    if (!getSidebar()) return;
+    btn.classList.add('menu-toggle-floating');
+    document.body.appendChild(btn);
 }
 
 function toggleSidebar() {
