@@ -7,7 +7,7 @@
 | RC | **FIT04-RC1** (identificador documental; sem tag remota) |
 | Branch | `integration/foundation-train` |
 | HEAD inicial (obrigatório) | `88cf672f394cf2c68ff120d7d74a0d916fc89f6c` |
-| HEAD FIT-04 (após commits) | `45ac8f2dd0a256a6637ebf0eff825ecf6f296d65` |
+| HEAD FIT-04 | `1e4ec6321539b4c101bac72e04ab0c9d4bf6d979` |
 | PR | https://github.com/EdeMachado/AbsenteismoController/pull/11 (draft) |
 | Ambiente staging | `/tmp/abs-fit04-rc-20260806-231537` · porta **18081** |
 | Config hash (requirements+authz+cors) | `15116b470622a28e2c946029d296449c0631d7af8b53917c28d69016e6b4efc1` |
