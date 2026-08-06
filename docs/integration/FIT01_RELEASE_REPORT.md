@@ -1,7 +1,7 @@
 # FIT-01 — Release Report (Foundation Integration Train)
 
 **Branch:** `integration/foundation-train`  
-**HEAD:** `90fbc513a549499253a6c32b7f08f1da3b9ba5b4`  
+**HEAD:** `acd7b487ebd2d9ac59b398904c31673689592a83`  
 **Base:** `origin/main` (`d0c012a`)  
 **Data:** 2026-08-06  
 **Tipo:** integração somente — **sem merge para main, sem deploy, sem migration em produção**
@@ -77,7 +77,7 @@ checkout -B integration/foundation-train origin/main
 
 | Conflito | Arquivo | Como resolvido |
 |----------|---------|----------------|
-| Único conflito de conteúdo | `.env.example` | Mantidos blocos Epic 1 **e** Epic 2A; ambas flags `false` |
+| Único conflito de conteúdo | `.env.example` | Mantidos blocos Epic 1 **e** Epic 2A; ambas flags `false` (marcadores `<<<<<<<` removidos no tip) |
 | Sobreposição `main.py` | #4 ∩ #8 | Resolvido pelo merge ort: guards S01-A + registro condicional ingestion |
 
 Nenhuma mudança comportamental intencional além da união de flags no template `.env.example`.
