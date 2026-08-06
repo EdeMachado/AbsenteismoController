@@ -56,9 +56,9 @@ def test_estabilidade(svc):
     r = svc.classify(baseline=baseline_ok(), current=current_stable())
     assert r.codigo in {
         EffectivenessCode.ESTABILIDADE.value,
-        EffectivenessCode.PREVENCAO_DE_PIORA.value,
         EffectivenessCode.RESULTADO_INCONCLUSIVO.value,
     }
+    assert r.codigo != EffectivenessCode.PREVENCAO_DE_PIORA.value
 
 
 def test_sem_evidencia_iqb_baixo(svc):
@@ -83,11 +83,12 @@ def test_horas_estimadas_gate(svc):
     assert "horas_majoritariamente_estimadas" in r.limitacoes
 
 
-def test_headcount_ausente_gate(svc):
+def test_headcount_ausente_not_global_block(svc):
     base = replace(baseline_ok(), headcount=None)
-    r = svc.classify(baseline=base, current=current_no_headcount())
-    assert "headcount_ausente" in r.limitacoes
-    assert r.codigo == EffectivenessCode.SEM_EVIDENCIA_SUFICIENTE.value
+    cur = replace(current_severity_control(), headcount=None, frequencia=None, eventos_por_100=None)
+    r = svc.classify(baseline=base, current=cur)
+    assert r.codigo == EffectivenessCode.CONTROLE_SEVERIDADE.value
+    assert any("headcount" in x for x in r.limitacoes)
 
 
 def test_conditionant_downgrades_integral(svc):
@@ -129,12 +130,12 @@ def test_deltas_rounding(svc):
     assert d["dias_perdidos"] < 0
 
 
-def test_prevenção_de_piora_path(svc):
+def test_estabilidade_not_auto_prevencao(svc):
     base = replace(baseline_ok(), afastamentos_longos=30.0, eventos=100.0)
     cur = replace(current_stable(), afastamentos_longos=25.0, eventos=100.0)
     r = svc.classify(baseline=base, current=cur)
-    assert r.codigo in {
-        EffectivenessCode.PREVENCAO_DE_PIORA.value,
-        EffectivenessCode.ESTABILIDADE.value,
-        EffectivenessCode.RESULTADO_INCONCLUSIVO.value,
-    }
+    assert r.codigo == EffectivenessCode.ESTABILIDADE.value
+    assert EffectivenessCode.PREVENCAO_DE_PIORA.value != r.codigo
+    assert "possivel_prevencao_de_piora" in r.hipoteses or any(
+        "prevencao" in h for h in r.hipoteses
+    )

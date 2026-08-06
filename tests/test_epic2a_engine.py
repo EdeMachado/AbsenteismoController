@@ -213,19 +213,21 @@ def test_executive_score_weights_validate():
 
 
 def test_score_transparent():
+    from backend.performance.schemas import ActionCounts
+
     svc = PerformanceService()
     score = svc.executive_score(
         deltas={"eventos": -0.2, "dias_perdidos": -0.2, "recorrencia": -0.1},
         effectiveness_code="EFICACIA_POSITIVA_PARCIAL",
         coverage=0.8,
         iqb=70,
-        acoes_executadas=4,
-        acoes_propostas=5,
+        action_counts=ActionCounts(propostas=5, aprovadas=5, executadas=4),
         metas_atingidas=0.6,
         conditionants=[],
     )
-    assert 0 <= score["score"] <= 100
-    assert "pesos" in score
+    assert score["score"] is not None and 0 <= score["score"] <= 100
+    assert "pesos_efetivos" in score
+    assert abs(sum(score["pesos_efetivos"].values()) - 100.0) < 1e-6
 
 
 def test_no_causality_in_narrative():

@@ -1,17 +1,21 @@
 # Effectiveness Classification
 
-Codes:
+## Headcount
 
-- `EFICACIA_POSITIVA_INTEGRAL`
-- `EFICACIA_POSITIVA_PARCIAL`
-- `CONTROLE_SEVERIDADE`
-- `CONTROLE_FREQUENCIA`
-- `ESTABILIDADE`
-- `PREVENCAO_DE_PIORA`
-- `SEM_EVIDENCIA_SUFICIENTE`
-- `RESULTADO_INCONCLUSIVO`
-- `RESULTADO_DESFAVORAVEL`
+Absence of headcount is **not** a global blocker. It only blocks population denominators:
 
-All thresholds live in `ThresholdConfig` and are unit-tested.
+- eventos por 100
+- horas por 100
+- frequência populacional
 
-Conditionants (delayed/refused structural actions) downgrade integral → partial and add limitations. **No automatic causality.**
+Absolute classifications remain available: severity control, duration, days, hours, long leaves, absolute stability.
+
+## Prevenção de piora (this version)
+
+Do **not** auto-classify `PREVENCAO_DE_PIORA` from stable long-leave shares.
+
+Return `ESTABILIDADE` and hypothesis `possivel_prevencao_de_piora` (no counterfactual). Formal class requires future historical series, prior trend, documented projection, confidence interval, and expected-scenario comparison.
+
+## Confidence
+
+Computed from IQB, completeness, hours coverage, headcount flag, available metrics fraction, window equivalence, and conditionant penalty — see `backend/performance/confidence.py`.

@@ -33,6 +33,10 @@ def snap(
         setores_criticos=["Producao"],
         grupos_cid=["J", "M"],
         meses_com_dados=3,
+        cobertura_horas_registradas=1.0,
+        cobertura_horas_estimadas=0.0,
+        metodologia_horas="registradas_preferenciais",
+        completude_periodo=1.0,
         limitacoes=[],
         fonte="synthetic_fixture",
     )

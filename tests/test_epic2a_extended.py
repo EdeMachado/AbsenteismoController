@@ -183,20 +183,21 @@ def test_incomplete_windows_never_silent():
 
 
 def test_rounding_digits_config():
+    from backend.performance.schemas import ActionCounts
+
     thr = ThresholdConfig(round_digits=2)
     svc = PerformanceService(thr)
     score = svc.executive_score(
-        deltas={"eventos": -0.12345},
+        deltas={"eventos": -0.12345, "dias_perdidos": -0.1, "recorrencia": 0.0},
         effectiveness_code="ESTABILIDADE",
         coverage=0.33333,
         iqb=70.123,
-        acoes_executadas=1,
-        acoes_propostas=3,
+        action_counts=ActionCounts(aprovadas=3, executadas=1),
         metas_atingidas=0.5,
         conditionants=[],
     )
-    # score itself rounded to 2
     text = str(score["score"])
+    assert score["score"] is not None
     assert len(text.split(".")[-1]) <= 2 or text.endswith(".0")
 
 
@@ -260,6 +261,8 @@ def test_effectiveness_result_shape():
         "evidencias",
         "limitacoes",
         "confianca",
+        "hipoteses",
+        "confianca_componentes",
     }
 
 
@@ -305,14 +308,15 @@ def test_biomed_productivity_fields():
 
 
 def test_score_does_not_include_worker_ids():
+    from backend.performance.schemas import ActionCounts
+
     score = PerformanceService().executive_score(
-        deltas={},
+        deltas={"eventos": 0.0, "dias_perdidos": 0.0},
         effectiveness_code="ESTABILIDADE",
-        coverage=None,
-        iqb=None,
-        acoes_executadas=0,
-        acoes_propostas=0,
-        metas_atingidas=None,
+        coverage=0.5,
+        iqb=70,
+        action_counts=ActionCounts(aprovadas=1, executadas=1),
+        metas_atingidas=0.5,
         conditionants=[],
     )
     blob = json_dumps(score)

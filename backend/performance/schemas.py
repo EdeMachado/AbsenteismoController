@@ -16,6 +16,13 @@ class QualityLabel(str, Enum):
     NAO_CONFIAVEL = "nao_confiavel"
 
 
+class DimensionStatus(str, Enum):
+    AVALIADA = "avaliada"
+    NAO_AVALIADA = "nao_avaliada"
+    INDISPONIVEL = "indisponivel"
+    NAO_APLICAVEL = "nao_aplicavel"
+
+
 class WindowStatus(str, Enum):
     COMPLETO = "completo"
     INCOMPLETO = "incompleto"
@@ -28,7 +35,7 @@ class EffectivenessCode(str, Enum):
     CONTROLE_SEVERIDADE = "CONTROLE_SEVERIDADE"
     CONTROLE_FREQUENCIA = "CONTROLE_FREQUENCIA"
     ESTABILIDADE = "ESTABILIDADE"
-    PREVENCAO_DE_PIORA = "PREVENCAO_DE_PIORA"
+    PREVENCAO_DE_PIORA = "PREVENCAO_DE_PIORA"  # reserved for future formal method
     SEM_EVIDENCIA_SUFICIENTE = "SEM_EVIDENCIA_SUFICIENTE"
     RESULTADO_INCONCLUSIVO = "RESULTADO_INCONCLUSIVO"
     RESULTADO_DESFAVORAVEL = "RESULTADO_DESFAVORAVEL"
@@ -48,26 +55,28 @@ class DecisionStatus(str, Enum):
     RECUSADA = "recusada"
     EXECUTADA = "executada"
     PENDENTE = "pendente"
+    CANCELADA = "cancelada"
+    CONCLUIDA = "concluida"
 
 
 @dataclass(frozen=True)
 class ThresholdConfig:
     """All interpretation thresholds — documented and testable; never hardcoded silently."""
 
-    # Relative change bands (fraction of baseline)
-    material_change: float = 0.05  # 5%
-    strong_improvement: float = 0.10  # 10%
-    stability_band: float = 0.03  # ±3%
-    # Evidence gates
+    material_change: float = 0.05
+    strong_improvement: float = 0.10
+    stability_band: float = 0.03
     min_iqb: float = 60.0
     min_window_completeness: float = 0.8
     min_months_for_integral: int = 3
     min_assistential_coverage: float = 0.5
-    # Estimated hours dominance
     max_estimated_hours_share: float = 0.5
-    # Rounding
+    # ROI comparability
+    min_hours_coverage_observed: float = 0.8
+    max_hours_coverage_diff: float = 0.15
+    # Executive score
+    min_score_coverage: float = 0.5  # fraction of original weight evaluated
     round_digits: int = 4
-    # Executive score weights (must sum ~100)
     w_freq: float = 20.0
     w_sev: float = 20.0
     w_rec: float = 15.0
@@ -90,6 +99,18 @@ class ThresholdConfig:
         )
         if abs(weights - 100.0) > 1e-6:
             raise ValueError(f"score weights must sum to 100; got {weights}")
+
+    def weight_map(self) -> dict[str, float]:
+        return {
+            "evolucao_frequencia": self.w_freq,
+            "evolucao_severidade": self.w_sev,
+            "recorrencia": self.w_rec,
+            "cobertura_assistencial": self.w_cov,
+            "execucao_acoes": self.w_exec,
+            "atingimento_metas": self.w_goals,
+            "qualidade_dados": self.w_quality,
+            "condicionantes_empresa": self.w_cond,
+        }
 
 
 @dataclass(frozen=True)
@@ -134,7 +155,7 @@ class MetricSnapshot:
     horas_perdidas_registradas: float | None = None
     horas_perdidas_estimadas: float | None = None
     duracao_media: float | None = None
-    frequencia: float | None = None
+    frequencia: float | None = None  # population frequency — requires headcount
     gravidade: float | None = None
     recorrencia: float | None = None
     afastamentos_longos: float | None = None
@@ -146,11 +167,39 @@ class MetricSnapshot:
     setores_criticos: list[str] = field(default_factory=list)
     grupos_cid: list[str] = field(default_factory=list)
     meses_com_dados: int = 0
+    # Hours / period comparability metadata
+    cobertura_horas_registradas: float | None = None  # 0..1
+    cobertura_horas_estimadas: float | None = None  # 0..1
+    metodologia_horas: str = "registradas_preferenciais"
+    completude_periodo: float | None = None  # 0..1
     limitacoes: list[str] = field(default_factory=list)
     fonte: str = "fixture_or_canonical"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ActionCounts:
+    propostas: int = 0
+    aprovadas: int = 0
+    aplicaveis: int | None = None  # defaults to aprovadas when None
+    executadas: int = 0
+    concluidas: int = 0
+    canceladas: int = 0
+    recusadas: int = 0
+    adiadas: int = 0
+    pendentes: int = 0
+
+    def aprovadas_aplicaveis(self) -> int:
+        if self.aplicaveis is not None:
+            return max(0, int(self.aplicaveis))
+        return max(0, int(self.aprovadas))
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["aprovadas_aplicaveis"] = self.aprovadas_aplicaveis()
+        return d
 
 
 @dataclass(frozen=True)
@@ -167,7 +216,7 @@ class BiomedProductivity:
     encaminhamentos: int = 0
     planos_ativos: int = 0
     planos_concluidos: int = 0
-    necessidade_estimada: int | None = None  # for coverage
+    necessidade_estimada: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -197,6 +246,8 @@ class EffectivenessResult:
     evidencias: list[str]
     limitacoes: list[str]
     confianca: float
+    hipoteses: list[str] = field(default_factory=list)
+    confianca_componentes: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
