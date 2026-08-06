@@ -49,9 +49,12 @@ def test_dashboard_powerbi_loads_auth_before_js():
     _auth_before("dashboard_powerbi.html", "dashboard_powerbi.js")
 
 
-def test_clonar_dados_passes_origem_id():
+def test_clonar_dados_requires_explicit_origem_query():
     text = (FRONTEND / "static/js/clientes.js").read_text(encoding="utf-8")
-    assert "clonar_dados?origem_id=" in text
+    assert "origem_id=1" not in text
+    assert "clonar_dados?origem_id=${origem}" in text
+    assert "montarUrlClonarDados" in text
+    assert "listarClientesOrigemParaClone" in text
 
 
 def test_auth_js_intercepts_window_fetch():
