@@ -35,3 +35,19 @@ class TenantRequiredError(PerformanceError):
 
 class ReadonlyViolationError(PerformanceError):
     code = "READONLY_VIOLATION"
+
+
+class ProductionPathError(PerformanceError):
+    code = "PRODUCTION_PATH_REFUSED"
+
+
+class IntegrityCheckError(PerformanceError):
+    code = "INTEGRITY_CHECK_FAILED"
+
+
+class SchemaIncompatibleError(PerformanceError):
+    code = "SCHEMA_INCOMPATIBLE"
+
+
+class WindowComparabilityError(PerformanceError):
+    code = "WINDOW_NOT_COMPARABLE"

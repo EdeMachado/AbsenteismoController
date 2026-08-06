@@ -21,4 +21,24 @@ __all__ = [
     "FEATURE_FLAG_ENV",
     "ENGINE_VERSION",
     "is_performance_engine_enabled",
+    "CanonicalSnapshotAdapter",
+    "DataQualityAdapter",
+    "PerformanceShadowService",
 ]
+
+
+def __getattr__(name: str):
+    # Lazy exports to avoid importing SQLAlchemy stacks at package import time
+    if name == "CanonicalSnapshotAdapter":
+        from backend.performance.canonical_snapshot_adapter import CanonicalSnapshotAdapter
+
+        return CanonicalSnapshotAdapter
+    if name == "DataQualityAdapter":
+        from backend.performance.data_quality_adapter import DataQualityAdapter
+
+        return DataQualityAdapter
+    if name == "PerformanceShadowService":
+        from backend.performance.performance_shadow_service import PerformanceShadowService
+
+        return PerformanceShadowService
+    raise AttributeError(name)
