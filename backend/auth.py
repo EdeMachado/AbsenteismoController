@@ -38,8 +38,8 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 horas
 
-# Security scheme
-security = HTTPBearer()
+# Security scheme — auto_error=False para retornar 401 (não 403) sem Bearer
+security = HTTPBearer(auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifica se a senha está correta"""
@@ -91,7 +91,7 @@ def authenticate_user(db: Session, username: str, password: str):
     return user
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
     """Obtém usuário atual a partir do token"""
@@ -100,6 +100,8 @@ def get_current_user(
         detail="Não autenticado",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if credentials is None or not credentials.credentials:
+        raise credentials_exception
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

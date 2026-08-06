@@ -52,6 +52,7 @@ from .auth import (
     get_current_admin_user, get_config_value, set_config_value,
     get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from .tenant import resolve_authorized_client, require_admin_user
 from .email_service import EmailService
 from datetime import timedelta
 import requests
@@ -651,8 +652,9 @@ async def health_check_integrity(db: Session = Depends(get_db)):
         }
 
 @app.get("/api/backup/list")
-async def list_backups():
-    """Lista backups disponíveis"""
+async def list_backups(current_user: User = Depends(get_current_admin_user)):
+    """Lista backups disponíveis (apenas administrador explícito — S01-A)"""
+    require_admin_user(current_user)
     try:
         from .backup_service import backup_service
         if backup_service:
@@ -1257,12 +1259,14 @@ async def upload_file(
     file: UploadFile = File(...),
     client_id: int = Form(...),  # Obrigatório, sem valor padrão
     mes_referencia: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Upload de planilha"""
+    """Upload de planilha (auth + tenant guard — S01-A)"""
     try:
-        # Valida se o cliente existe
-        client = validar_client_id(db, client_id)
+        # Resolve tenant autorizado (não confia só no Form)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         
         # Valida se o arquivo foi enviado
         if not file.filename:
@@ -2143,11 +2147,17 @@ async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
 @app.post("/api/clientes/{cliente_id}/clonar_dados")
 async def clonar_dados_cliente(
     cliente_id: int,
-    origem_id: int = 1,
-    db: Session = Depends(get_db)
+    origem_id: int = Query(..., description="ID do cliente origem (obrigatório, sem default)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Replica dados (uploads + atestados) de um cliente origem para o cliente destino."""
+    """Replica dados (uploads + atestados) — apenas admin explícito (S01-A)."""
     try:
+        require_admin_user(current_user)
+        # Valida existência de destino e origem (admin escolhe ambos; sem fallback 1)
+        resolve_authorized_client(db, current_user, cliente_id)
+        resolve_authorized_client(db, current_user, origem_id)
+
         if cliente_id == origem_id:
             raise HTTPException(status_code=400, detail="Cliente destino e origem não podem ser o mesmo.")
 
@@ -2616,10 +2626,14 @@ async def deletar_logo_cliente(
 async def deletar_cliente(
     cliente_id: int, 
     forcar: bool = Query(False, description="Forçar exclusão mesmo com dados"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Deleta um cliente. Se forcar=True, deleta também todos os dados relacionados."""
+    """Deleta um cliente. Apenas administrador explícito (S01-A)."""
     try:
+        require_admin_user(current_user)
+        resolve_authorized_client(db, current_user, cliente_id)
+
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -4384,11 +4398,12 @@ async def tendencias(
 async def delete_upload(
     upload_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Deleta um upload e seus dados"""
-    # Valida client_id
-    validar_client_id(db, client_id)
+    """Deleta um upload e seus dados (auth + tenant — S01-A)"""
+    client = resolve_authorized_client(db, current_user, client_id)
+    client_id = client.id
     
     # Valida se o upload pertence ao cliente
     upload = db.query(Upload).filter(
@@ -5046,12 +5061,13 @@ async def perfil_funcionario(
 async def listar_todos_dados(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     upload_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Lista todos os dados com filtros"""
+    """Lista todos os dados com filtros (auth + tenant — S01-A)"""
     try:
-        # Valida client_id
-        validar_client_id(db, client_id)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         
         query = db.query(Atestado).join(Upload).filter(Upload.client_id == client_id)
         
@@ -5182,6 +5198,8 @@ async def listar_todos_dados(
         
         return corrigir_encoding_json(resultado)
         
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         error_detail = str(e)
@@ -5282,12 +5300,13 @@ async def atualizar_dado(
 async def obter_produtividade(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_referencia: Optional[str] = Query(None),  # YYYY-MM
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Retorna dados de produtividade do cliente"""
+    """Retorna dados de produtividade do cliente (auth + tenant — S01-A)"""
     try:
-        # Valida client_id
-        validar_client_id(db, client_id)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         
         query = db.query(Produtividade).filter(Produtividade.client_id == client_id)
         
@@ -5316,6 +5335,8 @@ async def obter_produtividade(
                 for r in registros
             ]
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -5324,9 +5345,10 @@ async def obter_produtividade(
 @app.post("/api/produtividade")
 async def salvar_produtividade(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Salva ou atualiza dados de produtividade"""
+    """Salva ou atualiza dados de produtividade (auth + tenant — S01-A)"""
     try:
         data = await request.json()
         
@@ -5334,8 +5356,8 @@ async def salvar_produtividade(
         if not client_id:
             raise HTTPException(status_code=400, detail="client_id é obrigatório")
         
-        # Valida client_id
-        validar_client_id(db, client_id)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         mes_referencia = data.get("mes_referencia")  # YYYY-MM
         registros = data.get("registros", [])  # Lista de registros
         
@@ -5471,12 +5493,13 @@ async def atualizar_produtividade(
 async def excluir_produtividade(
     produtividade_id: int,
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Exclui um registro de produtividade"""
+    """Exclui um registro de produtividade (auth + tenant — S01-A)"""
     try:
-        # Valida client_id
-        validar_client_id(db, client_id)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         
         # Busca registro e valida que pertence ao cliente
         registro = db.query(Produtividade).filter(
