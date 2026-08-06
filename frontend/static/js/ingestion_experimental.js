@@ -1,7 +1,7 @@
 /**
  * Experimental intelligent ingestion UI.
+ * Auth comes from session cookies (PR #4) — never from identity headers.
  * All quality / reupload decisions come from the API — no client-side metrics.
- * No simulated data. PII must not be rendered from raw fields.
  */
 (function () {
   "use strict";
@@ -10,7 +10,6 @@
     step: 1,
     clientId: null,
     competencia: null,
-    user: null,
     preview: null,
     abort: null,
   };
@@ -21,7 +20,8 @@
 
   function setStatus(msg, kind) {
     statusEl.textContent = msg || "";
-    statusEl.className = "ing-meta" + (kind === "err" ? " ing-err" : kind === "warn" ? " ing-warn" : "");
+    statusEl.className =
+      "ing-meta" + (kind === "err" ? " ing-err" : kind === "warn" ? " ing-warn" : "");
   }
 
   function showStep(n) {
@@ -30,13 +30,6 @@
       el.classList.toggle("active", Number(el.dataset.step) === n);
     });
     bar.style.width = `${(n / 4) * 100}%`;
-  }
-
-  function headers() {
-    return {
-      "X-Ingestion-User": state.user,
-      "X-Ingestion-Client-Id": String(state.clientId),
-    };
   }
 
   function esc(s) {
@@ -49,13 +42,11 @@
   $("next1").addEventListener("click", () => {
     state.clientId = Number($("clientId").value);
     state.competencia = $("competencia").value;
-    state.user = ($("user").value || "").trim();
-    if (!state.clientId || !state.competencia || !state.user) {
-      setStatus("Preencha cliente, competência e usuário.", "err");
+    if (!state.clientId || !state.competencia) {
+      setStatus("Preencha cliente e competência.", "err");
       return;
     }
-    // Convert month input YYYY-MM
-    if (/^\d{4}-\d{2}$/.test(state.competencia) === false && state.competencia.includes("-")) {
+    if (state.competencia.includes("-")) {
       state.competencia = state.competencia.slice(0, 7);
     }
     setStatus("");
@@ -87,11 +78,16 @@
       fd.append("competencia", state.competencia);
       const res = await fetch("/api/ingestion/preview", {
         method: "POST",
-        headers: headers(),
         body: fd,
+        credentials: "same-origin",
         signal: state.abort.signal,
       });
       const body = await res.json().catch(() => ({}));
+      if (res.status === 503) {
+        throw new Error(
+          "Ingestão indisponível: autenticação (PR #4) ou persistência não configuradas."
+        );
+      }
       if (!res.ok) {
         throw new Error(body.detail?.message || body.detail || "Falha na prévia");
       }
@@ -133,8 +129,8 @@
     try {
       const res = await fetch(`/api/ingestion/previews/${state.preview.preview_id}/confirm`, {
         method: "POST",
-        headers: headers(),
         body: fd,
+        credentials: "same-origin",
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.detail || "Confirmação falhou");
@@ -157,8 +153,8 @@
     try {
       const res = await fetch(`/api/ingestion/previews/${state.preview.preview_id}/import`, {
         method: "POST",
-        headers: headers(),
         body: fd,
+        credentials: "same-origin",
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.detail || "Importação falhou");

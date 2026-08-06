@@ -1,6 +1,8 @@
 """Épico 1 — Intelligent data ingestion (feature-flagged, off by default).
 
 All services in this package are inert unless ENABLE_INTELLIGENT_INGESTION=true.
+HTTP routes additionally require PR #4 tenant guard (fail-closed) or explicit
+test dependency injection (INGESTION_ALLOW_TEST_DEPENDENCIES).
 They must not alter production data, existing uploads, or current upload routes.
 """
 

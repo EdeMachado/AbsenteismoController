@@ -17,9 +17,10 @@
 ## Integration with PR #4
 
 1. Merge PR #4 to main (or integrate) when authorized  
-2. Replace header bridge with session tenant dependency  
-3. Set `PR4_TENANT_GUARD_FACTORY`  
-4. Keep flag off until auth verified  
+2. Call `set_pr4_tenant_guard_factory(...)` from app startup using the real session guard  
+3. Provide explicit `IngestionRepository` (or staging `INGESTION_SQLITE_PATH` after offline SQL)  
+4. Keep flag off until auth + persistence verified  
+5. Never use `X-Ingestion-*` headers; never enable `INGESTION_ALLOW_TEST_DEPENDENCIES` in production  
 
 ## Future merge order (proposal)
 

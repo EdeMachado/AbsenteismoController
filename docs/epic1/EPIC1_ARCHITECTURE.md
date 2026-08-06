@@ -28,7 +28,13 @@ Import writes to `ingestion_canonical_rows`, not legacy `atestados`.
 
 ## PR #4 readiness
 
-`tenant_adapter.py` defines `TenantContext` / `TenantGuard`. API refuses unauthenticated requests. When PR #4 merges, wire `PR4_TENANT_GUARD_FACTORY` — do not duplicate auth.
+`tenant_adapter.py` defines `TenantContext` / `TenantGuard` and **fail-closed**
+`require_ingestion_tenant`. HTTP routes register only when the feature flag is on
+**and** `set_pr4_tenant_guard_factory` is connected (or explicit test deps).
+
+Browser identity headers are **not** used. Persistence via explicit `IngestionRepository`
+(no auto `/tmp` DB). When PR #4 merges, wire the factory — do not duplicate auth.
+
 
 ## Checkpoints
 
