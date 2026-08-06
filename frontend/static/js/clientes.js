@@ -1004,7 +1004,7 @@ async function replicarDadosCliente(cliente, triggerButton) {
     }
 
     try {
-        const response = await fetch(`/api/clientes/${cliente.id}/clonar_dados`, {
+        const response = await fetch(`/api/clientes/${cliente.id}/clonar_dados?origem_id=1`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
