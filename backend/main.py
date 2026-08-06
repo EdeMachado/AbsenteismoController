@@ -249,9 +249,12 @@ app.mount("/static", StaticFiles(directory=os.path.join(FRONTEND_DIR, "static"))
 
 # Epic 1 experimental ingestion — registered ONLY when ENABLE_INTELLIGENT_INGESTION=true.
 # Default off: no new endpoints, no menu entry, no startup migration.
+# Dual lock: feature flag + PR #4 tenant guard factory (fail-closed).
 try:
     from backend.ingestion.api import register_ingestion_routes
+    from backend.ingestion.pr4_bridge import wire_pr4_tenant_guard
 
+    wire_pr4_tenant_guard()
     register_ingestion_routes(app, FRONTEND_DIR)
 except Exception:
     # Never break legacy app if experimental package import fails

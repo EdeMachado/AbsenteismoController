@@ -2,14 +2,19 @@
 
 Connection/schema must be supplied by the caller (tests) or an explicitly
 configured staging path. Future: wrap SQLAlchemy Session from the main app.
+
+HTTP handlers must open a short-lived repository via
+`ingestion_repository_session()` so file-backed connections are closed
+per request (no shared long-lived SQLite connection across workers).
 """
 
 from __future__ import annotations
 
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Protocol
+from typing import Iterator, Protocol
 
 from backend.ingestion.exceptions import IngestionError, MigrationNotAllowedError
 from backend.ingestion.schema_sql import apply_epic1_schema
@@ -88,9 +93,28 @@ def create_file_repository(
     return SqliteIngestionRepository(conn, db_path=str(p), apply_schema=apply_schema)
 
 
+def _open_path_repository(path: str) -> SqliteIngestionRepository:
+    """Open a new connection to an explicit staging path (caller must close)."""
+    normalized = path.replace("\\", "/").lower()
+    if "absenteismo.db" in normalized or "/var/www/absenteismo" in normalized:
+        raise MigrationNotAllowedError(
+            "refusing ingestion repository on production-like database path"
+        )
+    if not Path(path).exists():
+        raise IngestionPersistenceError(
+            "ingestion sqlite path does not exist — create and migrate explicitly offline"
+        )
+    conn = sqlite3.connect(path, check_same_thread=False)
+    return SqliteIngestionRepository(conn, db_path=path, apply_schema=False)
+
+
 def get_ingestion_repository() -> IngestionRepository:
     """
-    Resolve repository for HTTP handlers.
+    Resolve repository (legacy helper).
+
+    Prefer `ingestion_repository_session()` in HTTP handlers so path-backed
+    connections are always closed. This function still opens a new connection
+    for INGESTION_SQLITE_PATH and does not auto-close.
 
     Order:
     1. Explicit override via set_ingestion_repository (app wiring / tests)
@@ -107,14 +131,31 @@ def get_ingestion_repository() -> IngestionRepository:
         raise IngestionPersistenceError(
             "ingestion persistence unavailable — set INGESTION_SQLITE_PATH or inject repository"
         )
-    normalized = path.replace("\\", "/").lower()
-    if "absenteismo.db" in normalized or "/var/www/absenteismo" in normalized:
-        raise MigrationNotAllowedError(
-            "refusing ingestion repository on production-like database path"
-        )
-    if not Path(path).exists():
+    return _open_path_repository(path)
+
+
+@contextmanager
+def ingestion_repository_session() -> Iterator[IngestionRepository]:
+    """
+    Per-request repository scope.
+
+    - Override (tests/app inject): yield without closing (owned by injector).
+    - INGESTION_SQLITE_PATH: open a fresh connection and always close it.
+    """
+    if _REPO_OVERRIDE is not None:
+        yield _REPO_OVERRIDE
+        return
+
+    path = (os.environ.get(INGESTION_SQLITE_PATH_ENV) or "").strip()
+    if not path:
         raise IngestionPersistenceError(
-            "ingestion sqlite path does not exist — create and migrate explicitly offline"
+            "ingestion persistence unavailable — set INGESTION_SQLITE_PATH or inject repository"
         )
-    conn = sqlite3.connect(path, check_same_thread=False)
-    return SqliteIngestionRepository(conn, db_path=path, apply_schema=False)
+    repo = _open_path_repository(path)
+    try:
+        yield repo
+    finally:
+        try:
+            repo.close()
+        except Exception:
+            pass

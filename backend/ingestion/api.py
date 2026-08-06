@@ -32,8 +32,7 @@ from backend.ingestion.mapping_profile_service import MappingProfileService
 from backend.ingestion.preview_service import PreviewService
 from backend.ingestion.repository import (
     IngestionPersistenceError,
-    IngestionRepository,
-    get_ingestion_repository,
+    ingestion_repository_session,
 )
 from backend.ingestion.tenant_adapter import (
     TenantContext,
@@ -61,15 +60,6 @@ def _resolve_tenant(request: Request, requested_client_id: int | None) -> Tenant
         raise HTTPException(status_code=401, detail="authentication required") from exc
     except TenantGuardError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
-
-
-def _repo() -> IngestionRepository:
-    try:
-        return get_ingestion_repository()
-    except IngestionPersistenceError as exc:
-        raise HTTPException(status_code=503, detail="ingestion persistence unavailable") from exc
-    except IngestionError as exc:
-        raise HTTPException(status_code=503, detail=exc.message) from exc
 
 
 def _http_from_ingestion(exc: Exception) -> HTTPException:
@@ -102,16 +92,16 @@ async def create_preview(
         data = await file.read()
         if len(data) > MAX_FILE_BYTES:
             raise HTTPException(status_code=413, detail="file too large")
-        repo = _repo()
-        svc = PreviewService(repo.conn, require_flag=True)
-        summary = svc.preview(
-            data=data,
-            original_name=file.filename or "upload.csv",
-            client_id=ctx.client_id,
-            competencia=competencia,
-            uploaded_by=ctx.username,
-        )
-        return summary.to_public_dict()
+        with ingestion_repository_session() as repo:
+            svc = PreviewService(repo.conn, require_flag=True)
+            summary = svc.preview(
+                data=data,
+                original_name=file.filename or "upload.csv",
+                client_id=ctx.client_id,
+                competencia=competencia,
+                uploaded_by=ctx.username,
+            )
+            return summary.to_public_dict()
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -126,11 +116,12 @@ async def get_preview(
 ) -> dict[str, Any]:
     try:
         ctx = _resolve_tenant(request, client_id)
-        svc = PreviewService(_repo().conn, require_flag=True)
-        data = svc.get_preview(preview_id)
-        if data["client_id"] != ctx.client_id:
-            raise TenantGuardError("cross-tenant preview access blocked")
-        return data
+        with ingestion_repository_session() as repo:
+            svc = PreviewService(repo.conn, require_flag=True)
+            data = svc.get_preview(preview_id)
+            if data["client_id"] != ctx.client_id:
+                raise TenantGuardError("cross-tenant preview access blocked")
+            return data
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -147,13 +138,14 @@ async def confirm_preview(
 ) -> dict[str, Any]:
     try:
         ctx = _resolve_tenant(request, client_id)
-        svc = PreviewService(_repo().conn, require_flag=True)
-        return svc.confirm_preview(
-            preview_id,
-            token=token,
-            client_id=ctx.client_id,
-            admin_justification=admin_justification,
-        )
+        with ingestion_repository_session() as repo:
+            svc = PreviewService(repo.conn, require_flag=True)
+            return svc.confirm_preview(
+                preview_id,
+                token=token,
+                client_id=ctx.client_id,
+                admin_justification=admin_justification,
+            )
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -171,17 +163,17 @@ async def import_preview(
 ) -> dict[str, Any]:
     try:
         ctx = _resolve_tenant(request, client_id)
-        conn = _repo().conn
-        preview_svc = PreviewService(conn, require_flag=True)
-        imp = ImportService(conn, preview_svc)
-        result = imp.import_preview(
-            preview_id=preview_id,
-            token=token,
-            client_id=ctx.client_id,
-            competencia=competencia,
-            expected_content_hash=content_hash,
-        )
-        return result.to_public_dict()
+        with ingestion_repository_session() as repo:
+            preview_svc = PreviewService(repo.conn, require_flag=True)
+            imp = ImportService(repo.conn, preview_svc)
+            result = imp.import_preview(
+                preview_id=preview_id,
+                token=token,
+                client_id=ctx.client_id,
+                competencia=competencia,
+                expected_content_hash=content_hash,
+            )
+            return result.to_public_dict()
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -192,9 +184,10 @@ async def import_preview(
 async def list_profiles(request: Request, client_id: int) -> dict[str, Any]:
     try:
         ctx = _resolve_tenant(request, client_id)
-        mps = MappingProfileService(_repo().conn)
-        profiles = [p.to_public_dict() for p in mps.list_for_client(ctx.client_id)]
-        return {"profiles": profiles}
+        with ingestion_repository_session() as repo:
+            mps = MappingProfileService(repo.conn)
+            profiles = [p.to_public_dict() for p in mps.list_for_client(ctx.client_id)]
+            return {"profiles": profiles}
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -217,18 +210,19 @@ async def create_profile(
 
         ctx = _resolve_tenant(request, client_id)
         mapping = json.loads(mapping_json)
-        mps = MappingProfileService(_repo().conn)
-        profile = mps.create_version(
-            client_id=ctx.client_id,
-            name=name,
-            structural_signature=structural_signature,
-            mapping=mapping,
-            sheet_name=sheet_name,
-            header_row=header_row,
-            created_by=ctx.username,
-            observation=observation,
-        )
-        return profile.to_public_dict()
+        with ingestion_repository_session() as repo:
+            mps = MappingProfileService(repo.conn)
+            profile = mps.create_version(
+                client_id=ctx.client_id,
+                name=name,
+                structural_signature=structural_signature,
+                mapping=mapping,
+                sheet_name=sheet_name,
+                header_row=header_row,
+                created_by=ctx.username,
+                observation=observation,
+            )
+            return profile.to_public_dict()
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
@@ -243,13 +237,13 @@ async def get_execution(
 ) -> dict[str, Any]:
     try:
         ctx = _resolve_tenant(request, client_id)
-        imp = ImportService(_repo().conn)
-        return imp.get_execution(execution_id, client_id=ctx.client_id)
+        with ingestion_repository_session() as repo:
+            imp = ImportService(repo.conn)
+            return imp.get_execution(execution_id, client_id=ctx.client_id)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
         raise _http_from_ingestion(exc) from exc
-
 
 def ingestion_http_ready() -> bool:
     """Both locks: feature flag + auth integration available."""
