@@ -41,7 +41,9 @@ jobs:
 
       - name: Conflict markers guard
         run: |
-          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!*.md' ':!.github/**'; then
+          # Exact git conflict markers only (======= is exactly 7 equals).
+          # Decorative ==== banners in ops .txt files must not fail CI.
+          if git grep -nE '^(<<<<<<< |>>>>>>>)|^={7}$' -- ':!*.md' ':!.github/**'; then
             echo "Conflict markers found" >&2
             exit 1
           fi
