@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ingestão experimental — Absenteísmo</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    :root {
+      --ing-bg: #0f1c17;
+      --ing-panel: #15261f;
+      --ing-ink: #e8f2ec;
+      --ing-muted: #9bb5a8;
+      --ing-accent: #3d9b6e;
+      --ing-warn: #c9852f;
+      --ing-danger: #c44b4b;
+      --ing-font: "Source Serif 4", "Libre Baskerville", Georgia, serif;
+      --ing-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+    }
+    body.ingestion-exp {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 20% 0%, #1a3328 0%, transparent 50%),
+        radial-gradient(ellipse at 100% 100%, #1e2a22 0%, transparent 45%),
+        var(--ing-bg);
+      color: var(--ing-ink);
+      font-family: var(--ing-sans);
+    }
+    .ing-wrap { max-width: 720px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .ing-brand {
+      font-family: var(--ing-font);
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      letter-spacing: -0.02em;
+      margin: 0 0 0.35rem;
+    }
+    .ing-lead { color: var(--ing-muted); margin: 0 0 2rem; max-width: 36ch; }
+    .ing-step { display: none; animation: ing-in 0.35s ease; }
+    .ing-step.active { display: block; }
+    @keyframes ing-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    label { display: block; margin: 0.75rem 0 0.35rem; color: var(--ing-muted); font-size: 0.9rem; }
+    input, select, textarea, button {
+      font: inherit; width: 100%; box-sizing: border-box;
+      border-radius: 6px; border: 1px solid #2a4036; background: var(--ing-panel); color: var(--ing-ink);
+      padding: 0.7rem 0.85rem;
+    }
+    button {
+      background: var(--ing-accent); border: none; color: #04140c; font-weight: 600;
+      cursor: pointer; margin-top: 1rem; transition: transform 0.15s ease, filter 0.15s;
+    }
+    button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    button.secondary { background: transparent; border: 1px solid #3d5a4c; color: var(--ing-ink); }
+    button:disabled { opacity: 0.5; cursor: wait; transform: none; }
+    .ing-panel {
+      background: color-mix(in srgb, var(--ing-panel) 88%, transparent);
+      border: 1px solid #24362d; padding: 1.1rem 1.2rem; margin-top: 1rem;
+    }
+    .ing-meta { font-size: 0.85rem; color: var(--ing-muted); line-height: 1.5; }
+    .ing-warn { color: var(--ing-warn); }
+    .ing-err { color: var(--ing-danger); }
+    .ing-progress { height: 3px; background: #24362d; margin: 1.5rem 0 1rem; overflow: hidden; }
+    .ing-progress > span {
+      display: block; height: 100%; width: 0%; background: var(--ing-accent);
+      transition: width 0.4s ease;
+    }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  </style>
+</head>
+<body class="ingestion-exp">
+  <main class="ing-wrap" id="app">
+    <p class="sr-only">Fluxo experimental de ingestão inteligente. Não substitui o upload atual.</p>
+    <h1 class="ing-brand">Absenteísmo</h1>
+    <p class="ing-lead">Ingestão experimental — prévia sem escrita no fluxo legado.</p>
+    <div class="ing-progress" aria-hidden="true"><span id="bar"></span></div>
+    <p id="status" class="ing-meta" role="status" aria-live="polite"></p>
+
+    <section class="ing-step active" data-step="1" aria-label="Cliente e competência">
+      <label for="clientId">Cliente autorizado (ID)</label>
+      <input id="clientId" type="number" min="1" required autocomplete="off" />
+      <label for="competencia">Competência (AAAA-MM)</label>
+      <input id="competencia" type="month" required />
+      <label for="user">Usuário autenticado</label>
+      <input id="user" type="text" required autocomplete="username" />
+      <button type="button" id="next1">Continuar</button>
+    </section>
+
+    <section class="ing-step" data-step="2" aria-label="Enviar arquivo">
+      <label for="file">Planilha (.xlsx ou .csv)</label>
+      <input id="file" type="file" accept=".xlsx,.csv,text/csv" />
+      <button type="button" class="secondary" id="back2">Voltar</button>
+      <button type="button" id="uploadBtn">Analisar prévia</button>
+    </section>
+
+    <section class="ing-step" data-step="3" aria-label="Revisão">
+      <div class="ing-panel" id="review"></div>
+      <label for="justification">Justificativa administrativa (se exigida)</label>
+      <textarea id="justification" rows="2"></textarea>
+      <button type="button" class="secondary" id="cancelBtn">Cancelar</button>
+      <button type="button" id="confirmBtn">Confirmar prévia</button>
+      <button type="button" id="importBtn" disabled>Importar</button>
+    </section>
+
+    <section class="ing-step" data-step="4" aria-label="Resultado">
+      <div class="ing-panel" id="result"></div>
+      <button type="button" id="restart">Nova análise</button>
+    </section>
+  </main>
+  <script src="/static/js/ingestion_experimental.js"></script>
+</body>
+</html>
