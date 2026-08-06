@@ -20,7 +20,8 @@ import pandas as pd
 import time
 from collections import defaultdict
 
-from .database import get_db, init_db, run_migrations, check_database_health, SessionLocal
+from .database import get_db, init_db, run_migrations, check_database_health
+from . import database as database_module
 from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade, ClientLogo, SavedFilter
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
@@ -147,19 +148,28 @@ async def api_auth_middleware(request: Request, call_next):
                 content={"detail": "Não autenticado"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        db = SessionLocal()
         try:
-            try:
-                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-                username = payload.get("sub")
-                if not username:
-                    raise JWTError("missing sub")
-            except JWTError:
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Não autenticado"},
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username = payload.get("sub")
+            if not username:
+                raise JWTError("missing sub")
+        except JWTError:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Não autenticado"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Honor FastAPI get_db overrides (tests); else current SessionLocal
+        db = None
+        db_gen = None
+        try:
+            override = app.dependency_overrides.get(get_db)
+            if override is not None:
+                db_gen = override()
+                db = next(db_gen)
+            else:
+                db = database_module.SessionLocal()
             user = db.query(User).filter(User.username == username).first()
             if user is None or not user.is_active:
                 return JSONResponse(
@@ -169,7 +179,15 @@ async def api_auth_middleware(request: Request, call_next):
                 )
             request.state.current_user = user
         finally:
-            db.close()
+            if db_gen is not None:
+                try:
+                    next(db_gen, None)
+                except StopIteration:
+                    pass
+                except Exception:
+                    pass
+            elif db is not None:
+                db.close()
 
     return await call_next(request)
 
