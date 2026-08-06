@@ -19,10 +19,18 @@ jobs:
       ENABLE_INTELLIGENT_INGESTION: "false"
       ENABLE_BIOMED_PERFORMANCE_ENGINE: "false"
       ENABLE_API_DOCS: "0"
+      # Disposable SQLite for TestClient startup (never production path)
+      ABSENTEISMO_SQLITE_PATH: ${{ runner.temp }}/fit-ci/ci.sqlite
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare disposable CI database path
+        run: |
+          mkdir -p "$(dirname "$ABSENTEISMO_SQLITE_PATH")"
+          mkdir -p database
+          test "$ABSENTEISMO_SQLITE_PATH" != "/var/www/absenteismo/database/absenteismo.db"
 
       - name: Set up Python
         uses: actions/setup-python@v5

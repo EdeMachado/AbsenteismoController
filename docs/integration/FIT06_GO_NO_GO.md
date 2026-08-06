@@ -4,7 +4,10 @@
 
 ## Motivo principal
 
-1. **CI vermelho na entrada do FIT-06** (falso positivo de conflict markers) — correção aplicada no workflow; **aguardar CI verde** no tip.  
+1. **CI vermelho** — correções aplicadas no workflow:
+   - falso positivo de conflict markers (`=======` vs banners);
+   - path SQLite do CI (`ABSENTEISMO_SQLITE_PATH` descartável + `mkdir database`).
+   **Aguardar CI verde** no tip.  
 2. **Backup atualizado do banco vivo ainda não executado** no VPS (pendência manual obrigatória).  
 3. Inventário/admins/CORS de produção ainda não confirmados no servidor.
 
