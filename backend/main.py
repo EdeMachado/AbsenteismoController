@@ -20,11 +20,18 @@ import pandas as pd
 import time
 from collections import defaultdict
 
-from .database import get_db, init_db, run_migrations, check_database_health
+from .database import get_db, init_db, run_migrations, check_database_health, SessionLocal
 from .models import Client, Upload, Atestado, User, Config, ClientColumnMapping, Produtividade, ClientLogo, SavedFilter
 from .excel_processor import ExcelProcessor
 from .analytics import Analytics
 from .insights import InsightsEngine
+from .authz import (
+    api_docs_enabled,
+    is_public_api_path,
+    require_authenticated_user,
+    require_admin,
+    assert_tenant_access,
+)
 # Sistema de logging (opcional - se falhar, ignora)
 try:
     from .logger import get_logger, audit_logger, log_operation, security_logger
@@ -50,7 +57,8 @@ from .alerts import AlertasSystem
 from .auth import (
     authenticate_user, create_access_token, get_current_active_user,
     get_current_admin_user, get_config_value, set_config_value,
-    get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
+    get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES,
+    SECRET_KEY, ALGORITHM,
 )
 from .tenant import resolve_authorized_client, require_admin_user
 from .email_service import EmailService
@@ -60,12 +68,17 @@ import re
 from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import Request
+from jose import JWTError, jwt
 
-# Initialize FastAPI app
+# Initialize FastAPI app (docs disabled when api_docs_enabled() is False — FIT-03)
+_docs = api_docs_enabled()
 app = FastAPI(
     title="AbsenteismoController",
     version="2.0.0",
-    description="Sistema de Gestão de Absenteísmo"
+    description="Sistema de Gestão de Absenteísmo",
+    docs_url="/docs" if _docs else None,
+    redoc_url="/redoc" if _docs else None,
+    openapi_url="/openapi.json" if _docs else None,
 )
 
 # Configuração para UTF-8
@@ -110,6 +123,55 @@ app.add_middleware(
     expose_headers=["Content-Type", "Content-Length"],
     max_age=3600,
 )
+
+# FIT-03: Bearer JWT gate for non-public /api/* (static pages untouched)
+@app.middleware("http")
+async def api_auth_middleware(request: Request, call_next):
+    """Require Bearer JWT on protected /api/* paths; set request.state.current_user."""
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    path = request.url.path
+    if path.startswith("/api/") and not is_public_api_path(path):
+        auth_header = request.headers.get("Authorization") or ""
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Não autenticado"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        token = auth_header[7:].strip()
+        if not token:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Não autenticado"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        db = SessionLocal()
+        try:
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                username = payload.get("sub")
+                if not username:
+                    raise JWTError("missing sub")
+            except JWTError:
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Não autenticado"},
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            user = db.query(User).filter(User.username == username).first()
+            if user is None or not user.is_active:
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Não autenticado"},
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            request.state.current_user = user
+        finally:
+            db.close()
+
+    return await call_next(request)
 
 # Rate Limiting - Proteção contra DDoS
 rate_limit_store = defaultdict(list)
@@ -301,22 +363,34 @@ def validar_client_id(db: Session, client_id: int) -> Client:
 def validar_acesso_client_id(current_user: User, client_id: int) -> None:
     """
     Valida se o usuário tem permissão para acessar o client_id especificado.
-    
-    Regras:
-    - Admin OU usuário sem client_id (NULL) → pode acessar qualquer cliente
-    - Usuário com client_id definido → só pode acessar seu próprio cliente
-    
+
+    Regras (FIT-03 / alinhado a resolve_authorized_client):
+    - is_admin=True → pode acessar qualquer cliente
+    - Usuário com client_id definido → só o próprio
+    - client_id NULL sem is_admin → 403 (não concede acesso global)
+
     Raises HTTPException 403 se não tiver permissão.
     """
-    # Admin ou usuário sem restrição (client_id = NULL) pode acessar qualquer cliente
-    if current_user.is_admin or not current_user.client_id:
-        return
-    
-    # Usuário comum só pode acessar seu próprio cliente
-    if current_user.client_id != client_id:
+    if current_user is None:
         raise HTTPException(
-            status_code=403,
-            detail=f"Acesso negado: você só tem permissão para acessar o cliente ID {current_user.client_id}"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Não autenticado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if getattr(current_user, "is_admin", False):
+        return
+
+    if current_user.client_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado: usuário sem cliente associado",
+        )
+
+    if int(current_user.client_id) != int(client_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Acesso negado: você só tem permissão para acessar o cliente ID {current_user.client_id}",
         )
 
 # Initialize database
@@ -548,80 +622,66 @@ async def auto_processor_page():
 @app.get("/api/health")
 async def health_check(db: Session = Depends(get_db)):
     """
-    Health check - versão melhorada com fallback seguro
-    Se novas verificações falharem, retorna versão básica
+    Health check público (FIT-03).
+    Expõe apenas status/version/timestamp e checks básicos — sem paths, tabelas ou secrets.
     """
-    # Resposta básica (sempre funciona)
     health_status = {
         "status": "ok",
-        "version": "2.0.0"
+        "version": "2.0.0",
+        "timestamp": datetime.now().isoformat(),
+        "checks": {},
     }
-    
-    # Tenta adicionar verificações extras (opcional)
+
     try:
-        health_status["timestamp"] = datetime.now().isoformat()
-        health_status["checks"] = {}
-        
-        # Verifica banco de dados (com fallback)
         try:
             db_health = check_database_health(db)
-            health_status["checks"]["database"] = db_health
+            health_status["checks"]["database"] = {
+                "healthy": bool(db_health.get("healthy", False)),
+                "connected": bool(db_health.get("connected", False)),
+            }
+            if db_health.get("integrity_check") is not None:
+                health_status["checks"]["database"]["integrity_ok"] = bool(
+                    db_health.get("integrity_check")
+                )
             if not db_health.get("healthy", False):
                 health_status["status"] = "degraded"
         except Exception:
-            # Se falhar, ignora e continua
-            pass
-        
-        # Verifica espaço em disco (com fallback)
+            health_status["checks"]["database"] = {"healthy": False, "connected": False}
+            health_status["status"] = "degraded"
+
         try:
             disk = shutil.disk_usage(os.path.dirname(os.path.dirname(__file__)))
-            disk_free_gb = disk.free / (1024 ** 3)
-            disk_percent_free = (disk.free / disk.total) * 100
-            
             health_status["checks"]["disk"] = {
-                "free_gb": round(disk_free_gb, 2),
-                "percent_free": round(disk_percent_free, 2)
+                "free_gb": round(disk.free / (1024 ** 3), 2),
+                "percent_free": round((disk.free / disk.total) * 100, 2),
             }
         except Exception:
-            # Se falhar, ignora e continua
             pass
-        
-        # Verifica memória (com fallback - só se psutil estiver instalado)
+
         try:
             import psutil
             memory = psutil.virtual_memory()
             health_status["checks"]["memory"] = {
                 "percent_used": round(memory.percent, 2),
-                "available_gb": round(memory.available / (1024 ** 3), 2)
+                "available_gb": round(memory.available / (1024 ** 3), 2),
             }
-        except ImportError:
-            # psutil não instalado - ignora silenciosamente
-            pass
         except Exception:
-            # Outro erro - ignora e continua
             pass
-        
-        # Tenta logar (opcional)
-        try:
-            logger = get_logger()
-            if logger:
-                logger.info(f"Health check: {health_status.get('status', 'ok')}")
-        except Exception:
-            # Se logging falhar, ignora
-            pass
-            
     except Exception:
-        # Se qualquer coisa falhar, retorna versão básica
         pass
-    
+
     return health_status
 
 @app.get("/api/health/integrity")
-async def health_check_integrity(db: Session = Depends(get_db)):
+async def health_check_integrity(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
     """
-    Verificação completa de integridade do banco
+    Verificação completa de integridade do banco (ADMIN ONLY — FIT-03).
     Inclui: SQLite integrity, foreign keys, dados órfãos, isolamento LGPD
     """
+    require_admin_user(current_user)
     try:
         from .integrity_checker import IntegrityChecker
         checker = IntegrityChecker(db)
@@ -638,16 +698,18 @@ async def health_check_integrity(db: Session = Depends(get_db)):
                 
                 if issues:
                     notification_service.notify_integrity_issue("; ".join(issues))
-            except:
+            except Exception:
                 pass
         
         return results
+    except HTTPException:
+        raise
     except Exception as e:
-        # Se falhar, retorna erro amigável
+        # Se falhar, retorna erro amigável (sem internals)
         return {
             "overall_healthy": False,
             "error": "Erro ao verificar integridade",
-            "message": str(e)
+            "message": "Falha na verificação de integridade",
         }
 
 @app.get("/api/backup/list")
@@ -843,8 +905,12 @@ class CadastroEmpresa(BaseModel):
     telefone: str
 
 @app.post("/api/cadastro-empresa")
-async def cadastro_empresa(cadastro: CadastroEmpresa):
-    """Recebe cadastro de empresa da landing page e envia email"""
+async def cadastro_empresa(
+    cadastro: CadastroEmpresa,
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Recebe cadastro de empresa (ADMIN ONLY — FIT-03)"""
+    require_admin_user(current_user)
     try:
         email_service = EmailService()
         
@@ -953,8 +1019,11 @@ async def cadastro_empresa(cadastro: CadastroEmpresa):
 # ==================== CONFIGURATIONS API ====================
 
 @app.get("/api/config")
-async def get_config(db: Session = Depends(get_db)):
-    """Retorna todas as configurações"""
+async def get_config(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Retorna todas as configurações (autenticado — FIT-03)"""
     configs = db.query(Config).all()
     result = {}
     for config in configs:
@@ -966,8 +1035,12 @@ async def get_config(db: Session = Depends(get_db)):
     return result
 
 @app.get("/api/config/{chave}")
-async def get_config_value_api(chave: str, db: Session = Depends(get_db)):
-    """Retorna valor de uma configuração específica"""
+async def get_config_value_api(
+    chave: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Retorna valor de uma configuração específica (autenticado — FIT-03)"""
     valor = get_config_value(db, chave)
     return {"chave": chave, "valor": valor}
 
@@ -1840,12 +1913,14 @@ async def dashboard(
 @app.get("/api/filtros")
 async def obter_filtros(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Retorna lista de funcionários e setores para preencher os filtros"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         # Busca funcionários únicos
         funcionarios = db.query(Atestado.nomecompleto).join(Upload).filter(
@@ -1865,6 +1940,8 @@ async def obter_filtros(
             "funcionarios": [f[0] for f in funcionarios if f[0]],
             "setores": [s[0] for s in setores if s[0]]
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -1875,8 +1952,13 @@ async def obter_filtros(
 
 # Endpoint removido para manter compatibilidade (retorna vazio)
 @app.get("/api/clientes/{client_id}/graficos")
-async def obter_graficos_configurados(client_id: int, db: Session = Depends(get_db)):
+async def obter_graficos_configurados(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Endpoint removido - retorna vazio para compatibilidade"""
+    validar_acesso_client_id(current_user, client_id)
     return {
         "success": True,
         "client_id": client_id,
@@ -1884,8 +1966,14 @@ async def obter_graficos_configurados(client_id: int, db: Session = Depends(get_
     }
 
 @app.put("/api/clientes/{client_id}/graficos")
-async def salvar_graficos_configurados(client_id: int, request: Request, db: Session = Depends(get_db)):
+async def salvar_graficos_configurados(
+    client_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Endpoint removido - não faz nada"""
+    validar_acesso_client_id(current_user, client_id)
     return {
         "success": True,
         "message": "Endpoint removido",
@@ -1894,8 +1982,14 @@ async def salvar_graficos_configurados(client_id: int, request: Request, db: Ses
     }
 
 @app.post("/api/clientes/{client_id}/graficos/gerar-dados")
-async def gerar_dados_grafico_personalizado(client_id: int, request: Request, db: Session = Depends(get_db)):
+async def gerar_dados_grafico_personalizado(
+    client_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Endpoint removido - retorna vazio para compatibilidade"""
+    validar_acesso_client_id(current_user, client_id)
     return {
         "success": True,
         "labels": [],
@@ -1907,9 +2001,14 @@ async def gerar_dados_grafico_personalizado(client_id: int, request: Request, db
     
 
 @app.get("/api/clientes/{client_id}/campos-disponiveis")
-async def obter_campos_disponiveis(client_id: int, db: Session = Depends(get_db)):
+async def obter_campos_disponiveis(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Retorna os campos disponíveis para um cliente (mapeados e com dados)"""
     try:
+        validar_acesso_client_id(current_user, client_id)
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -1982,8 +2081,9 @@ async def obter_alertas(
 ):
     """Retorna alertas automáticos do sistema"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         alertas_system = AlertasSystem(db)
         alertas = alertas_system.detectar_alertas(client_id, mes_inicio, mes_fim)
@@ -1996,6 +2096,8 @@ async def obter_alertas(
                 "baixa": len([a for a in alertas if a['severidade'] == 'baixa'])
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -2028,14 +2130,17 @@ async def listar_clientes(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Lista clientes - filtra por client_id do usuário se não for admin"""
+    """Lista clientes — admin vê todos; não-admin só o próprio; NULL sem admin → 403 (FIT-03)"""
     try:
-        # Se usuário é admin ou não tem client_id, vê todos os clientes
-        if current_user.is_admin or not current_user.client_id:
+        if getattr(current_user, "is_admin", False):
             clientes = db.query(Client).order_by(Client.nome).all()
-        else:
-            # Usuário comum só vê o cliente associado a ele
+        elif current_user.client_id is not None:
             clientes = db.query(Client).filter(Client.id == current_user.client_id).all()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado: usuário sem cliente associado",
+            )
         
         return [
             {
@@ -2056,15 +2161,22 @@ async def listar_clientes(
             }
             for c in clientes
         ]
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao listar clientes: {str(e)}")
 
 @app.get("/api/clientes/{cliente_id}")
-async def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
+async def obter_cliente(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Obtém um cliente específico"""
     try:
+        validar_acesso_client_id(current_user, cliente_id)
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -2220,8 +2332,13 @@ async def clonar_dados_cliente(
         raise HTTPException(status_code=500, detail=f"Erro ao clonar dados: {str(e)}")
 
 @app.post("/api/clientes")
-async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
-    """Cria um novo cliente"""
+async def criar_cliente(
+    cliente: ClienteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Cria um novo cliente (ADMIN ONLY — FIT-03)"""
+    require_admin_user(current_user)
     try:
         # Verifica se CNPJ já existe
         if cliente.cnpj:
@@ -2282,8 +2399,14 @@ async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Erro ao criar cliente: {str(e)}")
 
 @app.put("/api/clientes/{cliente_id}")
-async def atualizar_cliente(cliente_id: int, cliente: ClienteCreate, db: Session = Depends(get_db)):
-    """Atualiza um cliente"""
+async def atualizar_cliente(
+    cliente_id: int,
+    cliente: ClienteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Atualiza um cliente (ADMIN ONLY — FIT-03)"""
+    require_admin_user(current_user)
     try:
         cliente_db = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente_db:
@@ -2361,6 +2484,7 @@ async def upload_logo_cliente(
 ):
     """Adiciona um novo logo para um cliente (suporte a múltiplos logos)."""
     try:
+        validar_acesso_client_id(current_user, cliente_id)
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -2460,10 +2584,12 @@ async def upload_logo_cliente(
 @app.get("/api/clientes/{cliente_id}/logos")
 async def listar_logos_cliente(
     cliente_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Lista todos os logos de um cliente."""
     try:
+        validar_acesso_client_id(current_user, cliente_id)
         logos = db.query(ClientLogo).filter(ClientLogo.client_id == cliente_id).order_by(
             ClientLogo.is_principal.desc(),
             ClientLogo.created_at.desc()
@@ -2481,6 +2607,8 @@ async def listar_logos_cliente(
                 for logo in logos
             ]
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -2495,6 +2623,7 @@ async def definir_logo_principal(
 ):
     """Define um logo como principal."""
     try:
+        validar_acesso_client_id(current_user, cliente_id)
         logo = db.query(ClientLogo).filter(
             ClientLogo.id == logo_id,
             ClientLogo.client_id == cliente_id
@@ -2545,6 +2674,7 @@ async def deletar_logo_cliente(
 ):
     """Deleta um logo de um cliente."""
     try:
+        validar_acesso_client_id(current_user, cliente_id)
         logo = db.query(ClientLogo).filter(
             ClientLogo.id == logo_id,
             ClientLogo.client_id == cliente_id
@@ -2640,8 +2770,13 @@ async def deletar_cliente(
         raise HTTPException(status_code=500, detail=f"Erro ao deletar cliente: {str(e)}")
 
 @app.post("/api/clientes/{cliente_id}/arquivar")
-async def arquivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
-    """Move um cliente para o arquivo morto (mantém dados)"""
+async def arquivar_cliente(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Move um cliente para o arquivo morto (ADMIN ONLY — FIT-03)"""
+    require_admin_user(current_user)
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
@@ -2677,10 +2812,12 @@ async def arquivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
 async def salvar_cores_cliente(
     cliente_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Salva as cores personalizadas de um cliente"""
     try:
+        validar_acesso_client_id(current_user, cliente_id)
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -2714,9 +2851,14 @@ async def salvar_cores_cliente(
         raise HTTPException(status_code=500, detail=f"Erro ao salvar cores: {str(e)}")
 
 @app.get("/api/clientes/{cliente_id}/cores")
-async def obter_cores_cliente(cliente_id: int, db: Session = Depends(get_db)):
+async def obter_cores_cliente(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Obtém as cores personalizadas de um cliente"""
     try:
+        validar_acesso_client_id(current_user, cliente_id)
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -2740,8 +2882,13 @@ async def obter_cores_cliente(cliente_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Erro ao obter cores: {str(e)}")
 
 @app.post("/api/clientes/{cliente_id}/ativar")
-async def ativar_cliente(cliente_id: int, db: Session = Depends(get_db)):
-    """Reativa um cliente anteriormente arquivado"""
+async def ativar_cliente(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Reativa um cliente anteriormente arquivado (ADMIN ONLY — FIT-03)"""
+    require_admin_user(current_user)
     try:
         cliente = db.query(Client).filter(Client.id == cliente_id).first()
         if not cliente:
@@ -2773,9 +2920,14 @@ async def ativar_cliente(cliente_id: int, db: Session = Depends(get_db)):
 # ==================== API - MAPEAMENTO DE COLUNAS ====================
 
 @app.get("/api/clientes/{client_id}/column-mapping")
-async def get_column_mapping(client_id: int, db: Session = Depends(get_db)):
+async def get_column_mapping(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Obtém o mapeamento de colunas de um cliente"""
     try:
+        validar_acesso_client_id(current_user, client_id)
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -2828,10 +2980,12 @@ async def get_column_mapping(client_id: int, db: Session = Depends(get_db)):
 async def save_column_mapping(
     client_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Salva o mapeamento de colunas de um cliente"""
     try:
+        validar_acesso_client_id(current_user, client_id)
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -2921,10 +3075,12 @@ async def preview_column_mapping(
     client_id: int,
     file: UploadFile = File(...),
     column_mapping: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Preview do mapeamento de colunas usando uma planilha de exemplo"""
     try:
+        validar_acesso_client_id(current_user, client_id)
         client = db.query(Client).filter(Client.id == client_id).first()
         if not client:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -2981,8 +3137,11 @@ async def preview_column_mapping(
         raise HTTPException(status_code=500, detail=f"Erro ao fazer preview: {str(e)}")
 
 @app.get("/api/buscar-cnpj/{cnpj}")
-async def buscar_cnpj(cnpj: str):
-    """Busca dados da empresa por CNPJ usando ReceitaWS"""
+async def buscar_cnpj(
+    cnpj: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Busca dados da empresa por CNPJ usando ReceitaWS (auth — FIT-03)"""
     try:
         # Remove caracteres não numéricos
         cnpj_limpo = re.sub(r'\D', '', cnpj)
@@ -4240,11 +4399,13 @@ async def preview_data(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
     page: int = 1,
     per_page: int = 50,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Preview dos dados do upload"""
-    # Valida client_id
+    # Valida client_id + tenant
     validar_client_id(db, client_id)
+    validar_acesso_client_id(current_user, client_id)
     
     # Valida se o upload pertence ao cliente
     upload = db.query(Upload).filter(
@@ -4289,11 +4450,13 @@ async def analise_funcionarios(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Análise por funcionários"""
-    # Valida client_id
+    # Valida client_id + tenant
     validar_client_id(db, client_id)
+    validar_acesso_client_id(current_user, client_id)
     
     analytics = Analytics(db)
     return analytics.top_funcionarios(client_id, 1000, mes_inicio, mes_fim)
@@ -4303,11 +4466,13 @@ async def analise_setores(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Análise por setores"""
-    # Valida client_id
+    # Valida client_id + tenant
     validar_client_id(db, client_id)
+    validar_acesso_client_id(current_user, client_id)
     
     analytics = Analytics(db)
     return analytics.top_setores(client_id, 20, mes_inicio, mes_fim)
@@ -4317,11 +4482,13 @@ async def analise_cids(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     mes_inicio: Optional[str] = None,
     mes_fim: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Análise por CIDs"""
-    # Valida client_id
+    # Valida client_id + tenant
     validar_client_id(db, client_id)
+    validar_acesso_client_id(current_user, client_id)
     
     analytics = Analytics(db)
     return analytics.top_cids(client_id, 20, mes_inicio, mes_fim)
@@ -4329,11 +4496,13 @@ async def analise_cids(
 @app.get("/api/tendencias")
 async def tendencias(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Análise de tendências"""
-    # Valida client_id
+    # Valida client_id + tenant
     validar_client_id(db, client_id)
+    validar_acesso_client_id(current_user, client_id)
     
     analytics = Analytics(db)
     evolucao = analytics.evolucao_mensal(client_id, 12)
@@ -4844,12 +5013,14 @@ async def comparativo_periodos(
     periodo1_fim: str = Query(...),
     periodo2_inicio: str = Query(...),
     periodo2_fim: str = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Compara dois períodos e retorna métricas e variações"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         analytics = Analytics(db)
         
@@ -4909,6 +5080,8 @@ async def comparativo_periodos(
         
         return resultado
         
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -4927,12 +5100,14 @@ async def perfil_funcionario_page():
 async def perfil_funcionario(
     nome: str = Query(...),
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório - sem valor padrão
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Retorna perfil completo de um funcionário"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         analytics = Analytics(db)
         
@@ -5179,21 +5354,22 @@ async def listar_todos_dados(
 @app.get("/api/dados/{atestado_id}")
 async def obter_dado(
     atestado_id: int,
-    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    client_id: Optional[int] = Query(None, description="ID do cliente (opcional se derivável do recurso)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Obtém um registro específico"""
-    # Valida client_id
-    validar_client_id(db, client_id)
-    
-    # Busca atestado e valida que pertence ao cliente
-    atestado = db.query(Atestado).join(Upload).filter(
-        Atestado.id == atestado_id,
-        Upload.client_id == client_id
-    ).first()
-    
+    # Carrega recurso e deriva client_id do upload quando necessário (FIT-03)
+    atestado = db.query(Atestado).filter(Atestado.id == atestado_id).first()
     if not atestado:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    upload = db.query(Upload).filter(Upload.id == atestado.upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload relacionado não encontrado")
+    resolved_client_id = int(upload.client_id)
+    if client_id is not None and int(client_id) != resolved_client_id:
         raise HTTPException(status_code=404, detail="Registro não encontrado ou não pertence ao cliente")
+    validar_acesso_client_id(current_user, resolved_client_id)
     
     return corrigir_encoding_json({
         'id': atestado.id,
@@ -5219,16 +5395,28 @@ async def obter_dado(
 @app.post("/api/dados")
 async def criar_dado(
     atestado: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Cria um novo registro"""
+    """Cria um novo registro (auth + tenant via upload — FIT-03)"""
     try:
+        upload_id = atestado.get("upload_id")
+        if not upload_id:
+            raise HTTPException(status_code=400, detail="upload_id é obrigatório")
+        upload = db.query(Upload).filter(Upload.id == upload_id).first()
+        if not upload:
+            raise HTTPException(status_code=404, detail="Upload não encontrado")
+        validar_acesso_client_id(current_user, int(upload.client_id))
+
         novo = Atestado(**atestado)
         db.add(novo)
         db.commit()
         db.refresh(novo)
         
         return {"success": True, "id": novo.id}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -5237,21 +5425,21 @@ async def criar_dado(
 async def atualizar_dado(
     atestado_id: int,
     dados: dict,
-    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    client_id: Optional[int] = Query(None, description="ID do cliente (opcional se derivável)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Atualiza um registro"""
-    # Valida client_id
-    validar_client_id(db, client_id)
-    
-    # Busca atestado e valida que pertence ao cliente
-    atestado = db.query(Atestado).join(Upload).filter(
-        Atestado.id == atestado_id,
-        Upload.client_id == client_id
-    ).first()
-    
+    atestado = db.query(Atestado).filter(Atestado.id == atestado_id).first()
     if not atestado:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    upload = db.query(Upload).filter(Upload.id == atestado.upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload relacionado não encontrado")
+    resolved_client_id = int(upload.client_id)
+    if client_id is not None and int(client_id) != resolved_client_id:
         raise HTTPException(status_code=404, detail="Registro não encontrado ou não pertence ao cliente")
+    validar_acesso_client_id(current_user, resolved_client_id)
     
     try:
         for key, value in dados.items():
@@ -5260,6 +5448,9 @@ async def atualizar_dado(
         
         db.commit()
         return {"success": True}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -5390,22 +5581,20 @@ async def salvar_produtividade(
 @app.put("/api/produtividade/{produtividade_id}")
 async def atualizar_produtividade(
     produtividade_id: int,
-    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
+    client_id: Optional[int] = Query(None, description="ID do cliente (opcional se derivável)"),
     request: Request = ...,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Atualiza um registro de produtividade"""
     try:
-        # Valida client_id
-        validar_client_id(db, client_id)
-        
-        # Busca registro e valida que pertence ao cliente
-        registro = db.query(Produtividade).filter(
-            Produtividade.id == produtividade_id,
-            Produtividade.client_id == client_id
-        ).first()
+        registro = db.query(Produtividade).filter(Produtividade.id == produtividade_id).first()
         if not registro:
+            raise HTTPException(status_code=404, detail="Registro não encontrado")
+        resolved_client_id = int(registro.client_id)
+        if client_id is not None and int(client_id) != resolved_client_id:
             raise HTTPException(status_code=404, detail="Registro não encontrado ou não pertence ao cliente")
+        validar_acesso_client_id(current_user, resolved_client_id)
         
         data = await request.json()
         
@@ -5493,12 +5682,14 @@ async def excluir_produtividade(
 async def obter_evolucao_produtividade(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     agrupar_por: str = Query("mes", description="Agrupar por 'mes' ou 'ano'"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Retorna dados agregados de produtividade para gráficos de evolução"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         # Busca todos os registros do cliente
         registros = db.query(Produtividade).filter(
@@ -5603,26 +5794,29 @@ async def obter_evolucao_produtividade(
 @app.delete("/api/dados/{atestado_id}")
 async def excluir_dado(
     atestado_id: int,
-    client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório para validação
-    db: Session = Depends(get_db)
+    client_id: Optional[int] = Query(None, description="ID do cliente (opcional se derivável)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Exclui um registro"""
-    # Valida client_id
-    validar_client_id(db, client_id)
-    
-    # Busca atestado e valida que pertence ao cliente
-    atestado = db.query(Atestado).join(Upload).filter(
-        Atestado.id == atestado_id,
-        Upload.client_id == client_id
-    ).first()
-    
+    atestado = db.query(Atestado).filter(Atestado.id == atestado_id).first()
     if not atestado:
+        raise HTTPException(status_code=404, detail="Registro não encontrado")
+    upload = db.query(Upload).filter(Upload.id == atestado.upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload relacionado não encontrado")
+    resolved_client_id = int(upload.client_id)
+    if client_id is not None and int(client_id) != resolved_client_id:
         raise HTTPException(status_code=404, detail="Registro não encontrado ou não pertence ao cliente")
+    validar_acesso_client_id(current_user, resolved_client_id)
     
     try:
         db.delete(atestado)
         db.commit()
         return {"success": True}
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -5633,12 +5827,14 @@ async def atualizar_funcionario(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     genero: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Atualiza todos os registros de um funcionário (em massa)"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         # Busca todos os atestados do funcionário
         atestados = db.query(Atestado).join(Upload).filter(
@@ -5676,12 +5872,14 @@ async def atualizar_funcionarios_massa(
     client_id: int = Query(..., description="ID do cliente (obrigatório)"),  # Obrigatório
     genero: Optional[str] = Query(None),
     setor: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Atualiza múltiplos funcionários em massa"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         if not nomes or len(nomes) == 0:
             raise HTTPException(status_code=400, detail="Nenhum funcionário selecionado")
@@ -5725,9 +5923,10 @@ async def atualizar_funcionarios_massa(
 @app.post("/api/upload/analyze")
 async def analyze_file(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """Analisa arquivo e sugere configurações das colunas"""
+    """Analisa arquivo e sugere configurações das colunas (auth — FIT-03)"""
     try:
         # Salva arquivo temporário
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -5762,12 +5961,14 @@ async def process_file_with_config(
     file: UploadFile = File(...),
     config: str = Form(...),
     client_id: int = Form(...),  # Obrigatório, sem valor padrão
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Processa arquivo com configurações das colunas"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant
         validar_client_id(db, client_id)
+        validar_acesso_client_id(current_user, client_id)
         
         # Parse configurações
         column_configs = json.loads(config)
@@ -5825,6 +6026,9 @@ async def process_file_with_config(
             "message": "Dados processados com sucesso!"
         }
         
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
