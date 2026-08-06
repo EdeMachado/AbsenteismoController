@@ -307,87 +307,18 @@ def validar_acesso_client_id(current_user: User, client_id: int) -> None:
         )
 
 # Initialize database
-@app.on_event("startup")
-async def startup_event():
-    init_db()
-    run_migrations()
-    os.makedirs(LOGOS_DIR, exist_ok=True)
-    
-    # Atualiza permissões de usuários automaticamente no startup
-    try:
-        db = next(get_db())
-        
-        # Busca usuário Nilceia
-        nilceia = db.query(User).filter(
-            (User.username.ilike('%nilceia%')) | 
-            (User.email.ilike('%nilceia%')) |
-            (User.nome_completo.ilike('%nilceia%'))
-        ).first()
-        
-        if nilceia:
-            if nilceia.client_id != 2:
-                nilceia.client_id = 2  # CONVERPLAST
-                print(f"✅ Usuário {nilceia.username} atualizado: client_id = 2 (CONVERPLAST)")
-        
-        # Todos os outros usuários recebem client_id = NULL (acesso a todos)
-        outros_usuarios = db.query(User).filter(
-            User.id != nilceia.id if nilceia else True
-        ).all()
-        
-        atualizados = 0
-        for user in outros_usuarios:
-            if user.client_id is not None:
-                user.client_id = None
-                atualizados += 1
-                if atualizados <= 5:  # Log apenas os primeiros 5 para não poluir
-                    print(f"✅ Usuário {user.username} atualizado: client_id = NULL (acesso a todos)")
-        
-        if atualizados > 0 or (nilceia and nilceia.client_id == 2):
-            db.commit()
-            print(f"✅ Permissões atualizadas: {atualizados} usuários com acesso a todos, Nilceia com acesso apenas a CONVERPLAST")
-        else:
-            db.rollback()
-    except Exception as e:
-        print(f"⚠️ Erro ao atualizar permissões no startup (não crítico): {e}")
-        try:
-            db.rollback()
-        except:
-            pass
-    
-    # Inicializa backup automático (opcional - com fallback)
-    try:
-        from .backup_service import init_backup_service
-        from .database import DB_PATH
-        backup_svc = init_backup_service(DB_PATH)
-        
-        # Notifica sucesso (opcional)
-        try:
-            from .notification_service import notification_service
-            notification_service.notify(
-                notification_service.NotificationLevel.INFO,
-                "Sistema Iniciado",
-                "Backup automático configurado"
-            )
-        except:
-            pass
-    except Exception as e:
-        # Se falhar, ignora silenciosamente
-        try:
-            logger = get_logger()
-            if logger:
-                logger.warning(f"Backup automático não iniciado: {e}")
-        except:
-            pass
-    
-    db = next(get_db())
-    
-    # REMOVIDO: Código que deletava clientes no startup foi removido por segurança
-    # NUNCA deletar dados automaticamente no startup - pode causar perda de dados reais
-    
-    # Cria usuário admin padrão se não existir (verifica por username E email)
+def apply_non_destructive_startup_seeds(db: Session) -> dict:
+    """
+    Seeds idempotentes e não destrutivos (S01-A revisão).
+
+    - Nunca altera client_id / is_admin / senha de usuários existentes.
+    - Cria admin padrão somente se username e email ainda não existirem.
+    - Cria configs padrão somente se a chave ainda não existir.
+    """
+    created = {"admin": False, "configs": 0}
+
     admin = db.query(User).filter(User.username == "admin").first()
     if not admin:
-        # Verifica também se já existe usuário com esse email
         existing_email = db.query(User).filter(User.email == "admin@grupobiomed.com").first()
         if not existing_email:
             admin = User(
@@ -396,18 +327,64 @@ async def startup_event():
                 password_hash=get_password_hash("admin123"),
                 nome_completo="Administrador",
                 is_active=True,
-                is_admin=True
+                is_admin=True,
             )
             db.add(admin)
             db.commit()
-    # Configurações padrão
-    if not db.query(Config).filter(Config.chave == "nome_sistema").first():
-        set_config_value(db, "nome_sistema", "AbsenteismoController", "Nome do sistema", "string")
-        set_config_value(db, "empresa", "GrupoBiomed", "Nome da empresa", "string")
-        set_config_value(db, "email_contato", "contato@grupobiomed.com", "Email de contato", "string")
-        set_config_value(db, "tema_escuro", "false", "Tema escuro ativado", "boolean")
-        set_config_value(db, "itens_por_pagina", "50", "Itens por página", "number")
-    db.close()
+            created["admin"] = True
+
+    defaults = [
+        ("nome_sistema", "AbsenteismoController", "Nome do sistema", "string"),
+        ("empresa", "GrupoBiomed", "Nome da empresa", "string"),
+        ("email_contato", "contato@grupobiomed.com", "Email de contato", "string"),
+        ("tema_escuro", "false", "Tema escuro ativado", "boolean"),
+        ("itens_por_pagina", "50", "Itens por página", "number"),
+    ]
+    for chave, valor, descricao, tipo in defaults:
+        if not db.query(Config).filter(Config.chave == chave).first():
+            set_config_value(db, chave, valor, descricao, tipo)
+            created["configs"] += 1
+
+    return created
+
+
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+    run_migrations()
+    os.makedirs(LOGOS_DIR, exist_ok=True)
+
+    # REMOVIDO (S01-A): bloco que forçava client_id=NULL / Nilceia=2 em usuários existentes.
+    # Startup não pode alterar vínculos de tenant nem is_admin/senha de contas existentes.
+
+    # Inicializa backup automático (opcional - com fallback)
+    try:
+        from .backup_service import init_backup_service
+        from .database import DB_PATH
+        backup_svc = init_backup_service(DB_PATH)
+
+        try:
+            from .notification_service import notification_service
+            notification_service.notify(
+                notification_service.NotificationLevel.INFO,
+                "Sistema Iniciado",
+                "Backup automático configurado"
+            )
+        except Exception:
+            pass
+    except Exception as e:
+        try:
+            logger = get_logger()
+            if logger:
+                logger.warning(f"Backup automático não iniciado: {e}")
+        except Exception:
+            pass
+
+    db = next(get_db())
+    try:
+        apply_non_destructive_startup_seeds(db)
+    finally:
+        db.close()
 
 # ==================== ROUTES - FRONTEND ====================
 
@@ -669,6 +646,8 @@ async def list_backups(current_user: User = Depends(get_current_admin_user)):
                 "success": False,
                 "message": "Serviço de backup não disponível"
             }
+    except HTTPException:
+        raise
     except Exception as e:
         return {
             "success": False,
@@ -821,54 +800,17 @@ async def atualizar_permissoes_usuarios(
     db: Session = Depends(get_db)
 ):
     """
-    Atualiza permissões de usuários existentes:
-    - Todos os usuários (exceto Nilceia) recebem client_id = NULL (acesso a todos)
-    - Nilceia recebe client_id = 2 (CONVERPLAST)
+    DESATIVADO (S01-A): esta operação zerava client_id de usuários existentes
+    e forçava acesso global. Vínculos de tenant só podem ser alterados
+    explicitamente via gestão de usuários, nunca em massa no startup/API.
     """
-    try:
-        resultado = []
-        
-        # Busca usuário Nilceia (pode ser por username ou email)
-        nilceia = db.query(User).filter(
-            (User.username.ilike('%nilceia%')) | 
-            (User.email.ilike('%nilceia%')) |
-            (User.nome_completo.ilike('%nilceia%'))
-        ).first()
-        
-        if nilceia:
-            nilceia.client_id = 2  # CONVERPLAST
-            resultado.append(f"✅ {nilceia.username}: client_id = 2 (CONVERPLAST)")
-            print(f"✅ Usuário {nilceia.username} atualizado: client_id = 2 (CONVERPLAST)")
-        else:
-            resultado.append("⚠️ Usuário Nilceia não encontrado")
-            print("⚠️ Usuário Nilceia não encontrado")
-        
-        # Todos os outros usuários recebem client_id = NULL (acesso a todos)
-        outros_usuarios = db.query(User).filter(
-            User.id != nilceia.id if nilceia else True
-        ).all()
-        
-        atualizados = 0
-        for user in outros_usuarios:
-            if user.client_id is not None:
-                user.client_id = None
-                atualizados += 1
-                resultado.append(f"✅ {user.username}: client_id = NULL (acesso a todos)")
-                print(f"✅ Usuário {user.username} atualizado: client_id = NULL (acesso a todos)")
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": f"Permissões atualizadas: {atualizados} usuários com acesso a todos os clientes, Nilceia com acesso apenas a CONVERPLAST",
-            "atualizados": atualizados + (1 if nilceia else 0),
-            "detalhes": resultado
-        }
-    except Exception as e:
-        db.rollback()
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Erro ao atualizar permissões: {str(e)}")
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            "Operação desativada por segurança (S01-A): "
+            "não é permitido zerar ou reatribuir client_id em massa."
+        ),
+    )
 
 # ==================== CADASTRO DE EMPRESA ====================
 
@@ -4402,22 +4344,28 @@ async def delete_upload(
     current_user: User = Depends(get_current_active_user),
 ):
     """Deleta um upload e seus dados (auth + tenant — S01-A)"""
-    client = resolve_authorized_client(db, current_user, client_id)
-    client_id = client.id
-    
-    # Valida se o upload pertence ao cliente
-    upload = db.query(Upload).filter(
-        Upload.id == upload_id,
-        Upload.client_id == client_id
-    ).first()
-    
-    if not upload:
-        raise HTTPException(status_code=404, detail="Upload não encontrado ou não pertence ao cliente")
-    
-    db.delete(upload)
-    db.commit()
-    
-    return {"success": True, "message": "Upload deletado com sucesso"}
+    try:
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
+        
+        # Valida se o upload pertence ao cliente
+        upload = db.query(Upload).filter(
+            Upload.id == upload_id,
+            Upload.client_id == client_id
+        ).first()
+        
+        if not upload:
+            raise HTTPException(status_code=404, detail="Upload não encontrado ou não pertence ao cliente")
+        
+        db.delete(upload)
+        db.commit()
+        
+        return {"success": True, "message": "Upload deletado com sucesso"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar upload: {str(e)}")
 
 # ==================== ROUTES - EXPORTS ====================
 
