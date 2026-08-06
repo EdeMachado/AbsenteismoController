@@ -2,12 +2,12 @@
 
 **Status:** shadow — sem escrita, sem endpoint público, sem correção persistente.  
 **Branch:** `feat/a02a-data-quality-shadow`  
-**Base:** `feat/a01a-canonical-metrics-shadow` (@ `ce0bb99`)  
+**Base:** `feat/a01a-canonical-metrics-shadow`  
 **Serviço:** `backend/services/data_quality_service.py`
 
 ## Objetivo
 
-Analisar registros, agregar inconsistências, calcular **IQB** (0–100), propor normalizações **em memória** e emitir sugestões — **sem** alterar dados originais nem expor PII.
+Analisar registros, agregar inconsistências, calcular **IQB (0–100)**, propor normalizações **em memória** e emitir sugestões — **sem** alterar dados originais nem expor PII.
 
 ## Assinatura
 
@@ -17,28 +17,42 @@ resultado = service.analyze(
     client_id=2,
     periodo_inicio="2026-01",
     periodo_fim="2026-06",
+    profile=DataQualityProfile(centro_custo_aplicavel=True, cid_aplicavel=True),
+    reference_date=date(2026, 6, 20),
 )
 ```
 
 - `client_id` obrigatório (`> 0`), sem fallback.
 - Período: mesma validação `YYYY-MM` do `MetricService`.
-- Filtro: `Upload.client_id`.
+- Uploads auditados **independentemente** dos atestados (inclui zero eventos).
 - Sessão não mutada; nenhuma escrita.
 
-## Saída (resumo)
+## Status por dimensão/campo
 
-- `iqb`, `classificacao`, `dimensoes`, `pesos`
-- `completude`, `padronizacao_setor`, `centro_custo`, `identidade`
-- `horas`, `dias_datas`, `cid`, `rastreabilidade`, `atualidade`
-- `sugestoes`, `alertas`, `limitacoes`, `estrategia_identidade_futura`
+`avaliado` | `nao_aplicavel` | `indisponivel` | `nao_avaliado`
 
-Ver `A02_IQB_METHODOLOGY.md` e `A02_NORMALIZATION_CATALOG.md`.
+- Aplicável e ausente → **penaliza** (não melhora a nota).
+- Explicitamente não aplicável (`DataQualityProfile`) → não penaliza; **redistribui** peso.
+- Ausência total **não** remove dimensão automaticamente.
+
+Saída IQB inclui `pesos_originais`, `pesos_efetivos`, `dimensoes_nao_aplicaveis`, `metodologia_redistribuicao`.
+
+## Identidade
+
+- **Por evento:** matrícula / CPF / só nome / sem id.
+- **Por trabalhador aproximado:** melhor chave por identidade interna (base do IQB).
+- Fragmentação documentada; sem fuzzy matching.
+
+## Uploads e competência
+
+- `multiplos_uploads_competencia` / `possivel_reupload` / `duplicidade_nao_confirmada`
+- **Não** equivale a duplicidade confirmada (hash indisponível no schema).
+- Períodos inválidos aparecem em `periodos_invalidos` mesmo com janela válida.
 
 ## Privacidade
 
-Reutiliza o guard estruturado anti-PII do A01 (`assert_no_pii_in_payload`).  
-Proibido na saída: nome, CPF, matrícula, e-mail, telefone, documento, chave interna, CID por pessoa, linha original.
+Guard estruturado anti-PII do A01. Sem nome/CPF/matrícula/chave/CID individual.
 
-## Não implementado neste lote
+## Não implementado
 
-Correção automática, dicionário persistente, migration, cadastro mestre, IA, dashboard, endpoint público, prevenção de reupload, plano de ação.
+Correção automática, dicionário persistente, migration, cadastro mestre, IA, dashboard, endpoint, prevenção de reupload.

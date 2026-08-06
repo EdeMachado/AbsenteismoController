@@ -2,69 +2,78 @@
 
 ## Princípios
 
-1. **Nunca** altera o valor original persistido.
-2. Normalização ocorre **apenas em memória** para agregação/comparação.
-3. Sugestões têm `aplicacao_automatica: false`.
-4. **Não** gera SQL, script de `UPDATE` nem migration.
-5. **Não** inclui PII.
+1. Nunca altera o valor original persistido.
+2. Normalização só em memória.
+3. `aplicacao_automatica: false`.
+4. Sem SQL / UPDATE / migration.
+5. Sem PII.
 
-## Setor
+## Setor — duas representações
 
-Pipeline em memória:
+| Representação | Uso |
+|---------------|-----|
+| Valor original | Intocado no banco |
+| Chave comparável | NFKC → remoção de diacríticos (NFKD) → trim → espaços → casefold |
 
-1. Unicode NFKC  
-2. trim  
-3. compactação de espaços  
-4. chave case-insensitive (`UPPER`)  
-5. rótulo proposto (Title Case de apresentação)  
-6. valor original preservado no banco (intocado)
+### Mesmo grupo de forma
 
-### Une automaticamente (variantes de forma)
+- `Elétrica` / `ELETRICA` / `eletrica`
+- `Manutenção` / `MANUTENCAO` / `manutenção`
 
-- `Montagem` / `MONTAGEM` / `  montagem  `
-
-### Não une (semanticamente distintos)
+### Não une (semântica)
 
 - `Pintura` ≠ `Pintura (Líder)`
-- Qualquer diferença além de caixa/espaços/acentos Unicode equivalentes
 
-### Saída agregada
+## Rótulo proposto
 
-```json
-{
-  "chave_normalizada": "MONTAGEM",
-  "rotulo_proposto": "Montagem",
-  "quantidade_variantes": 2,
-  "eventos": 44
-}
-```
+1. Variante **mais frequente**
+2. Empate: ordem lexicográfica determinística
+3. Preserva siglas (`RH`, `TI`, `PCP`) — não força `Rh`/`Ti`/`Pcp`
+4. `necessita_validacao_humana=true`
+5. `proposta_definitiva=false`
+6. Lista apenas variantes agregadas (`rotulo` + `eventos`), não linhas
 
 ## Centro de custo
 
-- Mede cobertura e variantes de forma.
-- **Não** inventa CC a partir do setor.
-- Se 100% ausente → `status: indisponivel` (não trata `SEM_CENTRO_CUSTO` como dado válido).
+- Cobertura e variantes de forma.
+- Não inventa a partir do setor.
+- Aplicável + 100% ausente → penaliza.
+- `centro_custo_aplicavel=False` → não penaliza.
 
-## Identidade (estratégia futura — não implementada)
+## Uploads
 
-1. Matrícula preferencial  
-2. CPF só em camada médica restrita  
-3. Identificador pseudonimizado para analytics  
-4. Nome como fallback legado  
+Auditoria independente por `Upload.client_id` (inclui zero eventos):
 
-## Tipos de sugestão neste lote
+- válidos na janela
+- sem período / malformados
+- zero eventos
+- excluídos da janela por período inválido (visíveis em `periodos_invalidos`)
 
-| tipo | ação típica |
-|------|-------------|
-| `SETOR_VARIANTE` | Padronizar rótulos futuros no upload |
-| `REUPLOAD_COMPETENCIA` | Política de reupload (lote futuro) |
-| `CENTRO_CUSTO_AUSENTE` | Incluir CC no layout quando disponível |
-| `IDENTIDADE_FRAGIL` | Adotar matrícula preferencial |
+### Múltiplos uploads na competência
 
-## O que não pode ser corrigido automaticamente neste lote
+- `multiplos_uploads_competencia`
+- `possivel_reupload`
+- `duplicidade_nao_confirmada`
 
-- Histórico de uploads  
-- Dicionário persistente de setores  
-- Cadastro mestre de funcionários  
-- Deduplicação de reuploads  
-- Qualquer `UPDATE`/`DELETE` em produção  
+> A presença de mais de um upload na mesma competência exige revisão, mas não comprova duplicidade sem hash ou assinatura do conteúdo.
+
+`duplicidade_confirmada` permanece indisponível sem hash.
+
+## CID — supressão
+
+`GRUPO_SUPRIMIDO` reporta:
+
+- `grupos_suprimidos`
+- `soma_contagens_por_grupo` (pode doble-contar pessoas em vários grupos)
+- `trabalhadores_unicos_globais`
+
+Não interpretar a soma por grupo como efetivo total.
+
+## Tipos de sugestão
+
+| tipo | nota |
+|------|------|
+| `SETOR_VARIANTE` | padronizar uploads futuros |
+| `MULTIPLOS_UPLOADS_COMPETENCIA` | revisão; não confirma duplicidade |
+| `CENTRO_CUSTO_AUSENTE` | se aplicável |
+| `IDENTIDADE_FRAGIL` | matrícula preferencial |
