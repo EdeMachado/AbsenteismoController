@@ -51,6 +51,8 @@ Extração **progressiva** de `main.py` — sem rewrite big-bang.
 
 `recurrence_service`, `trend_service`, `severity_service`, `frequency_service`, `pareto_service`, `comparison_service`, `intelligence_engine`, import/converter/hash services.
 
+No Épico 2, frente obrigatória **UX/UI Modernization**: design system leve (tokens + componentes), piloto na ingestão inteligente, migração gradual — ver `ABSENTEISMO_UX_UI_MODERNIZATION_ADDENDUM.md`.
+
 ## Multi-tenant
 
 Todo cálculo e toda importação recebem `client_id` explícito. Sem fallback. Sem inferência pelo frontend.
