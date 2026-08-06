@@ -2,7 +2,9 @@ name: Foundation CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main, integration/foundation-train]
+  workflow_dispatch:
 
 permissions:
   contents: read
