@@ -24,28 +24,18 @@ Esta branch é o ponto de partida autorizado para implementar *BioMed Executive 
 ## 2. Arquitetura final (fundação integrada)
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Presentation (legado inalterado na train + UI experimental │
-│ ingestion flaggada OFF)                                     │
-└────────────────────────────┬────────────────────────────────┘
-                             │ HTTP (guards PR #4)
-┌────────────────────────────▼────────────────────────────────┐
-│ backend/main.py — rotas legadas + hook ingestion (flag)     │
-│ backend/tenant.py / auth.py                                 │
-└─────┬───────────────────�
-│ backend/main.py — rotas legadas + hook ingestion (flag)     │
-│ backend/tenant.py / auth.py                                 │
-└─────┬───────────────────┬───────────────────┬───────────────┘
-      │                   │                   │
-┌─────▼──────┐  ┌─────────▼────────┐  ┌───────▼──────────────┐
-│ services/  │  │ ingestion/       │  │ performance/         │
-│ Metric     │  │ Epic 1 pipeline  │  │ Engine + adapters    │
-│ DQ / IQB   │  │ (flag OFF)       │  │ (flag OFF; shadow)   │
-│ shadow_cmp │  │                  │  │ CLI readonly         │
-└─────┬──────┘  └─────────┬────────┘  └───────┬──────────────┘
-      └───────────────────┴───────────────────┘
-                          │
-                   SQLite tenant (não migrado aqui)
+Presentation (legado + UI experimental ingestion flag OFF)
+        | HTTP + guards PR #4
+backend/main.py + tenant.py + auth.py
+        |----------------+------------------|
+        v                v                  v
+  services/         ingestion/         performance/
+  Metric+IQB        Epic1 flag OFF     Engine flag OFF
+  shadow_compare                       CLI readonly
+        |                |                  |
+        +----------------+------------------+
+                         v
+              SQLite tenant (não migrado no FIT)
 ```
 
 Documentos mestres em `docs/master/` (incluindo `BIOMED_EXECUTIVE_INTELLIGENCE_ARCHITECTURE.md`).
