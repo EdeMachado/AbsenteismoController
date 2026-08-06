@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Shadow runner for BioMed Performance Engine — readonly, explicit DB path, fixtures OK.
+"""Shadow runner: canonical MetricService + IQB → BioMed Performance Engine.
 
-Usage examples:
-  python scripts/shadow_performance_engine.py --fixture severity
-  python scripts/shadow_performance_engine.py --db /path/to/temp.db --client-id 99 \\
-      --readonly
+Requires explicit --db-path. Opens SQLite mode=ro + PRAGMA query_only=ON.
+Refuses production paths. Never prints PII.
 
-Never defaults to production paths. Never prints PII.
+Example:
+  python scripts/shadow_performance_engine.py \\
+    --db-path /tmp/synthetic.sqlite \\
+    --client-id 2 \\
+    --baseline-inicio 2025-05 --baseline-fim 2025-07 \\
+    --atual-inicio 2026-05 --atual-fim 2026-07
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -21,101 +23,117 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.performance.performance_service import PerformanceService
+from backend.performance import ENGINE_VERSION
+from backend.performance.exceptions import (
+    IntegrityCheckError,
+    PerformanceError,
+    ProductionPathError,
+    SchemaIncompatibleError,
+)
+from backend.performance.performance_shadow_service import (
+    SHADOW_ADAPTER_VERSION,
+    PerformanceShadowService,
+    load_action_counts_json,
+    load_conditionants_json,
+    load_productivity_json,
+)
 from backend.performance.privacy import assert_no_pii
-from tests.fixtures.performance.builders import (
-    baseline_ok,
-    conditionant_delayed,
-    current_frequency_control,
-    current_integral,
-    current_severity_control,
-    current_worsened,
-    prod_good_coverage,
+from backend.performance.readonly_guard import (
+    assert_query_only,
+    file_fingerprint,
+    fingerprints_equal,
+    open_sqlite_readonly,
 )
 
 
-_FORBIDDEN = ("/var/www/absenteismo", "absenteismo.db")
-
-
-def _refuse_prod_path(path: str | None) -> None:
-    if not path:
-        return
-    norm = path.replace("\\", "/").lower()
-    for frag in _FORBIDDEN:
-        if frag in norm:
-            raise SystemExit(f"refusing production-like path: {path}")
-
-
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Shadow BioMed Performance Engine")
-    parser.add_argument("--db", default=None, help="Explicit SQLite path (optional)")
-    parser.add_argument("--readonly", action="store_true", help="Open DB readonly if --db set")
-    parser.add_argument("--client-id", type=int, default=99)
-    parser.add_argument(
-        "--fixture",
-        choices=["severity", "frequency", "integral", "worsened"],
-        default="severity",
+    parser = argparse.ArgumentParser(
+        description="Shadow BioMed Performance Engine (canonical adapter)"
     )
+    parser.add_argument(
+        "--db-path",
+        required=True,
+        help="Caminho explícito do SQLite (obrigatório; sem default)",
+    )
+    parser.add_argument("--client-id", type=int, required=True)
+    parser.add_argument("--baseline-inicio", required=True, help="YYYY-MM")
+    parser.add_argument("--baseline-fim", required=True, help="YYYY-MM")
+    parser.add_argument("--atual-inicio", required=True, help="YYYY-MM")
+    parser.add_argument("--atual-fim", required=True, help="YYYY-MM")
+    parser.add_argument("--productivity-json", default=None)
+    parser.add_argument("--conditionants-json", default=None)
+    parser.add_argument("--acoes-json", default=None)
+    parser.add_argument("--custo-programa", type=float, default=None)
+    parser.add_argument("--custo-hora", type=float, default=None)
+    parser.add_argument("--efetivo-trabalhadores", type=int, default=None)
     parser.add_argument("--json-out", default=None)
     args = parser.parse_args(argv)
 
-    _refuse_prod_path(args.db)
-    if args.db:
-        # Readonly open — no writes. MetricService integration optional future.
-        uri = f"file:{args.db}?mode=ro" if args.readonly else args.db
-        import sqlite3
+    try:
+        before = file_fingerprint(args.db_path)
+    except (ProductionPathError, FileNotFoundError, IntegrityCheckError) as exc:
+        raise SystemExit(str(exc)) from exc
+    except Exception as exc:
+        # integrity is inside open; fingerprint only needs safe path
+        if isinstance(exc, ProductionPathError):
+            raise SystemExit(str(exc)) from exc
+        raise SystemExit(str(exc)) from exc
 
-        try:
-            conn = sqlite3.connect(uri, uri=True) if args.readonly else sqlite3.connect(args.db)
-            conn.close()
-        except sqlite3.Error as exc:
-            raise SystemExit(f"cannot open db readonly/explicit: {exc}") from exc
-        print(
-            json.dumps(
-                {
-                    "warning": "db path accepted for connectivity check only; "
-                    "this shadow run uses synthetic fixtures for aggregates",
-                    "db": os.path.basename(args.db),
-                }
-            )
+    db = None
+    try:
+        db = open_sqlite_readonly(args.db_path)
+        assert_query_only(db)
+
+        prod = load_productivity_json(args.productivity_json)
+        conds = load_conditionants_json(args.conditionants_json)
+        acoes = load_action_counts_json(args.acoes_json)
+
+        service = PerformanceShadowService(db, db_sha256=str(before["sha256"]))
+        result = service.analyze(
+            client_id=args.client_id,
+            baseline_inicio=args.baseline_inicio,
+            baseline_fim=args.baseline_fim,
+            atual_inicio=args.atual_inicio,
+            atual_fim=args.atual_fim,
+            efetivo_trabalhadores=args.efetivo_trabalhadores,
+            productivity=prod,
+            conditionants=conds,
+            acoes=acoes,
+            custo_programa=args.custo_programa,
+            custo_hora=args.custo_hora,
+            fonte_custos="cli_opcional" if args.custo_programa is not None else "nao_informada",
         )
+        payload = result.to_dict()
+        payload["cli"] = {
+            "engine_version": ENGINE_VERSION,
+            "adapter_version": SHADOW_ADAPTER_VERSION,
+            "db_sha256": before["sha256"],
+            "db_basename": before["path_basename"],
+            "periodos": {
+                "baseline": [args.baseline_inicio, args.baseline_fim],
+                "atual": [args.atual_inicio, args.atual_fim],
+            },
+            "readonly": True,
+            "query_only": True,
+        }
+        assert_no_pii(payload)
+        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        if args.json_out:
+            Path(args.json_out).write_text(text, encoding="utf-8")
+        print(text)
+    except (ProductionPathError, IntegrityCheckError, SchemaIncompatibleError) as exc:
+        raise SystemExit(str(exc)) from exc
+    except PerformanceError as exc:
+        raise SystemExit(f"{exc.code}: {exc}") from exc
+    except Exception as exc:
+        raise SystemExit(f"shadow_failed: {exc}") from exc
+    finally:
+        if db is not None:
+            db.close()
 
-    cur_map = {
-        "severity": current_severity_control,
-        "frequency": current_frequency_control,
-        "integral": current_integral,
-        "worsened": current_worsened,
-    }
-    baseline = baseline_ok()
-    # Force tenant on fixtures
-    from dataclasses import replace
-
-    baseline = replace(baseline, client_id=args.client_id)
-    current = replace(cur_map[args.fixture](), client_id=args.client_id)
-
-    svc = PerformanceService(require_flag=False)
-    analysis = svc.analyze(
-        client_id=args.client_id,
-        baseline=baseline,
-        current=current,
-        productivity=prod_good_coverage(),
-        conditionants=[conditionant_delayed()] if args.fixture == "severity" else [],
-        reference_end=current.periodo_fim,
-        custo_programa=10000.0,
-        custo_hora=50.0,
-        fonte_custos="synthetic",
-        acoes_propostas=5,
-        acoes_aprovadas=3,
-        acoes_executadas=2,
-        acoes_pendentes=2,
-        metas_atingidas=0.4,
-    )
-    payload = analysis.to_dict()
-    assert_no_pii(payload)
-    text = json.dumps(payload, ensure_ascii=False, indent=2)
-    if args.json_out:
-        Path(args.json_out).write_text(text, encoding="utf-8")
-    print(text)
+    after = file_fingerprint(args.db_path)
+    if not fingerprints_equal(before, after):
+        raise SystemExit("readonly_violation: db fingerprint changed after analysis")
     return 0
 
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 from dataclasses import replace
 from pathlib import Path
 
@@ -244,26 +243,42 @@ def test_shadow_script_runs(tmp_path):
     import subprocess
     import sys
 
+    from tests.fixtures.performance.canonical_db import write_temp_fixture_db
+
+    db_path = write_temp_fixture_db()
     out = tmp_path / "out.json"
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "scripts/shadow_performance_engine.py",
-            "--fixture",
-            "integral",
-            "--client-id",
-            "99",
-            "--json-out",
-            str(out),
-        ],
-        cwd="/workspace",
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 0, proc.stderr
-    data = json.loads(out.read_text())
-    assert data["effectiveness"]["codigo"]
-    assert_no_pii(data)
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "scripts/shadow_performance_engine.py",
+                "--db-path",
+                str(db_path),
+                "--client-id",
+                "2",
+                "--baseline-inicio",
+                "2025-05",
+                "--baseline-fim",
+                "2025-07",
+                "--atual-inicio",
+                "2026-05",
+                "--atual-fim",
+                "2026-07",
+                "--efetivo-trabalhadores",
+                "100",
+                "--json-out",
+                str(out),
+            ],
+            cwd="/workspace",
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, proc.stderr + proc.stdout
+        data = json.loads(out.read_text())
+        assert data["effectiveness"]["codigo"]
+        assert_no_pii(data)
+    finally:
+        db_path.unlink(missing_ok=True)
 
 
 def test_shadow_refuses_prod_db():
@@ -274,9 +289,18 @@ def test_shadow_refuses_prod_db():
         [
             sys.executable,
             "scripts/shadow_performance_engine.py",
-            "--db",
+            "--db-path",
             "/var/www/absenteismo/database/absenteismo.db",
-            "--readonly",
+            "--client-id",
+            "2",
+            "--baseline-inicio",
+            "2025-05",
+            "--baseline-fim",
+            "2025-07",
+            "--atual-inicio",
+            "2026-05",
+            "--atual-fim",
+            "2026-07",
         ],
         cwd="/workspace",
         capture_output=True,
@@ -289,23 +313,34 @@ def test_shadow_readonly_temp_db(tmp_path):
     import subprocess
     import sys
 
-    db = tmp_path / "tmp.db"
-    sqlite3.connect(db).close()
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "scripts/shadow_performance_engine.py",
-            "--db",
-            str(db),
-            "--readonly",
-            "--fixture",
-            "severity",
-        ],
-        cwd="/workspace",
-        capture_output=True,
-        text=True,
-    )
-    assert proc.returncode == 0, proc.stderr
+    from tests.fixtures.performance.canonical_db import write_temp_fixture_db
+
+    db_path = write_temp_fixture_db()
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "scripts/shadow_performance_engine.py",
+                "--db-path",
+                str(db_path),
+                "--client-id",
+                "2",
+                "--baseline-inicio",
+                "2025-05",
+                "--baseline-fim",
+                "2025-07",
+                "--atual-inicio",
+                "2026-05",
+                "--atual-fim",
+                "2026-07",
+            ],
+            cwd="/workspace",
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, proc.stderr + proc.stdout
+    finally:
+        db_path.unlink(missing_ok=True)
 
 
 def test_indicators_include_actions_and_iqb():
