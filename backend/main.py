@@ -6,6 +6,7 @@ from typing import List
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from .cors_config import cors_allowed_origins, cors_allow_credentials
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, nullslast
@@ -114,14 +115,15 @@ def corrigir_encoding_json(dados):
 # Compressão GZip para melhor performance
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# CORS - Configuração mais restritiva
+# CORS — FIT-04: no silent wildcard; production uses CORS_ALLOWED_ORIGINS only
+_cors_origins = cors_allowed_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, especificar domínios permitidos
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=cors_allow_credentials(),
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["Content-Type", "Content-Length"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    expose_headers=["Content-Type", "Content-Length", "Content-Disposition"],
     max_age=3600,
 )
 
@@ -198,7 +200,16 @@ RATE_LIMIT_MAX_REQUESTS = 100  # Máximo de requisições por minuto
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    """Proteção contra abuso de requisições"""
+    """Proteção contra abuso de requisições (desligada em test — FIT-04)."""
+    env = (os.environ.get("ENVIRONMENT") or "").strip().lower()
+    if env in {"test", "testing"} or os.environ.get("DISABLE_RATE_LIMIT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return await call_next(request)
+
     client_ip = request.client.host if request.client else "unknown"
     current_time = time.time()
     
@@ -251,11 +262,17 @@ async def security_headers_middleware(request: Request, call_next):
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     
-    # Cache Control para recursos estáticos
-    if request.url.path.startswith("/static/"):
+    # Cache Control: estáticos cacheáveis; APIs/exportações sensíveis sem cache público
+    path = request.url.path
+    if path.startswith("/static/"):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    elif request.url.path.startswith("/api/"):
+    elif path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+        response.headers["Pragma"] = "no-cache"
+        if path.startswith("/api/export") or path.startswith("/api/auth/login"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
     
     # UTF-8
     if "Content-Type" in response.headers:
@@ -4878,9 +4895,10 @@ async def export_excel(
 ):
     """Exporta relatório completo para Excel - USA DADOS EXATOS DO DASHBOARD"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant (FIT-04)
         print(f"[EXPORT EXCEL] Recebido client_id: {client_id}")
-        client = validar_client_id(db, client_id)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         print(f"[EXPORT EXCEL] Cliente encontrado: {client.nome} (ID: {client.id})")
         
         # USA DADOS EXATOS DO DASHBOARD
@@ -4973,9 +4991,10 @@ async def export_pptx(
 ):
     """Exporta apresentação completa para PowerPoint - USA DADOS EXATOS DO DASHBOARD"""
     try:
-        # Valida client_id
+        # Valida client_id + tenant (FIT-04)
         print(f"[EXPORT PPTX] Recebido client_id: {client_id}")
-        client = validar_client_id(db, client_id)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         print(f"[EXPORT PPTX] Cliente encontrado: {client.nome} (ID: {client.id})")
         
         # USA DADOS EXATOS DO DASHBOARD
@@ -6150,6 +6169,8 @@ async def listar_filtros_salvos(
 ):
     """Lista filtros salvos do usuário para um cliente"""
     try:
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         filtros = db.query(SavedFilter).filter(
             SavedFilter.user_id == current_user.id,
             SavedFilter.client_id == client_id
@@ -6168,6 +6189,8 @@ async def listar_filtros_salvos(
             }
             for f in filtros
         ]
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -6186,8 +6209,9 @@ async def salvar_filtro(
 ):
     """Salva um novo filtro"""
     try:
-        # Valida client_id
-        validar_client_id(db, client_id)
+        # Valida client_id + tenant (FIT-04)
+        client = resolve_authorized_client(db, current_user, client_id)
+        client_id = client.id
         
         # Valida nome
         if not nome or len(nome.strip()) == 0:

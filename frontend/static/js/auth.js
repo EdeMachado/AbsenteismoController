@@ -216,18 +216,75 @@ function checkAdmin() {
     return true;
 }
 
-// Intercepta fetch para adicionar token automaticamente
+// Intercepta fetch para Bearer + semântica HTTP (FIT-04)
 const originalFetch = window.fetch;
 window.fetch = function(url, options = {}) {
-    // Se não for uma requisição de autenticação, adiciona token
-    if (!url.includes('/api/auth/login') && !url.includes('/api/health') && !url.includes('/landing')) {
+    const urlStr = typeof url === 'string' ? url : (url && url.url) || '';
+    const isPublicApi =
+        urlStr.includes('/api/auth/login') ||
+        urlStr.includes('/api/health') ||
+        urlStr.includes('/landing');
+
+    if (!isPublicApi && urlStr.includes('/api/')) {
         const token = getAccessToken();
         if (token) {
             options.headers = options.headers || {};
-            options.headers['Authorization'] = `Bearer ${token}`;
+            // Preserve Headers instance or plain object
+            if (typeof Headers !== 'undefined' && options.headers instanceof Headers) {
+                options.headers.set('Authorization', `Bearer ${token}`);
+            } else {
+                options.headers['Authorization'] = `Bearer ${token}`;
+            }
         }
     }
-    return originalFetch.call(this, url, options);
+
+    return originalFetch.call(this, url, options).then(async (response) => {
+        if (!urlStr.includes('/api/')) {
+            return response;
+        }
+        // 401: sessão inválida/expirada → login (exceto login/health)
+        if (response.status === 401 && !isPublicApi) {
+            try {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('user');
+            } catch (e) { /* ignore */ }
+            const path = window.location.pathname || '';
+            if (!path.includes('/login') && !path.includes('/landing')) {
+                window.location.href = '/login';
+            }
+            return response;
+        }
+        // 403: autenticado sem permissão — NÃO faz logout
+        if (response.status === 403) {
+            try {
+                if (!window.__fit04_403_notified) {
+                    window.__fit04_403_notified = true;
+                    console.warn('Acesso não autorizado (403)');
+                    if (typeof window.showAccessDeniedMessage === 'function') {
+                        window.showAccessDeniedMessage('Acesso não autorizado');
+                    }
+                    setTimeout(() => { window.__fit04_403_notified = false; }, 3000);
+                }
+            } catch (e) { /* ignore */ }
+        }
+        return response;
+    });
+};
+
+window.showAccessDeniedMessage = window.showAccessDeniedMessage || function(msg) {
+    try {
+        let el = document.getElementById('fit04AccessDeniedBanner');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'fit04AccessDeniedBanner';
+            el.setAttribute('role', 'alert');
+            el.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99999;background:#b71c1c;color:#fff;padding:10px 16px;border-radius:6px;font:14px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+            document.body.appendChild(el);
+        }
+        el.textContent = msg || 'Acesso não autorizado';
+        el.style.display = 'block';
+        setTimeout(() => { if (el) el.style.display = 'none'; }, 4000);
+    } catch (e) { /* ignore */ }
 };
 
 // Exibe informações do usuário
