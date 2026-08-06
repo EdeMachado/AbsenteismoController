@@ -70,9 +70,19 @@ Camadas de dados: **RAW → STANDARDIZED → CURATED** (detalhe em `ABSENTEISMO_
 | Épico | Nome | Foco |
 |-------|------|------|
 | **E1** | Fundação analítica e entrada de dados | Consolidar #5/#6 + conversor + preview + hash + idempotência |
-| **E2** | Biomed Intelligence Engine + Dashboard 2.0 | Motor central; gráficos oficiais; substituição gradual |
+| **E2** | Biomed Intelligence Engine + Dashboard 2.0 + **UX/UI Modernization** | Motor central; gráficos oficiais; substituição gradual; design system leve e usabilidade |
 | **E3** | Biomed Insight | Regras determinísticas + payload seguro + plano de ação + IA narrativa |
 | **E4** | Consolidação corporativa | Segurança, LGPD, backup, CI, deploy, logs, modularização |
+
+### Adendo Épico 2 — `UX/UI Modernization` (obrigatório)
+
+Frente obrigatória do Épico 2 (não é épico separado). Objetivo: padronizar identidade visual, simplificar navegação e melhorar usabilidade **sem redesign big bang**.
+
+- **Piloto recomendado:** fluxo de ingestão inteligente (Épico 1) — UI nova, sem afetar o upload atual.  
+- **Depois:** expansão gradual aos módulos existentes no Épico 2.  
+- **Entregas:** auditoria UX, mapa de navegação, tokens, biblioteca de componentes, página-piloto, screenshots, critérios de acessibilidade, plano de migração visual, testes responsivos, PR draft — sem merge/deploy automático.
+
+Documento completo: `ABSENTEISMO_UX_UI_MODERNIZATION_ADDENDUM.md` · backlog em `ABSENTEISMO_EPIC_2_PLAN.md`.
 
 Regras: branch própria, testes, docs, PR draft, **parada antes de merge**, sem deploy automático. Não iniciar o próximo épico antes da entrega técnica do anterior.
 
@@ -117,7 +127,7 @@ Detalhes: `ABSENTEISMO_EPIC_{1,2,3,4}_PLAN.md`.
 1. Consolidação documental *(esta entrega)*.  
 2. Aprovação/merge governado de #4, #5, #6 *(humano)*.  
 3. **Épico 1** — conversor, preview, hash, reupload, idempotência, docs.  
-4. **Épico 2** — intelligence engine + dashboard gradual.  
+4. **Épico 2** — intelligence engine + dashboard gradual + **UX/UI Modernization** (tokens → componentes → piloto ingestão → migração visual gradual).  
 5. **Épico 3** — regras + insight + plano de ação.  
 6. **Épico 4** — segurança plena, LGPD, backup Linux, CI, deploy, logs, modularização.
 
@@ -143,6 +153,7 @@ Detalhes: `ABSENTEISMO_EPIC_{1,2,3,4}_PLAN.md`.
 | Reupload acumulando KPI | Hash + política no Épico 1; sem dedupe silencioso histórico |
 | Taxa oficial sem denominador | Só publicar com horas previstas confiáveis |
 | Big-bang no `main.py` | Extração incremental de services/routers |
+| Redesign big bang de UI | Tokens + piloto (ingestão) + migração gradual no Épico 2 |
 | IA com PII | Payload agregado + guardrails Épico 3 |
 
 ---
@@ -154,6 +165,7 @@ Detalhes: `ABSENTEISMO_EPIC_{1,2,3,4}_PLAN.md`.
 | `ABSENTEISMO_MASTER_ARCHITECTURE_IMPLEMENTATION_PLAN.md` | Este documento |
 | `ABSENTEISMO_TARGET_ARCHITECTURE.md` | Arquitetura-alvo |
 | `ABSENTEISMO_EPIC_1_PLAN.md` … `_4_` | Planos por épico |
+| `ABSENTEISMO_UX_UI_MODERNIZATION_ADDENDUM.md` | Adendo obrigatório UX/UI no Épico 2 |
 | `ABSENTEISMO_DATA_GOVERNANCE.md` | RAW/STD/CURATED + identidade |
 | `ABSENTEISMO_DEPLOY_GOVERNANCE.md` | Pipeline e gates |
 | `ABSENTEISMO_ROLLBACK_STRATEGY.md` | Rollback |
