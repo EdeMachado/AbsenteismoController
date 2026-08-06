@@ -1605,6 +1605,38 @@
         </div>
     </div>
     
+    <div id="modalClonarDados" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h2>Clonar dados entre clientes</h2>
+                <button class="modal-close" onclick="fecharModalClonarDados()" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="clonarDestinoId" value="">
+                <p style="margin-bottom: 12px;">
+                    Destino:
+                    <strong id="clonarDestinoNome"></strong>
+                </p>
+                <label for="clonarOrigemSelect" style="display:block; margin-bottom: 6px; font-weight: 600;">
+                    Cliente origem (seleção obrigatória)
+                </label>
+                <select id="clonarOrigemSelect" onchange="atualizarTextoConfirmacaoClone()" style="width:100%; padding: 10px; margin-bottom: 12px;">
+                    <option value="">Selecione o cliente origem…</option>
+                </select>
+                <p id="clonarConfirmacaoTexto" style="min-height: 1.4em; color: #444;"></p>
+                <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                    Nenhum cliente é pré-selecionado. A API só é chamada após origem explícita e confirmação.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalClonarDados()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmarClonarDadosSelecionados()">
+                    <i class="fas fa-copy"></i> Confirmar clonagem
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/clientes.js"></script>
     <script src="/static/js/mapeamento_colunas.js"></script>

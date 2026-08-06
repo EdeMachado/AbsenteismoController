@@ -680,6 +680,10 @@ function renderizarCards() {
                         <button type="button" class="btn-card btn-card-info" onclick="event.stopPropagation(); configurarMapeamento(${cliente.id})" title="Configurar Mapeamento de Planilha">
                             <i class="fas fa-table-columns"></i>
                         </button>
+                        ${(!temDados && typeof isAdmin === 'function' && isAdmin()) ? `
+                        <button type="button" class="btn-card btn-card-info btn-clonar-dados" onclick="event.stopPropagation(); iniciarClonagemCliente(${cliente.id}, event)" title="Clonar dados de outro cliente">
+                            <i class="fas fa-copy"></i>
+                        </button>` : ''}
                         <button type="button" class="btn-card ${actionClass}" onclick="event.stopPropagation(); confirmarDeletar(${cliente.id})" title="${actionLabel}">
                             <i class="fas ${actionIcon}"></i>
                         </button>
@@ -986,16 +990,124 @@ function renderizarTabela() {
 }
 
 // ==================== REPLICAÇÃO E ENTRADA ====================
-async function replicarDadosCliente(cliente, triggerButton) {
-    if (!cliente || cliente.total_uploads > 0) {
+function nomeExibicaoCliente(cliente) {
+    if (!cliente) return '';
+    return (cliente.nome_fantasia || cliente.nome || `Cliente #${cliente.id}`).trim();
+}
+
+function listarClientesOrigemParaClone(destinoId, lista) {
+    const destino = Number(destinoId);
+    return (lista || []).filter((c) => c && Number(c.id) !== destino);
+}
+
+function montarUrlClonarDados(destinoId, origemId) {
+    if (destinoId == null || origemId == null || destinoId === '' || origemId === '') {
+        return null;
+    }
+    const destino = Number(destinoId);
+    const origem = Number(origemId);
+    if (!Number.isFinite(destino) || !Number.isFinite(origem) || destino <= 0 || origem <= 0) {
+        return null;
+    }
+    if (destino === origem) {
+        return null;
+    }
+    return `/api/clientes/${destino}/clonar_dados?origem_id=${origem}`;
+}
+
+function fecharModalClonarDados() {
+    const modal = document.getElementById('modalClonarDados');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    const select = document.getElementById('clonarOrigemSelect');
+    if (select) {
+        select.innerHTML = '';
+        select.value = '';
+    }
+    const destinoId = document.getElementById('clonarDestinoId');
+    if (destinoId) destinoId.value = '';
+    window.__clonarTriggerButton = null;
+}
+
+function abrirModalClonarDados(clienteDestino) {
+    const modal = document.getElementById('modalClonarDados');
+    const select = document.getElementById('clonarOrigemSelect');
+    const destinoIdEl = document.getElementById('clonarDestinoId');
+    const destinoNomeEl = document.getElementById('clonarDestinoNome');
+    const confirmText = document.getElementById('clonarConfirmacaoTexto');
+    if (!modal || !select || !destinoIdEl || !destinoNomeEl) {
+        mostrarErro('Modal de clonagem indisponível.');
         return;
     }
 
-    const confirmar = confirm(`Ainda não existem dados para ${cliente.nome_fantasia || cliente.nome}. Deseja replicar os dados do GrupoBioMed?`);
-    if (!confirmar) {
-        throw new Error('cancelado');
+    const origens = listarClientesOrigemParaClone(clienteDestino.id, clientes);
+    select.innerHTML = '<option value="">Selecione o cliente origem…</option>';
+    origens.forEach((origem) => {
+        const opt = document.createElement('option');
+        opt.value = String(origem.id);
+        opt.textContent = nomeExibicaoCliente(origem);
+        select.appendChild(opt);
+    });
+
+    destinoIdEl.value = String(clienteDestino.id);
+    destinoNomeEl.textContent = nomeExibicaoCliente(clienteDestino);
+    if (confirmText) {
+        confirmText.textContent = '';
+    }
+    select.value = '';
+    modal.classList.add('show');
+}
+
+function atualizarTextoConfirmacaoClone() {
+    const select = document.getElementById('clonarOrigemSelect');
+    const destinoNomeEl = document.getElementById('clonarDestinoNome');
+    const confirmText = document.getElementById('clonarConfirmacaoTexto');
+    if (!select || !destinoNomeEl || !confirmText) return;
+    const origemId = select.value;
+    if (!origemId) {
+        confirmText.textContent = '';
+        return;
+    }
+    const origem = clientes.find((c) => String(c.id) === String(origemId));
+    const origemNome = nomeExibicaoCliente(origem) || `Cliente #${origemId}`;
+    const destinoNome = destinoNomeEl.textContent || '';
+    confirmText.textContent =
+        `Confirmar clonagem de dados de "${origemNome}" para "${destinoNome}"?`;
+}
+
+async function confirmarClonarDadosSelecionados() {
+    if (typeof isAdmin === 'function' && !isAdmin()) {
+        mostrarErro('Acesso negado. Apenas administradores podem clonar dados.');
+        fecharModalClonarDados();
+        return;
     }
 
+    const destinoId = document.getElementById('clonarDestinoId')?.value;
+    const origemId = document.getElementById('clonarOrigemSelect')?.value;
+    const destinoNome = document.getElementById('clonarDestinoNome')?.textContent || '';
+    const origem = clientes.find((c) => String(c.id) === String(origemId));
+    const origemNome = nomeExibicaoCliente(origem);
+
+    if (!origemId) {
+        mostrarErro('Selecione explicitamente o cliente origem.');
+        return;
+    }
+
+    const url = montarUrlClonarDados(destinoId, origemId);
+    if (!url) {
+        mostrarErro('Origem e destino devem ser clientes distintos e válidos.');
+        return;
+    }
+
+    const confirmar = confirm(
+        `Confirmar clonagem?\n\nOrigem: ${origemNome}\nDestino: ${destinoNome}\n\nEsta ação copia uploads e atestados.`
+    );
+    if (!confirmar) {
+        return;
+    }
+
+    const triggerButton = window.__clonarTriggerButton;
     let originalHTML = null;
     if (triggerButton instanceof HTMLElement) {
         originalHTML = triggerButton.innerHTML;
@@ -1004,7 +1116,7 @@ async function replicarDadosCliente(cliente, triggerButton) {
     }
 
     try {
-        const response = await fetch(`/api/clientes/${cliente.id}/clonar_dados`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -1015,14 +1127,58 @@ async function replicarDadosCliente(cliente, triggerButton) {
         }
 
         const resultado = await response.json();
-        cliente.total_uploads = resultado.total_uploads ?? cliente.total_uploads ?? 0;
-        refreshClientesUI(cliente.id);
+        const destino = clientes.find((c) => String(c.id) === String(destinoId));
+        if (destino) {
+            destino.total_uploads = resultado.total_uploads ?? destino.total_uploads ?? 0;
+            refreshClientesUI(destino.id);
+        }
+        fecharModalClonarDados();
+        mostrarSucesso(
+            `Dados clonados de "${origemNome}" para "${destinoNome}".`
+        );
+    } catch (error) {
+        console.error('Erro ao clonar dados:', error);
+        mostrarErro(error.message || 'Erro ao clonar dados.');
     } finally {
         if (triggerButton instanceof HTMLElement) {
             triggerButton.disabled = false;
             triggerButton.innerHTML = originalHTML;
         }
+        window.__clonarTriggerButton = null;
     }
+}
+
+async function replicarDadosCliente(cliente, triggerButton) {
+    if (!cliente || cliente.total_uploads > 0) {
+        return;
+    }
+    if (typeof isAdmin === 'function' && !isAdmin()) {
+        mostrarErro('Acesso negado. Apenas administradores podem clonar dados entre clientes.');
+        return;
+    }
+    const origens = listarClientesOrigemParaClone(cliente.id, clientes);
+    if (!origens.length) {
+        mostrarErro('Não há outro cliente disponível para usar como origem.');
+        return;
+    }
+    window.__clonarTriggerButton = triggerButton || null;
+    abrirModalClonarDados(cliente);
+}
+
+function iniciarClonagemCliente(destinoId, triggerEvent) {
+    if (typeof isAdmin === 'function' && !isAdmin()) {
+        mostrarErro('Acesso negado. Apenas administradores podem clonar dados entre clientes.');
+        return;
+    }
+    const cliente = clientes.find((c) => Number(c.id) === Number(destinoId));
+    if (!cliente) {
+        mostrarErro('Cliente destino não encontrado.');
+        return;
+    }
+    const btn = triggerEvent && triggerEvent.currentTarget instanceof HTMLElement
+        ? triggerEvent.currentTarget
+        : null;
+    replicarDadosCliente(cliente, btn);
 }
 
 async function entrarCliente(event, id) {
