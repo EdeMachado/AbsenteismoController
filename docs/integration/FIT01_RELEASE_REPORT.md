@@ -1,7 +1,7 @@
 # FIT-01 — Release Report (Foundation Integration Train)
 
 **Branch:** `integration/foundation-train`  
-**HEAD:** `47bb389a26327f40f5785ab4f722b7377955a4da`  
+**HEAD:** `90fbc513a549499253a6c32b7f08f1da3b9ba5b4`  
 **Base:** `origin/main` (`d0c012a`)  
 **Data:** 2026-08-06  
 **Tipo:** integração somente — **sem merge para main, sem deploy, sem migration em produção**
