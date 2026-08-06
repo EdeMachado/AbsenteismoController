@@ -490,7 +490,7 @@
 html {
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
 }
@@ -502,7 +502,7 @@ body {
     line-height: 1.6;
     width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -1898,6 +1898,21 @@ body {
 
 body.sidebar-open {
     overflow: hidden;
+}
+
+/* Em mobile, sidebar off-canvas não empurra o layout */
+@media (max-width: 1024px) {
+    .container {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        max-width: 100vw;
+        min-width: 0;
+    }
 }
 
 .sidebar {
