@@ -1,9 +1,14 @@
 /**
- * Mobile Menu Controller — R01-A shell global
+ * Mobile Menu Controller — R01-A shell (estabilizado)
  * Injeta overlay + hambúrguer. Não altera auth.js / menu / APIs.
  */
 
-var __mobileMenuListenersBound = false;
+var MOBILE_MQ = '(max-width: 1024px)';
+var __mobileGlobalListenersBound = false;
+
+function isMobileViewport() {
+    return window.matchMedia(MOBILE_MQ).matches;
+}
 
 function getSidebar() {
     return document.getElementById('sidebar')
@@ -78,15 +83,63 @@ function ensureMenuToggle() {
     document.body.appendChild(btn);
 }
 
-function bindNavCloseHandlers() {
-    document.querySelectorAll('.sidebar-nav .nav-item, .sidebar a.nav-item').forEach(function (item) {
+function bindSidebarInstance(sidebar) {
+    if (!sidebar) return;
+    if (sidebar.getAttribute('data-mobile-sidebar-bound') === '1') {
+        bindNavCloseHandlers(sidebar);
+        return;
+    }
+
+    sidebar.setAttribute('data-mobile-sidebar-bound', '1');
+
+    var touchStartX = 0;
+    sidebar.addEventListener('touchstart', function (e) {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    sidebar.addEventListener('touchend', function (e) {
+        var touchEndX = e.changedTouches[0].screenX;
+        if (touchStartX - touchEndX < -50 && sidebar.classList.contains('open')) {
+            closeSidebar();
+        }
+    }, { passive: true });
+
+    bindNavCloseHandlers(sidebar);
+}
+
+function bindNavCloseHandlers(sidebar) {
+    var root = sidebar || document;
+    root.querySelectorAll('.sidebar-nav .nav-item, a.nav-item').forEach(function (item) {
         if (item.getAttribute('data-mobile-nav-bound') === '1') return;
         item.setAttribute('data-mobile-nav-bound', '1');
         item.addEventListener('click', function () {
-            if (window.innerWidth < 1024) {
+            if (isMobileViewport()) {
                 closeSidebar();
             }
         });
+    });
+}
+
+function bindGlobalListenersOnce() {
+    if (__mobileGlobalListenersBound) return;
+    __mobileGlobalListenersBound = true;
+
+    var resizeTimer;
+    window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+            if (!isMobileViewport()) {
+                closeSidebar();
+            } else {
+                ensureMenuToggle();
+            }
+        }, 250);
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeSidebar();
+        }
     });
 }
 
@@ -94,6 +147,8 @@ function toggleSidebar() {
     var sidebar = ensureSidebarId(getSidebar());
     var overlay = ensureSidebarOverlay();
     if (!sidebar || !overlay) return;
+
+    bindSidebarInstance(sidebar);
 
     sidebar.classList.toggle('open');
     overlay.classList.toggle('active');
@@ -119,48 +174,17 @@ function initMobileMenu() {
 
     ensureSidebarOverlay();
     ensureMenuToggle();
-    bindNavCloseHandlers();
-
-    if (__mobileMenuListenersBound) return;
-    __mobileMenuListenersBound = true;
-
-    var resizeTimer;
-    window.addEventListener('resize', function () {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(function () {
-            if (window.innerWidth >= 1024) {
-                closeSidebar();
-            } else {
-                ensureMenuToggle();
-            }
-        }, 250);
-    });
-
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            closeSidebar();
-        }
-    });
-
-    var touchStartX = 0;
-    sidebar.addEventListener('touchstart', function (e) {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    sidebar.addEventListener('touchend', function (e) {
-        var touchEndX = e.changedTouches[0].screenX;
-        if (touchStartX - touchEndX < -50 && sidebar.classList.contains('open')) {
-            closeSidebar();
-        }
-    }, { passive: true });
+    bindSidebarInstance(sidebar);
+    bindGlobalListenersOnce();
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     initMobileMenu();
-    // auth.js reescreve a sidebar após boot — reaplicar shell sem rebind global
+    // auth.js pode substituir a sidebar após o boot — reinicializa a instância
     setTimeout(initMobileMenu, 100);
     setTimeout(initMobileMenu, 600);
 });
 
 window.toggleSidebar = toggleSidebar;
 window.closeSidebar = closeSidebar;
+window.isMobileViewport = isMobileViewport;
