@@ -1,7 +1,8 @@
 # FIT-02 — Staging Validation Gate
 
 **Branch:** `integration/foundation-train`  
-**HEAD inicial obrigatório:** `ee8149a9dc0e3dfab419627de2361645bd2a18cd`  
+**HEAD inicial obrigatório:**   
+**HEAD final FIT-02:** `ee8149a9dc0e3dfab419627de2361645bd2a18cd`  
 **PR:** [#11](https://github.com/EdeMachado/AbsenteismoController/pull/11) (draft)  
 **Base:** `origin/main`
 
