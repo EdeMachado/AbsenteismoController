@@ -5970,7 +5970,9 @@ async def analyze_file(
         os.remove(file_path)
         
         return {"columns": columns}
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         return {"error": str(e)}
 
