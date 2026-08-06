@@ -1,0 +1,98 @@
+name: Foundation CI
+
+on:
+  pull_request:
+    branches: [main, integration/foundation-train]
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SECRET_KEY: ci-foundation-secret-not-for-production
+      ENVIRONMENT: test
+      ENABLE_INTELLIGENT_INGESTION: "false"
+      ENABLE_BIOMED_PERFORMANCE_ENGINE: "false"
+      ENABLE_API_DOCS: "0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install runtime + test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Import / py_compile check
+        run: |
+          python -m py_compile backend/main.py backend/authz.py backend/cors_config.py backend/route_security_registry.py
+          python -c "import backend.main; print('import_ok', backend.main.app.title)"
+
+      - name: Conflict markers guard
+        run: |
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- ':!*.md' ':!.github/**'; then
+            echo "Conflict markers found" >&2
+            exit 1
+          fi
+
+      - name: Forbid secrets / live DB artifacts in PR diff
+        run: |
+          set -euo pipefail
+          mapfile -t added < <(git diff --name-only --diff-filter=A origin/${{ github.base_ref }}...HEAD || git diff --name-only --diff-filter=A HEAD~1...HEAD || true)
+          for f in "${added[@]:-}"; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              *.db|*.sqlite|*.sqlite3|*.env|.env*|**/backups/**|**/backup/**)
+                echo "Forbidden artifact added: $f" >&2
+                exit 1
+                ;;
+            esac
+            # crude PII-ish path guard
+            if echo "$f" | grep -Eiq '(cpf|rg_real|senha_prod|production_dump)'; then
+              echo "Suspicious path: $f" >&2
+              exit 1
+            fi
+          done
+
+      - name: Route inventory + security suite
+        run: |
+          pytest -q \
+            tests/test_fit03_api_auth_smoke.py \
+            tests/test_fit04_route_inventory.py \
+            tests/test_fit04_cors_headers.py \
+            tests/test_fit04_landing.py \
+            tests/test_fit04_browser_static.py \
+            tests/test_fit04_resource_ownership.py \
+            tests/test_s01a_tenant_guard.py
+
+      - name: Full test suite
+        run: pytest -q tests/
+
+      - name: Foundation coverage gate (auth/tenant/metrics/IQB/ingestion/performance)
+        run: |
+          # FIT-02 baseline ~89% on foundation packages; FIT-04 expanded surface
+          # (authz/cors/registry) measures ≥87% with full suite.
+          pytest -q \
+            --cov=backend.auth \
+            --cov=backend.authz \
+            --cov=backend.tenant \
+            --cov=backend.cors_config \
+            --cov=backend.route_security_registry \
+            --cov=backend.metrics \
+            --cov=backend.data_quality \
+            --cov=backend.ingestion \
+            --cov=backend.performance \
+            --cov-report=term-missing \
+            --cov-fail-under=87 \
+            tests/
