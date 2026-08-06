@@ -29,9 +29,14 @@ Backup histórico validado (não substitui backup atual):
 - Correção: padrão restrito a marcadores Git reais (`<<<<<<< `, `>>>>>>> `, linha exatamente `=======`)
 - Arquivo: `.github/workflows/foundation-ci.yml`
 
-### Pós-correção
+### Correções aplicadas no tip FIT-06
 
-Reexecutar CI no tip da branch. **Merge humano só após CI verde.**
+1. Conflict-marker guard (sem falso positivo em banners `====`)
+2. `ABSENTEISMO_SQLITE_PATH` descartável no workflow + `mkdir`
+3. `tests/conftest.py` garante SQLite temporário antes dos imports
+4. Trigger `push` em `integration/foundation-train`
+
+**Merge humano só após CI verde no HEAD atual.**
 
 ## Declaração de banco
 
