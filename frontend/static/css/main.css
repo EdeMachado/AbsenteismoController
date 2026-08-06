@@ -1836,6 +1836,153 @@ body {
     }
 }
 
+/* ==================== R01 GLOBAL RESPONSIVE SHELL ==================== */
+
+.header-leading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.header-leading .header-title {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.sidebar-open {
+    overflow: hidden;
+}
+
+.sidebar {
+    transition: transform 0.3s ease;
+}
+
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+}
+
+.modal,
+.modal-overlay,
+.modal-backdrop {
+    max-width: 100vw;
+}
+
+.modal-content,
+.modal .modal-dialog {
+    max-width: min(920px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.form-group,
+.filter-group,
+.filters-grid > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea,
+.filter-input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="month"],
+input[type="date"],
+input[type="search"],
+select,
+textarea {
+    max-width: 100%;
+}
+
+.btn,
+button.btn {
+    min-height: 40px;
+}
+
+.header-actions {
+    flex-wrap: wrap;
+    max-width: 100%;
+}
+
+.periodo-grid,
+.comparativo-grid,
+.metrics-grid,
+.kpi-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 1024px) {
+    .periodo-grid,
+    .comparativo-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .table th,
+    .table td {
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 768px) {
+    .periodo-grid,
+    .comparativo-grid,
+    .filters-grid,
+    .cards-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .header-actions .btn {
+        flex: 1 1 auto;
+    }
+
+    .modal-content,
+    .modal .modal-dialog {
+        max-width: calc(100vw - 16px);
+        max-height: calc(100vh - 16px);
+        margin: 8px auto;
+    }
+
+    .search-input {
+        max-width: 100% !important;
+    }
+
+    .btn,
+    button.btn,
+    .menu-toggle {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-title {
+        font-size: 16px;
+    }
+
+    .card-title {
+        font-size: 12px;
+    }
+}
+
 /* ==================== UTILITIES ==================== */
 
 .text-center { text-align: center; }
