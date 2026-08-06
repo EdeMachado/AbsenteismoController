@@ -487,12 +487,24 @@
     box-sizing: border-box;
 }
 
+html {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--background);
     color: var(--text-primary);
     line-height: 1.6;
-    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* ==================== LAYOUT ==================== */
@@ -500,6 +512,9 @@ body {
 .container {
     display: flex;
     min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
 }
 
 .main-page.no-sidebar {
@@ -1071,8 +1086,14 @@ body {
 .main-content {
     margin-left: var(--sidebar-width);
     flex: 1;
+    min-width: 0;
+    width: calc(100% - var(--sidebar-width));
+    max-width: 100%;
     min-height: 100vh;
     background: var(--background);
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
 }
 
 [data-theme="dark"] .main-content {
@@ -1080,15 +1101,19 @@ body {
 }
 
 .header {
-    height: var(--header-height);
+    min-height: var(--header-height);
+    height: auto;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 32px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 32px;
     box-shadow: var(--shadow-sm);
     position: relative;
+    max-width: 100%;
 }
 
 .header-title {
@@ -1170,19 +1195,45 @@ body {
 
 .content {
     padding: 32px;
+    max-width: 100%;
+    min-width: 0;
 }
 
 [data-theme="dark"] .content {
     background: var(--background) !important;
 }
 
+/* ==================== DASHBOARD CHART GRIDS ==================== */
+
+.charts-grid,
+.charts-grid-2,
+.charts-grid-3 {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.charts-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.charts-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 /* ==================== CARDS ==================== */
 
 .cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
     gap: 24px;
     margin-bottom: 32px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .card {
@@ -1193,6 +1244,8 @@ body {
     box-shadow: var(--shadow-sm);
     transition: var(--transition);
     border: 1px solid var(--border);
+    min-width: 0;
+    max-width: 100%;
 }
 
 .card:hover {
@@ -1266,6 +1319,10 @@ body {
     padding: 16px;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    overflow: hidden;
 }
 
 .chart-header {
@@ -1278,17 +1335,28 @@ body {
     font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .chart-subtitle {
     font-size: 12px;
     color: var(--text-secondary);
     margin-top: 2px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .chart-wrapper {
     position: relative;
     height: 300px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.chart-wrapper canvas {
+    max-width: 100% !important;
 }
 
 .chart-wrapper.large {
@@ -1360,6 +1428,9 @@ body {
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border);
     transition: var(--transition);
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
 }
 
 .filters:hover {
@@ -1370,6 +1441,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
     margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 2px solid var(--border);
@@ -1377,8 +1450,10 @@ body {
 
 .filters-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
     gap: 16px;
+    width: 100%;
+    min-width: 0;
 }
 
 .filter-group {
@@ -1467,7 +1542,10 @@ body {
 .insights-container {
     display: grid;
     gap: 20px;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .insight-card {
@@ -1548,9 +1626,12 @@ body {
 .table-container {
     background: var(--surface);
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
+    max-width: 100%;
 }
 
 .table {
@@ -1589,9 +1670,80 @@ body {
 
 /* ==================== RESPONSIVE ==================== */
 
+/* Menu hambúrguer e overlay mobile */
+.menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 18px;
+    flex-shrink: 0;
+    z-index: 1001;
+}
+
+.menu-toggle:hover {
+    background: var(--surface-hover);
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Notebooks / monitores médios: sidebar mais estreita */
+@media (max-width: 1366px) and (min-width: 1025px) {
+    :root {
+        --sidebar-width: 280px;
+    }
+
+    .content {
+        padding: 24px;
+    }
+
+    .charts-grid-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Telas com pouco espaço horizontal: gráficos em coluna única */
+@media (max-width: 1200px) {
+    .charts-grid-2,
+    .charts-grid-3 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .insights-container {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 @media (max-width: 1024px) {
+    .menu-toggle {
+        display: inline-flex;
+    }
+
     .sidebar {
         transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        width: min(var(--sidebar-width), 85vw);
     }
     
     .sidebar.open {
@@ -1600,10 +1752,25 @@ body {
     
     .main-content {
         margin-left: 0;
+        width: 100%;
+        max-width: 100%;
     }
     
     .cards-grid {
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+    }
+
+    .header {
+        padding: 12px 16px;
+    }
+
+    .header-title {
+        font-size: 20px;
+    }
+
+    .charts-grid-2,
+    .charts-grid-3 {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -1613,11 +1780,59 @@ body {
     }
     
     .header {
-        padding: 0 16px;
+        padding: 10px 12px;
+    }
+
+    .header-title {
+        font-size: 18px;
+    }
+
+    .header-actions {
+        flex-wrap: wrap;
+        gap: 8px;
     }
     
     .cards-grid {
         grid-template-columns: 1fr;
+    }
+
+    .filters {
+        padding: 16px;
+    }
+
+    .filters-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .chart-wrapper {
+        height: 260px;
+    }
+
+    .chart-wrapper.large {
+        height: 300px;
+    }
+
+    .btn-print-header span {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .content {
+        padding: 12px;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .card-value {
+        font-size: 24px;
+    }
+
+    .chart-wrapper {
+        height: 220px;
     }
 }
 
