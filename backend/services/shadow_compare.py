@@ -3,18 +3,35 @@ Comparação local (shadow) entre métricas legadas e o MetricService canônico.
 
 Uso previsto:
 - scripts/testes locais com banco temporário + fixtures sintéticas;
-- NÃO registrar como rota pública de produção.
+- NÃO registrar como rota pública de produção;
+- NÃO importar no startup da aplicação;
+- NÃO executar automaticamente.
 
 Não altera telas, uploads, schema ou dados reais.
+Não aponta para caminhos de produção por padrão.
 """
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
-from backend.services.metric_service import compute_canonical_metrics
+from backend.services.metric_service import MetricService
+
+# Caminho conhecido de produção — nunca é default; exige path explícito.
+_PRODUCTION_DB_HINT = "/var/www/absenteismo/database/absenteismo.db"
+
+_PII_PATTERNS = [
+    re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b"),
+    re.compile(r"\bmat:", re.I),
+    re.compile(r"\bcpf:", re.I),
+    re.compile(r"\bnome:", re.I),
+]
 
 
 @dataclass
@@ -29,8 +46,8 @@ class ShadowDiff:
 @dataclass
 class ShadowCompareReport:
     client_id: int
-    periodo_inicio: str
-    periodo_fim: str
+    periodo_inicio: Optional[str]
+    periodo_fim: Optional[str]
     legado: Dict[str, Any]
     canonico: Dict[str, Any]
     diferencas: List[ShadowDiff] = field(default_factory=list)
@@ -54,6 +71,50 @@ class ShadowCompareReport:
             ],
             "avisos": list(self.avisos),
         }
+
+
+def assert_no_pii_in_payload(payload: Dict[str, Any]) -> None:
+    """Garante que agregados não carregam chaves internas nem CPF formatado."""
+    blob = json.dumps(payload, ensure_ascii=False)
+    for pat in _PII_PATTERNS:
+        if pat.search(blob):
+            raise ValueError(f"PII ou chave interna detectada na saída shadow: {pat.pattern}")
+    for banned in ("nomecompleto", "matricula", "cpf", "diagnostico"):
+        # Valores de campos de metodologia podem citar nomes de colunas — ok em chaves de texto
+        # de documentação; bloqueamos estruturas de distribuição com esses nomes como keys de item.
+        pass
+    for key in (
+        "distribuicao_setor",
+        "distribuicao_centro_custo",
+        "distribuicao_grupo_alfabetico_cid",
+    ):
+        for item in payload.get("canonico", {}).get(key, []) if "canonico" in payload else payload.get(key, []):
+            if any(b in item for b in ("nomecompleto", "matricula", "cpf", "nome")):
+                raise ValueError("Distribuição contém campo identificável")
+
+
+def open_sqlite_readonly(db_path: str) -> Session:
+    """
+    Abre SQLite em modo leitura. Exige caminho explícito.
+    Não usa /var/www/... como default.
+    """
+    import sqlite3
+
+    if not db_path or not str(db_path).strip():
+        raise ValueError("db_path explícito é obrigatório (sem default de produção)")
+    path = str(Path(db_path).expanduser())
+
+    def _connect():
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
+        try:
+            conn.execute("PRAGMA query_only = ON")
+        except Exception:
+            pass
+        return conn
+
+    engine = create_engine("sqlite://", creator=_connect)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return SessionLocal()
 
 
 def _legacy_metricas_gerais(
@@ -95,7 +156,7 @@ def _legacy_metricas_gerais(
         "total_dias_perdidos": float(total_dias),
         "total_horas_perdidas": float(total_horas),
         "funcionarios_unicos": funcionarios_unicos,
-        "taxa_absenteismo": 0,  # legado usa efetivo; shadow não força denominador
+        "taxa_absenteismo": 0,
         "identidade_legado": "distinct(nomecompleto)",
     }
 
@@ -104,55 +165,60 @@ def compare_shadow(
     db: Session,
     *,
     client_id: int,
-    periodo_inicio: str,
-    periodo_fim: str,
+    periodo_inicio: Optional[str],
+    periodo_fim: Optional[str],
     efetivo_trabalhadores: Optional[int] = None,
 ) -> ShadowCompareReport:
     """
     Compara métricas legadas vs canônicas no mesmo escopo.
 
-    Aceita banco temporário de testes e fixtures sintéticas.
-    Não cria endpoint HTTP.
+    Aceita sessão já aberta (testes/fixtures ou readonly explícito).
+    Não cria endpoint HTTP. Não imprime PII.
     """
     if client_id is None:
         raise ValueError("client_id é obrigatório")
 
     legado = _legacy_metricas_gerais(db, client_id, periodo_inicio, periodo_fim)
-    canonico = compute_canonical_metrics(
-        db,
+    canonico = MetricService(db).compute(
         client_id=client_id,
         periodo_inicio=periodo_inicio,
         periodo_fim=periodo_fim,
         efetivo_trabalhadores=efetivo_trabalhadores,
-    )
+    ).to_dict()
     m = canonico["metricas"]
+
+    # Sanidade: chave interna de trabalhador não pode vazar
+    blob = json.dumps(canonico, ensure_ascii=False)
+    if "mat:" in blob or "cpf:" in blob or '"nome:' in blob:
+        raise ValueError("chave interna de trabalhador vazou no resultado canônico")
 
     diffs: List[ShadowDiff] = []
     avisos: List[str] = [
-        "Legado identifica trabalhador por nomecompleto; canônico usa matricula→cpf→nome.",
-        "Legado total_horas_perdidas soma apenas horas_perdi; canônico separa registrada vs estimada.",
-        "Taxa de absenteísmo legado não é comparada aqui (denominador de horas previstas não oficial neste lote).",
+        "Legado identifica trabalhador por nomecompleto; canônico usa identidade aproximada matricula→cpf→nome.",
+        "Legado total_horas_perdidas soma horas_perdi; canônico separa registrada vs estimada e médias distintas.",
+        "Taxa de absenteísmo legado não é comparada aqui.",
+        "Somente agregados — sem nomes, CPF ou matrícula.",
     ]
 
     pairs = [
-        ("eventos", legado["total_atestados"], m["eventos"], "contagem de linhas Atestado"),
+        ("eventos", legado["total_atestados"], m["eventos"], "alias de eventos_brutos"),
         (
             "trabalhadores_unicos",
             legado["funcionarios_unicos"],
             m["trabalhadores_unicos"],
-            "pode divergir se houver matrícula/CPF distintos com mesmo nome",
+            "pode divergir por identidade aproximada",
         ),
         (
             "dias_perdidos",
             legado["total_dias_perdidos"],
             m["dias_perdidos"],
-            "ambos usam dias_atestados",
+            "canônico ignora dias inválidos no total",
         ),
         (
             "horas_perdidas_registradas",
             legado["total_horas_perdidas"],
             m["horas_perdidas_registradas"],
-            "ambos somam horas_perdi > 0; legado também soma zeros como 0",
+            "ambos somam horas_perdi > 0",
         ),
     ]
 
@@ -166,7 +232,7 @@ def compare_shadow(
                 ShadowDiff(chave=chave, legado=leg, canonico=can, delta=delta, nota=nota)
             )
 
-    return ShadowCompareReport(
+    report = ShadowCompareReport(
         client_id=client_id,
         periodo_inicio=periodo_inicio,
         periodo_fim=periodo_fim,
@@ -175,10 +241,15 @@ def compare_shadow(
         diferencas=diffs,
         avisos=avisos,
     )
+    assert_no_pii_in_payload(report.to_dict())
+    return report
 
 
 __all__ = [
     "ShadowDiff",
     "ShadowCompareReport",
     "compare_shadow",
+    "open_sqlite_readonly",
+    "assert_no_pii_in_payload",
+    "_PRODUCTION_DB_HINT",
 ]
