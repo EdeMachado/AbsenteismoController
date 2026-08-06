@@ -1,9 +1,10 @@
 """
-S01-A revisão — startup não destrutivo.
+S01-A — startup não destrutivo e sem admin/admin123.
 Banco temporário isolado; nomes fictícios.
 """
 from __future__ import annotations
 
+import inspect
 import os
 
 import pytest
@@ -131,29 +132,8 @@ def test_startup_idempotent_twice(db_session):
     apply_non_destructive_startup_seeds(db_session)
     s2 = _snapshot(db_session)
     assert mid == s2
-    # vínculos originais intactos
     assert s2["user_conver_ficticio"]["client_id"] == s1["user_conver_ficticio"]["client_id"]
     assert s2["user_roda_ficticio"]["client_id"] == s1["user_roda_ficticio"]["client_id"]
-
-
-def test_startup_can_create_missing_admin_without_touching_others(db_session):
-    # remove admin existente
-    admin = db_session.query(User).filter(User.username == "admin").one()
-    db_session.delete(admin)
-    db_session.commit()
-
-    before_others = {
-        u.username: (u.client_id, u.is_admin, u.password_hash)
-        for u in db_session.query(User).all()
-    }
-    created = apply_non_destructive_startup_seeds(db_session)
-    assert created["admin"] is True
-    new_admin = db_session.query(User).filter(User.username == "admin").one()
-    assert new_admin.is_admin is True
-
-    for username, triple in before_others.items():
-        u = db_session.query(User).filter(User.username == username).one()
-        assert (u.client_id, u.is_admin, u.password_hash) == triple
 
 
 def test_startup_never_clears_tenant_links(db_session):
@@ -165,3 +145,72 @@ def test_startup_never_clears_tenant_links(db_session):
     )
     assert all(u.client_id is not None for u in linked)
     assert {u.client_id for u in linked} == {2, 4}
+
+
+def test_startup_empty_users_does_not_create_admin(db_session):
+    db_session.query(User).delete()
+    db_session.commit()
+    assert db_session.query(User).count() == 0
+    created = apply_non_destructive_startup_seeds(db_session)
+    assert created["admin"] is False
+    assert created["admin_missing_warned"] is True
+    assert db_session.query(User).count() == 0
+
+
+def test_startup_existing_admin_untouched(db_session):
+    before = _snapshot(db_session)["admin"]
+    created = apply_non_destructive_startup_seeds(db_session)
+    assert created["admin"] is False
+    after = _snapshot(db_session)["admin"]
+    assert after == before
+
+
+def test_startup_common_user_only_not_promoted():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    session = Session()
+    session.add(Client(id=2, nome="Tenant Alpha SA", cnpj="11111111000111"))
+    session.add(
+        User(
+            username="only_common",
+            email="only_common@example.test",
+            password_hash=get_password_hash("x"),
+            is_active=True,
+            is_admin=False,
+            client_id=2,
+        )
+    )
+    session.commit()
+    try:
+        created = apply_non_destructive_startup_seeds(session)
+        u = session.query(User).filter(User.username == "only_common").one()
+        assert u.is_admin is False
+        assert u.client_id == 2
+        assert created["admin"] is False
+        assert session.query(User).filter(User.is_admin == True).count() == 0  # noqa: E712
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
+
+def test_startup_source_has_no_admin123():
+    src = inspect.getsource(apply_non_destructive_startup_seeds)
+    assert "admin123" not in src
+    assert "get_password_hash" not in src
+
+
+def test_startup_configs_without_creating_user(db_session):
+    db_session.query(User).delete()
+    db_session.query(Config).delete()
+    db_session.commit()
+    created = apply_non_destructive_startup_seeds(db_session)
+    assert created["admin"] is False
+    assert db_session.query(User).count() == 0
+    assert created["configs"] >= 1
+    assert db_session.query(Config).filter(Config.chave == "nome_sistema").first() is not None

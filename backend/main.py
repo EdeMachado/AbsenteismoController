@@ -309,29 +309,38 @@ def validar_acesso_client_id(current_user: User, client_id: int) -> None:
 # Initialize database
 def apply_non_destructive_startup_seeds(db: Session) -> dict:
     """
-    Seeds idempotentes e não destrutivos (S01-A revisão).
+    Seeds idempotentes e não destrutivos (S01-A).
 
     - Nunca altera client_id / is_admin / senha de usuários existentes.
-    - Cria admin padrão somente se username e email ainda não existirem.
+    - Nunca cria usuário administrativo com senha padrão/fixa.
     - Cria configs padrão somente se a chave ainda não existir.
+    - Se não houver administrador, apenas registra aviso seguro (sem credenciais).
     """
-    created = {"admin": False, "configs": 0}
+    created = {"admin": False, "configs": 0, "admin_missing_warned": False}
 
-    admin = db.query(User).filter(User.username == "admin").first()
-    if not admin:
-        existing_email = db.query(User).filter(User.email == "admin@grupobiomed.com").first()
-        if not existing_email:
-            admin = User(
-                username="admin",
-                email="admin@grupobiomed.com",
-                password_hash=get_password_hash("admin123"),
-                nome_completo="Administrador",
-                is_active=True,
-                is_admin=True,
+    admin_exists = (
+        db.query(User).filter(User.is_admin == True, User.is_active == True).first()  # noqa: E712
+        is not None
+    )
+    if not admin_exists:
+        created["admin_missing_warned"] = True
+        try:
+            logger = get_logger()
+            if logger:
+                logger.warning(
+                    "Nenhum administrador ativo encontrado no startup. "
+                    "Crie o primeiro administrador por procedimento administrativo explícito."
+                )
+            else:
+                print(
+                    "AVISO: nenhum administrador ativo encontrado. "
+                    "Crie o primeiro administrador por procedimento administrativo explícito."
+                )
+        except Exception:
+            print(
+                "AVISO: nenhum administrador ativo encontrado. "
+                "Crie o primeiro administrador por procedimento administrativo explícito."
             )
-            db.add(admin)
-            db.commit()
-            created["admin"] = True
 
     defaults = [
         ("nome_sistema", "AbsenteismoController", "Nome do sistema", "string"),
