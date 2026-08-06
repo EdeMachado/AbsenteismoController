@@ -302,3 +302,41 @@ def test_clone_requires_admin_and_origem(client):
     assert r.status_code == 403
     r2 = client.post("/api/clientes/4/clonar_dados", headers=_auth("admin_explicit"))
     assert r2.status_code in (400, 422)
+
+
+def test_listar_clientes_orphan_forbidden(client):
+    """FIT-03: client_id NULL sem is_admin não lista todos — 403."""
+    r = client.get("/api/clientes", headers=_auth("user_orphan"))
+    assert r.status_code == 403
+
+
+def test_listar_clientes_bound_only_own(client):
+    r = client.get("/api/clientes", headers=_auth("user_alpha"))
+    assert r.status_code == 200
+    ids = {c["id"] for c in r.json()}
+    assert ids == {2}
+
+
+def test_listar_clientes_admin_sees_all(client):
+    r = client.get("/api/clientes", headers=_auth("admin_explicit"))
+    assert r.status_code == 200
+    ids = {c["id"] for c in r.json()}
+    assert 2 in ids and 4 in ids
+
+
+def test_validar_acesso_null_without_admin_forbidden(db_session):
+    from fastapi import HTTPException
+    from backend.main import validar_acesso_client_id
+
+    user = db_session.query(User).filter(User.username == "user_orphan").first()
+    with pytest.raises(HTTPException) as exc:
+        validar_acesso_client_id(user, 2)
+    assert exc.value.status_code == 403
+
+
+def test_anonymous_business_routes_401(client):
+    """FIT-03 smoke: unprotected business routes require Bearer."""
+    assert client.get("/api/clientes/1").status_code == 401
+    assert client.get("/api/analises/setores", params={"client_id": 1}).status_code == 401
+    assert client.get("/api/health").status_code == 200
+
