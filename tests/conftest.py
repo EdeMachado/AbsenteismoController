@@ -24,7 +24,9 @@ os.environ.setdefault("ENABLE_INTELLIGENT_INGESTION", "false")
 os.environ.setdefault("ENABLE_BIOMED_PERFORMANCE_ENGINE", "false")
 os.environ.setdefault("ENABLE_EXECUTIVE_UI", "false")
 os.environ.setdefault("ENABLE_EXECUTIVE_PRESENTATION", "false")
+os.environ.setdefault("ENABLE_API_DOCS", "false")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-not-for-production")
+# Preview/homologation surfaces allowed in test ENVIRONMENT (see preview_gate.py)
 
 # Ensure default relative database/ exists as a safety net for any leftover imports.
 Path("database").mkdir(exist_ok=True)

@@ -18,9 +18,9 @@ def test_executive_identity_preview_public():
     client = TestClient(app)
     r = client.get("/preview/executive")
     assert r.status_code == 200
-    assert "Executive Cover" in r.text
-    assert "Executive Closing" in r.text
-    assert "BioMed Executive Signature" in r.text
+    assert "Capa executiva" in r.text
+    assert "Encerramento" in r.text
+    assert "Assinatura" in r.text or "BioMed Assinatura" in r.text
     assert "dataset sintético" in r.text.lower() or "sintético" in r.text
 
 

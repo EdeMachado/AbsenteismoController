@@ -34,6 +34,7 @@ from .authz import (
     require_admin,
     assert_tenant_access,
 )
+from .preview_gate import is_preview_homologation_path, preview_surfaces_enabled
 # Sistema de logging (opcional - se falhar, ignora)
 try:
     from .logger import get_logger, audit_logger, log_operation, security_logger
@@ -191,6 +192,19 @@ async def api_auth_middleware(request: Request, call_next):
             elif db is not None:
                 db.close()
 
+    return await call_next(request)
+
+
+# RC-1.5: fail-closed preview/homologation surfaces in production
+@app.middleware("http")
+async def preview_surfaces_middleware(request: Request, call_next):
+    """Block /preview/*, /staging/*, /f/*, /api/preview/ficha* when preview surfaces disabled."""
+    path = request.url.path
+    if is_preview_homologation_path(path) and not preview_surfaces_enabled():
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": "Não encontrado"},
+        )
     return await call_next(request)
 
 # Rate Limiting - Proteção contra DDoS

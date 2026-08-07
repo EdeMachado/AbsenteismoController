@@ -25,7 +25,8 @@ def test_product_excellence_preview_public():
     assert "Design Consistency Report" in body
     assert "Executive Readability Report" in body
     assert "Executive Value Report" in body
-    assert "Executive Summary" in body
+    assert "Capa executiva" in body
+    assert "Encerramento" in body
     assert "bm-audit-toggle" in body
     # audit panels exist but default mode hides via CSS class gate
     assert "is-audit-mode" in body or "bm-audit-toggle" in body

@@ -17,6 +17,8 @@ from backend.database import get_db
 from backend.models import Client, User
 from backend.tenant import require_admin_user, resolve_authorized_client
 
+from backend.preview_gate import preview_surfaces_enabled
+
 # Intentional public API paths (method-agnostic path match).
 PUBLIC_API_PATHS = frozenset(
     {
@@ -81,7 +83,8 @@ def is_public_api_path(path: str) -> bool:
         return True
     if path.rstrip("/") == "/api/health":
         return True
-    # RC-1.2A preview: digital form APIs (in-memory, synthetic, no clinical content in URLs)
+    # RC-1.2A digital form preview APIs — public ONLY when preview surfaces enabled
+    # (fail-closed in production). Never production persistence.
     if path.startswith("/api/preview/ficha"):
-        return True
+        return preview_surfaces_enabled()
     return False
