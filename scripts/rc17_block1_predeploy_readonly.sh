@@ -31,7 +31,8 @@ echo "PRODUCTION_EXPECTED_HEAD=$PRODUCTION_EXPECTED_HEAD"
 
 if [[ "${FORCE_NONPROD:-}" != "1" ]]; then
   if [[ "$APP_DIR" != "/var/www/absenteismo" ]] || [[ "$LIVE_DB" != "/var/www/absenteismo/database/absenteismo.db" ]]; then
-    fail "paths are not known production layout (set FORCE_NONPROD=1 to override)"
+    echo "REFUSING: paths are not known production layout (set FORCE_NONPROD=1 to override)." >&2
+    exit 2
   fi
 fi
 
