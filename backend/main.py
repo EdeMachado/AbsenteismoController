@@ -621,6 +621,14 @@ async def release_candidate_consolidation_preview():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/preview/release-candidate-functional", response_class=HTMLResponse)
+async def release_candidate_functional_preview():
+    """RC-1.2 — functional consolidation & micro-UX. Synthetic. No login. No new features."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "release-candidate-functional.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():
     """Página de análises"""

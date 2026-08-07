@@ -23,7 +23,7 @@
     const vals = values || [];
     const max = Math.max.apply(null, vals.map(Number).concat([1]));
     if (!cats.length) {
-      return '<p class="bm-ei-empty">Série temporal indisponível nesta janela.</p>';
+      return '<p class="bm-ei-empty">Comparação indisponível para este período.</p>';
     }
     return cats
       .map(function (c, i) {

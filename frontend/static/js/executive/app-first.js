@@ -1,5 +1,6 @@
 /**
- * EXEC-08/09/10 — bootstrap: Abertura → Decision → Evidence Intelligence.
+ * EXEC-08/09/10 + RC-1.2 — bootstrap with micro-UX consolidation.
+ * No business-rule changes. Human language. Clear back/escape. Focus after view.
  */
 (function () {
   "use strict";
@@ -34,24 +35,56 @@
     return fetch(url, { credentials: "same-origin", headers: tokenHeaders() }).then(function (res) {
       if (res.status === 401) {
         window.location.href = "/login";
-        throw new Error("Não autenticado");
+        throw new Error("session");
       }
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (res.status === 403) {
+        throw new Error("forbidden");
+      }
+      if (!res.ok) throw new Error("http");
       return res.json();
     });
   }
 
-  function setStatus(msg, isError) {
+  function setStatus(msg, isError, withRetry) {
     const el = document.getElementById("bm-status");
     if (!el) return;
     if (!msg) {
       el.style.display = "none";
-      el.textContent = "";
+      el.innerHTML = "";
+      el.className = "";
       return;
     }
     el.style.display = "block";
     el.className = isError ? "bm-error" : "bm-loading";
     el.textContent = msg;
+    if (withRetry && isError) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "bm-btn bm-btn-ghost";
+      btn.style.marginLeft = "0.75rem";
+      btn.textContent = "Tentar novamente";
+      btn.addEventListener("click", function () {
+        load();
+      });
+      el.appendChild(btn);
+    }
+  }
+
+  function setLoadingSkeleton(on) {
+    const main = document.getElementById("bm-main");
+    if (!main) return;
+    main.classList.toggle("is-loading", !!on);
+  }
+
+  function focusMain() {
+    const main = document.getElementById("bm-main");
+    if (!main) return;
+    if (!main.hasAttribute("tabindex")) main.setAttribute("tabindex", "-1");
+    try {
+      main.focus({ preventScroll: true });
+    } catch (e) {
+      main.focus();
+    }
   }
 
   function showView(id) {
@@ -68,29 +101,30 @@
 
     if (id === "evidence") {
       if (title) title.textContent = "Evidence Intelligence";
-      if (lede) lede.textContent = "Como sabemos disso — sustentação da recomendação.";
+      if (lede) lede.textContent = "Por que podemos confiar nesta recomendação.";
       if (navDec) navDec.hidden = false;
       if (navEv) navEv.hidden = false;
       history.replaceState(null, "", "#evidence");
     } else if (id === "decision") {
-      if (title) title.textContent = "Executive Decision";
-      if (lede) lede.textContent = "Conversa visual — problema, evidência, custo, caminho e primeiro passo.";
+      if (title) title.textContent = "Decision Experience";
+      if (lede) lede.textContent = "O que fazer — impacto, caminho e primeiro passo.";
       if (navDec) navDec.hidden = false;
       if (navEv) navEv.hidden = false;
       history.replaceState(null, "", "#decision");
     } else {
       if (title) title.textContent = "Abertura executiva";
-      if (lede) lede.textContent = "Primeiros 30 segundos — estado, indicadores e uma decisão.";
+      if (lede) lede.textContent = "Estado, indicadores e uma decisão.";
       if (navDec) navDec.hidden = true;
       if (navEv) navEv.hidden = true;
       history.replaceState(null, "", "#first");
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
+    focusMain();
   }
 
   function openEvidenceIntelligence() {
     if (!lastPayload || !lastPayload.evidence_intelligence || !EI) {
-      setStatus("Evidence Intelligence indisponível neste payload.", true);
+      setStatus("Não há evidência suficiente para esta leitura.", true, true);
       return;
     }
     EI.render(document.getElementById("bm-evidence-intelligence"), lastPayload.evidence_intelligence, {
@@ -103,7 +137,7 @@
 
   function openDecisionExperience() {
     if (!lastPayload || !lastPayload.decision_experience || !DX) {
-      setStatus("Decision Experience indisponível neste payload.", true);
+      setStatus("Não foi possível abrir esta decisão.", true, true);
       return;
     }
     DX.render(
@@ -121,7 +155,7 @@
     lastPayload = payload;
     const fx = payload.first_experience;
     if (!fx || !FX) {
-      setStatus("Primeira experiência indisponível neste payload.", true);
+      setStatus("Dados insuficientes para esta análise.", true, true);
       return;
     }
     FX.render(document.getElementById("bm-first-experience"), fx, openDecisionExperience);
@@ -141,15 +175,21 @@
       return;
     }
     setStatus("Preparando leitura executiva…");
+    setLoadingSkeleton(true);
     try {
       const payload = await fetchJson("/api/executive/command-center", filterOpts());
       renderAll(payload);
       setStatus("");
     } catch (err) {
-      setStatus(
-        "Não foi possível carregar a abertura executiva. Verifique autenticação e ENABLE_EXECUTIVE_UI.",
-        true
-      );
+      const msg =
+        err && err.message === "forbidden"
+          ? "Você não tem permissão para esta análise."
+          : err && err.message === "session"
+            ? "Sessão expirada. Faça login novamente."
+            : "Não foi possível carregar esta análise.";
+      setStatus(msg, true, err && err.message !== "session");
+    } finally {
+      setLoadingSkeleton(false);
     }
   }
 
@@ -187,6 +227,14 @@
     if (e.key !== "Escape") return;
     const hash = (location.hash || "").replace("#", "");
     if (hash === "evidence") openDecisionExperience();
+    else if (hash === "decision") showView("first");
+    else showView("first");
+  });
+
+  window.addEventListener("hashchange", function () {
+    const hash = (location.hash || "").replace("#", "");
+    if (hash === "evidence") openEvidenceIntelligence();
+    else if (hash === "decision") openDecisionExperience();
     else showView("first");
   });
 
