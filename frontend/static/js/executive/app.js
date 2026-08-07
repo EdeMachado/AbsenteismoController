@@ -7,6 +7,7 @@
 
   const CC = window.BioMedCommandCenter;
   const Charts = window.BioMedExecutiveCharts;
+  const Analytics = window.BioMedExecutiveAnalytics;
 
   let chartHandles = [];
   let lastPayload = null;
@@ -68,6 +69,10 @@
   }
 
   function showModule(id) {
+    if (id === "presentation") {
+      window.location.href = "/executive/presentation";
+      return;
+    }
     document.querySelectorAll(".bm-module").forEach(function (el) {
       el.classList.toggle("is-visible", el.id === id || el.dataset.module === id);
     });
@@ -118,6 +123,22 @@
     chartHandles.push(
       Charts.renderOrEmpty("wrap-sectors-mod", "chart-sectors-mod", setores, function (c, s) {
         return Charts.barChart(c, s, Charts.palette.accent);
+      })
+    );
+    const custoEvo = findChart(charts, "custo_evolucao");
+    const custoSetor = findChart(charts, "custo_setor");
+    const custoCid = findChart(charts, "custo_cid");
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-custo-evo", "chart-custo-evo", custoEvo, Charts.lineChart)
+    );
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-custo-setor", "chart-custo-setor", custoSetor, function (c, s) {
+        return Charts.barChart(c, s, Charts.palette.accent);
+      })
+    );
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-custo-cid", "chart-custo-cid", custoCid, function (c, s) {
+        return Charts.barChart(c, s, Charts.palette.brand);
       })
     );
     chartHandles = chartHandles.filter(Boolean);
@@ -181,6 +202,28 @@
     CC.renderRoi(document.getElementById("bm-roi"), payload.roi);
     renderCharts(payload.charts);
 
+    if (Analytics) {
+      Analytics.renderCatalog(
+        document.getElementById("bm-analytics-catalog"),
+        payload.analytics_catalog,
+        openAnalyze
+      );
+      Analytics.renderRecurrence(
+        document.getElementById("bm-recorrencia"),
+        payload.recorrencia_agregada
+      );
+      Analytics.renderCost(
+        document.getElementById("bm-cost-block"),
+        payload.custo,
+        payload.condicionantes_financeiras
+      );
+      Analytics.renderQuestions(
+        document.getElementById("bm-questions"),
+        payload.decision_questions,
+        askQuestion
+      );
+    }
+
     const methodBody = document.getElementById("bm-method-body");
     if (methodBody) {
       const how = (payload.methodology && payload.methodology.how) || [];
@@ -191,6 +234,43 @@
 
     const hash = (location.hash || "#command").replace("#", "") || "command";
     showModule(hash);
+  }
+
+  function openAnalyze(analysisId) {
+    const modal = document.getElementById("bm-analyze-modal");
+    const body = document.getElementById("bm-analyze-body");
+    const title = document.getElementById("bm-analyze-title");
+    if (title) title.textContent = "Analisar — " + analysisId;
+    if (body) body.innerHTML = "<p class='bm-loading'>Gerando leitura…</p>";
+    modal.classList.add("is-open");
+    fetchJson("/api/executive/analyze/" + encodeURIComponent(analysisId), filterOpts())
+      .then(function (data) {
+        if (Analytics) Analytics.renderAnalyze(body, data);
+      })
+      .catch(function () {
+        if (body) body.innerHTML = "<p class='bm-error'>Falha ao analisar.</p>";
+      });
+  }
+
+  function askQuestion(qid) {
+    const box = document.getElementById("bm-question-answer");
+    if (!box) return;
+    box.hidden = false;
+    box.innerHTML = "<p class='bm-loading'>Consultando…</p>";
+    fetchJson("/api/executive/questions/" + encodeURIComponent(qid), filterOpts())
+      .then(function (data) {
+        box.innerHTML =
+          "<h3 class='bm-section-title'>" +
+          (data.label || qid) +
+          "</h3><p class='bm-lede'>" +
+          (data.answer || "") +
+          "</p><p class='bm-muted'>Confiança: " +
+          (data.confidence || "—") +
+          " · sem PII</p>";
+      })
+      .catch(function () {
+        box.innerHTML = "<p class='bm-error'>Não foi possível responder.</p>";
+      });
   }
 
   function filterOpts() {
@@ -255,9 +335,23 @@
   document.getElementById("bm-method-modal").addEventListener("click", function (e) {
     if (e.target === this) this.classList.remove("is-open");
   });
+  const analyzeClose = document.getElementById("bm-analyze-close");
+  if (analyzeClose) {
+    analyzeClose.addEventListener("click", function () {
+      document.getElementById("bm-analyze-modal").classList.remove("is-open");
+    });
+  }
+  const analyzeModal = document.getElementById("bm-analyze-modal");
+  if (analyzeModal) {
+    analyzeModal.addEventListener("click", function (e) {
+      if (e.target === this) this.classList.remove("is-open");
+    });
+  }
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
       document.getElementById("bm-method-modal").classList.remove("is-open");
+      const am = document.getElementById("bm-analyze-modal");
+      if (am) am.classList.remove("is-open");
     }
   });
   document.querySelectorAll("[data-goto]").forEach(function (btn) {

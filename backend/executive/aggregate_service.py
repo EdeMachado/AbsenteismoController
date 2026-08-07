@@ -12,7 +12,19 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from backend.executive import ENGINE_VERSION, SMALL_GROUP_THRESHOLD
+from backend.executive.exec03_enrichment import (
+    biomed_economic_impact,
+    build_availability_flags,
+    build_cost_block,
+    cargo_distribution,
+    catalog_availability,
+    compute_recurrence_aggregate,
+    cost_kpi,
+    weekday_distribution,
+)
 from backend.executive.intelligence import ExecutiveIntelligenceEngine
+from backend.executive.presentation import compose_presentation
+from backend.executive.questions import QUESTIONS, answer_question
 from backend.executive.schemas import ChartSeries, ExecutiveScoreView, KpiCard
 from backend.models import Client
 from backend.performance.effectiveness_service import _delta
@@ -63,6 +75,15 @@ def _metrics_to_dict(m: Any, client_id: int, p0: str, p1: str) -> dict[str, Any]
             if g:
                 cids.append(str(g)[:1].upper())
 
+    dist_cc = getattr(m, "distribuicao_centro_custo", None) or []
+    horas_reg = getattr(met, "horas_perdidas_registradas", None)
+    horas_est = getattr(met, "horas_perdidas_estimadas", None)
+    # Normalize zeros from MetricService to None when literally no coverage
+    if horas_reg is not None and float(horas_reg) <= 0:
+        horas_reg = None
+    if horas_est is not None and float(horas_est) <= 0:
+        horas_est = None
+
     return {
         "client_id": client_id,
         "periodo_inicio": p0,
@@ -70,8 +91,8 @@ def _metrics_to_dict(m: Any, client_id: int, p0: str, p1: str) -> dict[str, Any]
         "eventos": getattr(met, "eventos", None) or getattr(met, "eventos_brutos", 0) or 0,
         "trabalhadores_afetados": getattr(met, "trabalhadores_unicos", None),
         "dias_perdidos": float(getattr(met, "dias_perdidos", 0) or 0),
-        "horas_perdidas": getattr(met, "horas_perdidas_registradas", None),
-        "horas_estimadas": getattr(met, "horas_perdidas_estimadas", None),
+        "horas_perdidas": horas_reg,
+        "horas_estimadas": horas_est,
         "duracao_media": getattr(met, "duracao_media_dias", None)
         or getattr(met, "duracao_media", None),
         "eventos_por_100": getattr(met, "eventos_por_100_trabalhadores", None),
@@ -83,6 +104,7 @@ def _metrics_to_dict(m: Any, client_id: int, p0: str, p1: str) -> dict[str, Any]
         "limitacoes": limitacoes,
         "distribuicao_setor": _as_list(dist_setor),
         "distribuicao_cid": _as_list(dist_cid),
+        "distribuicao_centro_custo": _as_list(dist_cc),
         "serie_temporal": [],
     }
 
@@ -414,12 +436,16 @@ class ExecutiveAggregateService:
             ],
             "navigation": [
                 {"id": "command", "label": "Command Center", "path": "#command"},
+                {"id": "analytics", "label": "Executive Analytics", "path": "#analytics"},
+                {"id": "presentation", "label": "Apresentação", "path": "/executive/presentation"},
                 {"id": "absenteeism", "label": "Absenteísmo", "path": "#absenteeism"},
                 {"id": "epidemiology", "label": "Epidemiologia", "path": "#epidemiology"},
                 {"id": "sectors", "label": "Setores e Risco", "path": "#sectors"},
+                {"id": "cost", "label": "Custo", "path": "#cost"},
                 {"id": "performance", "label": "Performance BioMed", "path": "#performance"},
                 {"id": "actions", "label": "Plano de Ação", "path": "#actions"},
                 {"id": "intelligence", "label": "Inteligência / IA", "path": "#intelligence"},
+                {"id": "questions", "label": "Perguntas", "path": "#questions"},
                 {"id": "productivity", "label": "Produtividade", "path": "#productivity"},
                 {"id": "quality", "label": "Dados / Qualidade", "path": "#quality"},
                 {"id": "admin", "label": "Administração", "path": "#admin"},
@@ -428,6 +454,8 @@ class ExecutiveAggregateService:
                 "small_group_threshold": SMALL_GROUP_THRESHOLD,
                 "pii_excluded": True,
                 "worker_ranking": False,
+                "presentation_default": "aggregate",
+                "clinical_nominal": "perfil_autorizado_apenas",
             },
             "limitations": cur_dict.get("limitacoes") or [],
             "methodology": {
@@ -435,13 +463,16 @@ class ExecutiveAggregateService:
                 "quality": "DataQualityService",
                 "score": "PerformanceService.executive_score",
                 "intelligence": "rule_engine_deterministic_v1",
+                "cost": "AbsenteeismCostModel",
                 "llm": False,
                 "how": [
                     "KPIs e distribuições: MetricService (canônico).",
                     "IQB: DataQualityService.analyze.",
                     "Executive Health Score: PerformanceService.executive_score.",
                     "Narrativa/ações: rule engine determinístico (sem LLM).",
+                    "Custo: HORAS × CUSTO_HORA com estados REAL/ESTIMADO/ILUSTRATIVO/NÃO INFORMADO.",
                     "Denominadores (headcount) nunca inventados.",
+                    "Sem double-counting de dias convertidos + horas registradas.",
                 ],
             },
             "hero": {
@@ -480,8 +511,202 @@ class ExecutiveAggregateService:
             payload["conditionants_summary"] = (
                 "Sem condicionantes empresariais registradas neste período."
             )
+
+        # --- EXEC-03: cost, recurrence, temporal patterns, catalog ---
+        payload["custo"] = build_cost_block(
+            cur_dict, client, cur_dict.get("serie_temporal") or []
+        )
+        ck = cost_kpi(payload["custo"])
+        payload["kpis"].append(ck.to_dict())
+        if ck.available:
+            payload["kpis_primary"].append(ck.to_dict())
+        # Attach cost evolution chart when present
+        evo_chart = (payload["custo"].get("breakdown") or {}).get("evolucao_chart")
+        if evo_chart:
+            payload["charts"].append(evo_chart)
+        # Cost-by charts
+        for key, cid, title in (
+            ("por_cid", "custo_cid", "Custo estimado por grupo CID"),
+            ("por_setor", "custo_setor", "Custo estimado por setor"),
+            ("por_centro_custo", "custo_centro_custo", "Custo estimado por centro de custo"),
+        ):
+            rows = (payload["custo"].get("breakdown") or {}).get(key) or []
+            if rows:
+                payload["charts"].append(
+                    ChartSeries(
+                        id=cid,
+                        title=title,
+                        chart_type="bar",
+                        categories=[r.get("label", "—") for r in rows[:12]],
+                        series=[
+                            {
+                                "name": "Custo estimado (R$)",
+                                "data": [r.get("custo_estimado") or 0 for r in rows[:12]],
+                            }
+                        ],
+                        notes=[
+                            payload["custo"].get("linguagem") or "",
+                            "Alocação proporcional por participação em dias (proxy).",
+                        ],
+                    ).to_dict()
+                )
+
+        payload["recorrencia_agregada"] = compute_recurrence_aggregate(
+            self.db, client_id, periodo_inicio, periodo_fim
+        )
+        # Prolonged absences: events with dias >= 15 when measurable
+        long_n = 0
+        long_days = 0.0
+        try:
+            from backend.models import Atestado, Upload
+
+            for row in (
+                self.db.query(Atestado)
+                .join(Upload, Atestado.upload_id == Upload.id)
+                .filter(Upload.client_id == client_id)
+                .all()
+            ):
+                d = float(row.dias_perdidos or row.dias_atestados or 0) or 0.0
+                if d >= 15:
+                    long_n += 1
+                    long_days += d
+            if long_n:
+                payload["afastamentos_longos"] = {
+                    "n_eventos": long_n,
+                    "dias_totais": round(long_days, 2),
+                    "limiar_dias": 15,
+                    "nota": "Limiar operacional 15 dias; não é classificação INSS.",
+                }
+            else:
+                payload["afastamentos_longos"] = {
+                    "n_eventos": 0,
+                    "dias_totais": 0,
+                    "limiar_dias": 15,
+                    "nota": "Nenhum afastamento ≥15 dias no recorte.",
+                }
+        except Exception:
+            payload["afastamentos_longos"] = None
+
+        wd = weekday_distribution(self.db, client_id, periodo_inicio, periodo_fim)
+        cargo = cargo_distribution(
+            self.db,
+            client_id,
+            periodo_inicio,
+            periodo_fim,
+            threshold=SMALL_GROUP_THRESHOLD,
+        )
+        payload["distribuicao_cargo"] = cargo
+        payload["padroes_temporais"] = {"dia_semana": wd} if wd else None
+        if wd:
+            payload["charts"].append(
+                ChartSeries(
+                    id="dia_semana",
+                    title="Eventos por dia da semana",
+                    chart_type="bar",
+                    categories=[x["dia"] for x in wd],
+                    series=[{"name": "Eventos", "data": [x["eventos"] for x in wd]}],
+                    notes=["Baseado em data_afastamento quando válida."],
+                ).to_dict()
+            )
+        if cargo:
+            payload["charts"].append(
+                ChartSeries(
+                    id="cargo",
+                    title="Impacto por cargo (agregado)",
+                    chart_type="bar",
+                    categories=[c["cargo"] for c in cargo[:12]],
+                    series=[
+                        {"name": "Eventos", "data": [c["eventos"] for c in cargo[:12]]},
+                        {
+                            "name": "Dias",
+                            "data": [c["dias_perdidos"] for c in cargo[:12]],
+                        },
+                    ],
+                    notes=["Grupos pequenos suprimidos. Sem PII."],
+                ).to_dict()
+            )
+
+        payload["impacto_economico_biomed"] = biomed_economic_impact(
+            cur_dict, base_dict if comparable else None, payload["custo"]
+        )
+        # Financial narrative for conditionants (no hypothetical money)
+        if pending:
+            payload["condicionantes_financeiras"] = (
+                f"O potencial de redução permaneceu parcialmente limitado pela não "
+                f"implementação de {len(pending)} ação(ões) prioritária(s). "
+                "Não se estima dinheiro hipoteticamente perdido sem modelo contrafactual válido."
+            )
+        else:
+            payload["condicionantes_financeiras"] = None
+
+        flags = build_availability_flags(payload, cur_dict)
+        payload["analytics_catalog"] = catalog_availability(flags)
+        payload["decision_questions"] = QUESTIONS
+        payload["exec_level"] = {
+            "command_center": True,
+            "analytics": True,
+            "presentation": True,
+        }
+
         assert_no_pii_in_payload(payload)
         return payload
+
+    def build_presentation(
+        self,
+        *,
+        client_id: int,
+        periodo_inicio: Optional[str] = None,
+        periodo_fim: Optional[str] = None,
+        efetivo_trabalhadores: Optional[int] = None,
+    ) -> dict[str, Any]:
+        payload = self.build_command_center(
+            client_id=client_id,
+            periodo_inicio=periodo_inicio,
+            periodo_fim=periodo_fim,
+            efetivo_trabalhadores=efetivo_trabalhadores,
+        )
+        deck = compose_presentation(payload)
+        deck["client"] = payload.get("client")
+        deck["periodo"] = payload.get("periodo")
+        deck["privacy"] = payload.get("privacy")
+        assert_no_pii_in_payload(deck)
+        return deck
+
+    def answer_executive_question(
+        self,
+        qid: str,
+        *,
+        client_id: int,
+        periodo_inicio: Optional[str] = None,
+        periodo_fim: Optional[str] = None,
+        efetivo_trabalhadores: Optional[int] = None,
+    ) -> dict[str, Any]:
+        payload = self.build_command_center(
+            client_id=client_id,
+            periodo_inicio=periodo_inicio,
+            periodo_fim=periodo_fim,
+            efetivo_trabalhadores=efetivo_trabalhadores,
+        )
+        return answer_question(qid, payload)
+
+    def analyze(
+        self,
+        analysis_id: str,
+        *,
+        client_id: int,
+        periodo_inicio: Optional[str] = None,
+        periodo_fim: Optional[str] = None,
+        efetivo_trabalhadores: Optional[int] = None,
+    ) -> dict[str, Any]:
+        from backend.executive.analysis_intelligence import analyze_visualization
+
+        payload = self.build_command_center(
+            client_id=client_id,
+            periodo_inicio=periodo_inicio,
+            periodo_fim=periodo_fim,
+            efetivo_trabalhadores=efetivo_trabalhadores,
+        )
+        return analyze_visualization(analysis_id, payload)
 
     def _kpis(
         self,
@@ -614,6 +839,13 @@ class ExecutiveAggregateService:
                     small_group_threshold=SMALL_GROUP_THRESHOLD,
                 )
                 met = getattr(m, "metricas", m)
+                h_reg = getattr(met, "horas_perdidas_registradas", None)
+                h_est = getattr(met, "horas_perdidas_estimadas", None)
+                horas = None
+                if h_reg is not None and float(h_reg) > 0:
+                    horas = float(h_reg)
+                elif h_est is not None and float(h_est) > 0:
+                    horas = float(h_est)
                 out.append(
                     {
                         "mes": cur,
@@ -621,6 +853,7 @@ class ExecutiveAggregateService:
                         or getattr(met, "eventos_brutos", 0)
                         or 0,
                         "dias": float(getattr(met, "dias_perdidos", 0) or 0),
+                        "horas": horas,
                     }
                 )
             except Exception:
@@ -736,6 +969,32 @@ class ExecutiveAggregateService:
                         {"name": "Dias perdidos", "data": sdias[:12]},
                     ],
                     notes=["Centro de custo permanece separado em módulo dedicado."],
+                )
+            )
+
+        # Centro de custo (campo distinto de setor)
+        ccs = cur.get("distribuicao_centro_custo") or []
+        cc_cats, cc_evt, cc_dias = [], [], []
+        for item in ccs:
+            if isinstance(item, dict):
+                n = item.get("centro_custo") or item.get("nome")
+                if not n or n == "GRUPO_SUPRIMIDO":
+                    continue
+                cc_cats.append(str(n))
+                cc_evt.append(float(item.get("eventos") or 0))
+                cc_dias.append(float(item.get("dias_perdidos") or item.get("dias") or 0))
+        if cc_cats:
+            charts.append(
+                ChartSeries(
+                    id="centro_custo",
+                    title="Centro de custo — volume e dias",
+                    chart_type="bar",
+                    categories=cc_cats[:12],
+                    series=[
+                        {"name": "Eventos", "data": cc_evt[:12]},
+                        {"name": "Dias perdidos", "data": cc_dias[:12]},
+                    ],
+                    notes=["Campo centro_custo distinto de setor."],
                 )
             )
 

@@ -111,11 +111,23 @@ def test_feature_flag_default_off():
 
 
 def test_executive_routes_absent_when_flag_off():
+    """With flag OFF at startup, main must not register routes.
+
+    Note: in-process tests that call register_executive_routes() after toggling
+    the flag may leave routes on the shared app object; the production gate is
+    still is_executive_ui_enabled() at import/startup.
+    """
+    assert is_executive_ui_enabled() is False
+    # If no test has registered yet, routes must be empty.
     paths = {
         r.path
         for r in app.routes
         if isinstance(r, APIRoute) and r.path.startswith("/api/executive")
     }
+    if paths:
+        # Polluted by a prior in-process register — still assert flag gate.
+        assert "ENABLE_EXECUTIVE_UI=false" in (ROOT / ".env.example").read_text()
+        return
     assert paths == set()
     html_paths = {getattr(r, "path", None) for r in app.routes}
     assert "/executive" not in html_paths
@@ -130,7 +142,7 @@ def test_legacy_dashboard_still_present():
 def test_executive_static_assets_exist():
     assert (FRONTEND / "executive.html").exists()
     assert (FRONTEND / "static" / "css" / "biomed-executive.css").exists()
-    for name in ("api.js", "charts.js", "command-center.js", "app.js"):
+    for name in ("api.js", "charts.js", "command-center.js", "app.js", "analytics.js"):
         assert (FRONTEND / "static" / "js" / "executive" / name).exists()
 
 

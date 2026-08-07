@@ -121,6 +121,58 @@
         </div>
       </section>
 
+      <section id="analytics" class="bm-module" data-module="analytics" aria-label="Executive Analytics">
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Executive Analytics</h2>
+            <p class="bm-section-sub">Profundidade: quem · o quê · quando · onde · quanto · e agora — só com campos disponíveis</p>
+          </div>
+          <div id="bm-analytics-catalog" class="bm-analytics-grid"></div>
+        </div>
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Recorrência (agregada)</h2>
+            <p class="bm-section-sub">Sem ranking nominal — visão executiva</p>
+          </div>
+          <div id="bm-recorrencia"></div>
+        </div>
+      </section>
+
+      <section id="cost" class="bm-module" data-module="cost" aria-label="Custo do absenteísmo">
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Custo do absenteísmo</h2>
+            <p class="bm-section-sub">Impacto laboral estimado — premissa explícita</p>
+          </div>
+          <div id="bm-cost-block"></div>
+          <div class="bm-grid-2" style="margin-top:1rem">
+            <article class="bm-card">
+              <h3 class="bm-section-title">Evolução do custo</h3>
+              <div class="bm-chart" id="wrap-custo-evo"><canvas id="chart-custo-evo"></canvas></div>
+            </article>
+            <article class="bm-card">
+              <h3 class="bm-section-title">Custo por setor</h3>
+              <div class="bm-chart" id="wrap-custo-setor"><canvas id="chart-custo-setor"></canvas></div>
+            </article>
+          </div>
+          <article class="bm-card" style="margin-top:1rem">
+            <h3 class="bm-section-title">Custo por CID</h3>
+            <div class="bm-chart" id="wrap-custo-cid"><canvas id="chart-custo-cid"></canvas></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="questions" class="bm-module" data-module="questions" aria-label="Perguntas executivas">
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Perguntas executivas</h2>
+            <p class="bm-section-sub">Atalhos de decisão — respostas determinísticas</p>
+          </div>
+          <div id="bm-questions" class="bm-questions"></div>
+          <article class="bm-card" style="margin-top:1rem" id="bm-question-answer" hidden></article>
+        </div>
+      </section>
+
       <section id="absenteeism" class="bm-module" data-module="absenteeism" aria-label="Absenteísmo">
         <div class="bm-section">
           <h2 class="bm-section-title">Absenteísmo</h2>
@@ -207,6 +259,14 @@
     </main>
   </div>
 
+  <div class="bm-modal" id="bm-analyze-modal" role="dialog" aria-modal="true" aria-labelledby="bm-analyze-title">
+    <div class="bm-modal__panel bm-analyze-panel">
+      <h2 class="bm-section-title" id="bm-analyze-title">Analisar</h2>
+      <div id="bm-analyze-body" class="bm-muted"></div>
+      <p style="margin-top:1rem"><button type="button" class="bm-btn" id="bm-analyze-close">Fechar</button></p>
+    </div>
+  </div>
+
   <div class="bm-modal" id="bm-method-modal" role="dialog" aria-modal="true" aria-labelledby="bm-method-title">
     <div class="bm-modal__panel">
       <h2 class="bm-section-title" id="bm-method-title">Como calculamos?</h2>
@@ -218,6 +278,7 @@
   <script src="/static/js/executive/api.js"></script>
   <script src="/static/js/executive/charts.js"></script>
   <script src="/static/js/executive/command-center.js"></script>
+  <script src="/static/js/executive/analytics.js"></script>
   <script src="/static/js/executive/app.js"></script>
 </body>
 </html>

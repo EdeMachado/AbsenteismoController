@@ -123,7 +123,9 @@ def test_kpi_hierarchy_primary_secondary(db_session):
     )
     prim = {k["id"] for k in payload["kpis_primary"]}
     sec = {k["id"] for k in payload["kpis_secondary"]}
-    assert prim == {"dias", "horas", "eventos", "trabalhadores"}
+    # Core EXEC-02 primaries; EXEC-03 may add "custo" when hourly assumption is available.
+    assert {"dias", "horas", "eventos", "trabalhadores"}.issubset(prim)
+    assert prim <= {"dias", "horas", "eventos", "trabalhadores", "custo"}
     assert "iqb" in sec
     assert "freq100" in sec
     assert "effectiveness" not in prim
