@@ -158,6 +158,27 @@ body.bm-plat-legacy .apresentacao-header {
   background: linear-gradient(120deg, #12324a 0%, #1a4566 55%, #2a6b5a 100%) !important;
   background-image: linear-gradient(120deg, #12324a 0%, #1a4566 55%, #2a6b5a 100%) !important;
 }
+/* Full-bleed immersive: hide chrome that leaks white admin margins */
+.bm-plat-column:has(.apresentacao-container),
+body.bm-plat-legacy:has(.apresentacao-container) .bm-plat-column {
+  background: #0f2a3d !important;
+}
+.bm-plat-column:has(.apresentacao-container) .bm-plat-top,
+.bm-plat-column:has(.apresentacao-container) .bm-plat-crumb,
+.bm-plat-column:has(.apresentacao-container) .bm-plat-foot {
+  display: none !important;
+}
+body.bm-plat-legacy:has(.apresentacao-container) .apresentacao-container,
+.bm-plat-main:has(.apresentacao-container) .apresentacao-container {
+  min-height: 100dvh !important;
+  height: 100dvh !important;
+}
+@supports not (height: 100dvh) {
+  body.bm-plat-legacy:has(.apresentacao-container) .apresentacao-container {
+    min-height: 100vh !important;
+    height: 100vh !important;
+  }
+}
 body.bm-plat-legacy .slide-content,
 body.bm-plat-legacy #slideContent {
   max-width: min(1280px, 100%) !important;
@@ -430,10 +451,26 @@ body.bm-plat-legacy .action-buttons {
   }
 }
 
-/* Button overlap guard */
-body.bm-plat-legacy .btn + .btn,
-body.bm-plat-legacy button.btn + button.btn {
-  margin-left: 0 !important;
+/* Dashboard / analytics empty chart breathing room */
+body.bm-plat-legacy .chart-container h3,
+body.bm-plat-legacy .chart-container .chart-title,
+body.bm-plat-legacy .chart-card h3 {
+  color: var(--bmx-ink, #132033) !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em;
+}
+body.bm-plat-legacy .filters-header h2,
+body.bm-plat-legacy .filters h2,
+body.bm-plat-legacy .analysis-header h2 {
+  color: var(--bmx-brand, #1a4566) !important;
+}
+
+/* Snapshot / KPI decorative blobs — neutralize purple leftovers */
+body.bm-plat-legacy .snapshot-card::before,
+body.bm-plat-legacy .snapshot-card::after,
+body.bm-plat-legacy .stat-card::before {
+  background: rgba(26, 69, 102, 0.08) !important;
+  background-image: none !important;
 }
 body.bm-plat-legacy .header-actions > *,
 body.bm-plat-legacy .filter-actions > *,

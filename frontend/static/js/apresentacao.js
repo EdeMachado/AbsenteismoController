@@ -203,7 +203,7 @@ async function carregarApresentacao(forceClientId = null) {
             const a = document.getElementById('slideAtual');
             const t = document.getElementById('totalSlides');
             if (a) a.textContent = '—';
-            if (t) t.textContent = '0';
+            if (t) t.textContent = '—';
             const root = document.querySelector('.apresentacao-container');
             if (root) root.classList.add('is-empty');
             mostrarErro('Nenhum dado disponível para apresentação. Verifique se há dados cadastrados para este cliente.');
