@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BioMed — Ficha Digital do Colaborador (preview)</title>
+  <title>BioMed — Questionário do Colaborador (preview)</title>
   <link rel="stylesheet" href="/static/css/biomed-ficha-digital.css" />
 </head>
 <body class="bm-fd-body">
   <header class="bm-fd-chrome">
-    <strong>BioMed · Ficha Digital</strong>
+    <strong>BioMed · Questionário digital</strong>
     <div class="bm-fd-tabs" role="tablist">
-      <button type="button" class="bm-fd-tab is-on" data-panel="panel-send">Enviar ficha</button>
+      <button type="button" class="bm-fd-tab is-on" data-panel="panel-send">Solicitar preenchimento</button>
       <button type="button" class="bm-fd-tab" data-panel="panel-employee">Colaborador</button>
       <button type="button" class="bm-fd-tab" data-panel="panel-analysis">Análise</button>
       <button type="button" class="bm-fd-tab" data-panel="panel-alerts">Alertas</button>
-      <button type="button" class="bm-fd-tab" data-panel="panel-timeline">Timeline</button>
+      <button type="button" class="bm-fd-tab" data-panel="panel-timeline">Histórico</button>
       <button type="button" class="bm-fd-tab" data-panel="panel-tracking">Acompanhamento</button>
     </div>
     <div class="bm-fd-bell-wrap" title="Central de alertas">
@@ -29,31 +29,31 @@
 
     <section class="bm-fd-panel is-on" id="panel-send">
       <article class="bm-fd-card">
-        <h2>Enviar ficha</h2>
-        <p class="bm-fd-muted">RH ou Médico seleciona colaborador, ficha e canal. Link seguro com token opaco.</p>
+        <h2>Solicitar preenchimento</h2>
+        <p class="bm-fd-muted">RH ou Médico seleciona o colaborador, o questionário e o canal. O acesso é individual e temporário.</p>
         <div class="bm-fd-field">
           <label for="fd-collab">Colaborador</label>
           <select id="fd-collab"></select>
         </div>
         <div class="bm-fd-field">
-          <label for="fd-template">Ficha</label>
+          <label for="fd-template">Questionário</label>
           <select id="fd-template"></select>
         </div>
         <div class="bm-fd-field">
           <label>Canal</label>
-          <label style="font-weight:500;margin-right:1rem"><input type="radio" name="fd-channel" value="whatsapp" checked /> WhatsApp (modo link)</label>
+          <label style="font-weight:500;margin-right:1rem"><input type="radio" name="fd-channel" value="whatsapp" checked /> WhatsApp</label>
           <label style="font-weight:500"><input type="radio" name="fd-channel" value="email" /> E-mail</label>
         </div>
         <div class="bm-fd-row">
-          <button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-send">Gerar link e enviar</button>
-          <button type="button" class="bm-fd-btn bm-fd-btn-ghost" id="fd-reset">Reset demo</button>
+          <button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-send">Solicitar preenchimento</button>
+          <button type="button" class="bm-fd-btn bm-fd-btn-ghost" id="fd-reset">Reiniciar demonstração</button>
         </div>
       </article>
       <article class="bm-fd-card" id="fd-channel-out"></article>
     </section>
 
     <section class="bm-fd-panel" id="panel-employee">
-      <div id="fd-employee"><p class="bm-fd-muted">Envie uma ficha e use “Simular colaborador”.</p></div>
+      <div id="fd-employee"><p class="bm-fd-muted">Solicite o preenchimento e use “Abrir como colaborador”.</p></div>
     </section>
 
     <section class="bm-fd-panel" id="panel-analysis">
@@ -63,14 +63,14 @@
     <section class="bm-fd-panel" id="panel-alerts">
       <article class="bm-fd-card">
         <h2>Central de alertas</h2>
-        <p class="bm-fd-muted">Integração ao sininho — sem conteúdo clínico no dropdown.</p>
+        <p class="bm-fd-muted">Alertas no sininho — sem conteúdo clínico.</p>
         <div id="fd-alerts"></div>
       </article>
     </section>
 
     <section class="bm-fd-panel" id="panel-timeline">
       <article class="bm-fd-card">
-        <h2>Timeline</h2>
+        <h2>Histórico</h2>
         <ul class="bm-fd-timeline" id="fd-timeline"></ul>
       </article>
     </section>
@@ -82,7 +82,7 @@
       </article>
     </section>
 
-    <p class="bm-fd-note">Preview RC-1.2A · store in-memory · sem migration · sem produção · tenant isolation demonstrada por chave de preview.</p>
+    <p class="bm-fd-note">Preview · demonstração · sem produção.</p>
   </main>
 
   <script src="/static/js/ficha/digital-form.js"></script>

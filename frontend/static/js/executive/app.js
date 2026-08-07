@@ -248,7 +248,7 @@
         if (Analytics) Analytics.renderAnalyze(body, data);
       })
       .catch(function () {
-        if (body) body.innerHTML = "<p class='bm-error'>Falha ao analisar.</p>";
+        if (body) body.innerHTML = "<p class='bm-error'>Não foi possível analisar esta visualização. Tente novamente. Se o problema persistir, entre em contato com o administrador.</p>";
       });
   }
 
@@ -302,14 +302,14 @@
       window.location.href = "/login";
       return;
     }
-    setStatus("Carregando painel executivo…");
+    setStatus("Preparando leitura executiva…");
     try {
       const payload = await fetchJson("/api/executive/command-center", filterOpts());
       renderAll(payload);
       setStatus("");
     } catch (err) {
       setStatus(
-        "Não foi possível carregar o Command Center. Verifique autenticação, tenant e flag ENABLE_EXECUTIVE_UI.",
+        "Não foi possível concluir esta ação. Tente novamente. Se o problema persistir, entre em contato com o administrador.",
         true
       );
     }

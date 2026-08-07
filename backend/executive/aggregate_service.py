@@ -447,7 +447,7 @@ class ExecutiveAggregateService:
                 {"id": "cost", "label": "Custo", "path": "#cost"},
                 {"id": "performance", "label": "Performance BioMed", "path": "#performance"},
                 {"id": "actions", "label": "Plano de Ação", "path": "#actions"},
-                {"id": "intelligence", "label": "Inteligência / IA", "path": "#intelligence"},
+                {"id": "intelligence", "label": "Inteligência", "path": "#intelligence"},
                 {"id": "questions", "label": "Perguntas", "path": "#questions"},
                 {"id": "productivity", "label": "Produtividade", "path": "#productivity"},
                 {"id": "quality", "label": "Dados / Qualidade", "path": "#quality"},
@@ -462,20 +462,20 @@ class ExecutiveAggregateService:
             },
             "limitations": cur_dict.get("limitacoes") or [],
             "methodology": {
-                "metrics": "MetricService",
-                "quality": "DataQualityService",
-                "score": "PerformanceService.executive_score",
-                "intelligence": "rule_engine_deterministic_v1",
-                "cost": "AbsenteeismCostModel",
+                "metrics": "Métricas agregadas",
+                "quality": "Qualidade dos dados",
+                "score": "Score executivo de saúde",
+                "intelligence": "Priorização determinística",
+                "cost": "Modelo de custo laboral",
                 "llm": False,
                 "how": [
-                    "KPIs e distribuições: MetricService (canônico).",
-                    "IQB: DataQualityService.analyze.",
-                    "Executive Health Score: PerformanceService.executive_score.",
-                    "Narrativa/ações: rule engine determinístico (sem LLM).",
-                    "Custo: HORAS × CUSTO_HORA com estados REAL/ESTIMADO/ILUSTRATIVO/NÃO INFORMADO.",
-                    "Denominadores (headcount) nunca inventados.",
-                    "Sem double-counting de dias convertidos + horas registradas.",
+                    "Indicadores e distribuições a partir de métricas agregadas do período.",
+                    "Qualidade (IQB) a partir da análise de cobertura e preenchimento.",
+                    "Score executivo de saúde: leitura descritiva do período.",
+                    "Narrativa e ações: priorização determinística — necessária validação humana.",
+                    "Custo: horas × custo/hora com estados REAL/ESTIMADO/ILUSTRATIVO/NÃO INFORMADO.",
+                    "Denominadores (efetivo) nunca inventados.",
+                    "Sem dupla contagem de dias convertidos e horas registradas.",
                 ],
             },
             "hero": {
@@ -508,7 +508,7 @@ class ExecutiveAggregateService:
             )
         elif conds:
             payload["conditionants_summary"] = (
-                "Condicionantes empresariais registradas; sem pendências bloqueantes neste payload."
+                "Condicionantes empresariais registradas; sem pendências bloqueantes neste período."
             )
         else:
             payload["conditionants_summary"] = (

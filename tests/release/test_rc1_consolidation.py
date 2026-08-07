@@ -20,13 +20,13 @@ def test_release_candidate_preview_public():
     assert r.status_code == 200
     body = r.text
     for name in (
-        "Executive Cover",
-        "Executive Opening",
-        "Executive Summary",
-        "Decision Experience",
-        "Evidence Intelligence",
-        "Executive Closing",
-        "Executive Signature",
+        "Capa executiva",
+        "Abertura executiva",
+        "Síntese executiva",
+        "Decisão",
+        "Evidências",
+        "Encerramento",
+        "Assinatura BioMed",
     ):
         assert name in body
     assert "Antes" in body and "Depois" in body

@@ -326,7 +326,7 @@
       ["O que recomendamos", intel.o_que_recomendamos || []],
       ["O que precisa de validação", intel.o_que_precisa_validacao || []],
       ["Limitações", intel.limitacoes || []],
-      ["Confiança", ["Nível: " + (intel.confianca || "—") + " · engine=" + (intel.engine || "rule_engine")]],
+      ["Confiança", ["Nível: " + (intel.confianca || "—")]],
     ];
     el.innerHTML = "";
     sections.forEach(function (sec) {
@@ -339,12 +339,13 @@
       ul.className = "bm-list";
       (sec[1] || []).forEach(function (item) {
         const li = document.createElement("li");
-        li.textContent = typeof item === "string" ? item : JSON.stringify(item);
+        li.textContent =
+          typeof item === "string" ? item : "Informação não disponível em texto.";
         ul.appendChild(li);
       });
       if (!ul.children.length) {
         const li = document.createElement("li");
-        li.textContent = "Sem itens.";
+        li.textContent = "Nenhum item nesta seção.";
         ul.appendChild(li);
       }
       card.appendChild(ul);
@@ -356,7 +357,9 @@
     if (!el) return;
     el.innerHTML =
       '<span class="bm-badge bm-badge-na">' +
-      ((roi && roi.kind) || "ROI_NAO_CALCULAVEL") +
+      (((roi && roi.kind) === "ROI_NAO_CALCULAVEL" || !(roi && roi.kind))
+        ? "ROI não calculável"
+        : String(roi.kind).replace(/_/g, " ")) +
       "</span>" +
       '<p class="bm-muted" style="margin-top:0.75rem"></p>';
     el.querySelector("p").textContent =

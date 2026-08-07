@@ -213,7 +213,7 @@
     } catch (e) {
       status.className = "bm-error";
       status.textContent =
-        "Não foi possível montar a apresentação. Verifique ENABLE_EXECUTIVE_PRESENTATION e autenticação.";
+        "Não foi possível concluir esta ação. Tente novamente. Se o problema persistir, entre em contato com o administrador.";
     }
   }
 

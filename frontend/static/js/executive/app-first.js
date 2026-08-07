@@ -100,14 +100,14 @@
     const navEv = document.getElementById("bm-nav-evidence");
 
     if (id === "evidence") {
-      if (title) title.textContent = "Evidence Intelligence";
+      if (title) title.textContent = "Evidências";
       if (lede) lede.textContent = "Por que podemos confiar nesta recomendação.";
       if (navDec) navDec.hidden = false;
       if (navEv) navEv.hidden = false;
       history.replaceState(null, "", "#evidence");
     } else if (id === "decision") {
-      if (title) title.textContent = "Decision Experience";
-      if (lede) lede.textContent = "O que fazer — impacto, caminho e primeiro passo.";
+      if (title) title.textContent = "Decisão";
+      if (lede) lede.textContent = "O que fazer — impacto, caminho e próximo passo.";
       if (navDec) navDec.hidden = false;
       if (navEv) navEv.hidden = false;
       history.replaceState(null, "", "#decision");

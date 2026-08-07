@@ -173,7 +173,7 @@
       '<button type="button" class="bm-btn bm-btn-ghost" id="bm-dx-back">' +
       esc(dx.cta_back || "Voltar à abertura") +
       "</button>" +
-      '<p class="bm-dx-kicker">BioMed Executive Decision Experience</p>' +
+      '<p class="bm-dx-kicker">BioMed · Decisão</p>' +
       "</header>" +
       // 1 header
       '<section class="bm-dx-block bm-dx-hero-dec">' +
@@ -200,8 +200,8 @@
       "</section>" +
       // 2 evidence
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence</h2>' +
-      '<p class="bm-dx-sub">Como sabemos disso — só evidência visual.</p>' +
+      '<h2 class="bm-fx-section-title">Evidências</h2>' +
+      '<p class="bm-dx-sub">Como sabemos disso — apenas evidência visual.</p>' +
       '<div class="bm-dx-chips">' +
       indHtml +
       "</div>" +
@@ -210,7 +210,7 @@
       "</div></section>" +
       // 3 business impact
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Business Impact</h2>' +
+      '<h2 class="bm-fx-section-title">Impacto para o negócio</h2>' +
       '<div class="bm-dx-impact-grid">' +
       impactCard(bi.cost_today || {}) +
       impactCard(bi.cost_if_nothing || {}) +
@@ -218,29 +218,29 @@
       "</div></section>" +
       // 4 why
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Why</h2>' +
+      '<h2 class="bm-fx-section-title">Por quê</h2>' +
       '<div class="bm-fx-summary__body bm-dx-why">' +
       whyHtml +
       "</div></section>" +
       // 5 recommendations
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">BioMed Recommendation</h2>' +
-      '<p class="bm-dx-sub">No máximo três. Validação humana obrigatória.</p>' +
+      '<h2 class="bm-fx-section-title">Recomendação BioMed</h2>' +
+      '<p class="bm-dx-sub">No máximo três. Necessária validação humana.</p>' +
       '<div class="bm-dx-recs">' +
       recHtml +
       "</div>" +
-      '<p class="bm-dx-six"><strong>Primeiro passo:</strong> ' +
+      '<p class="bm-dx-six"><strong>Próximo passo:</strong> ' +
       esc(six.first_step || "") +
       "</p></section>" +
       // 6 roadmap
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Implementation Roadmap</h2>' +
+      '<h2 class="bm-fx-section-title">Roteiro de implementação</h2>' +
       '<div class="bm-dx-road">' +
       roadHtml +
       "</div></section>" +
       // 7 expected results
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Expected Results</h2>' +
+      '<h2 class="bm-fx-section-title">Resultados esperados</h2>' +
       '<div class="bm-dx-results">' +
       "<div><h3>Financeiro</h3><p>" +
       esc(er.financial || "") +
@@ -256,7 +256,7 @@
       "</p></div></div></section>" +
       // 8 confidence
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence Confidence</h2>' +
+      '<h2 class="bm-fx-section-title">Confiança da evidência</h2>' +
       '<div class="bm-dx-conf">' +
       '<div class="bm-dx-conf__level">' +
       esc(conf.level || "Baixa") +

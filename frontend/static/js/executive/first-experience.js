@@ -128,8 +128,8 @@
       esc(hero.opening_phrase || "") +
       "</p>" +
       "</div></section>" +
-      '<section class="bm-fx-summary" aria-label="Executive Summary">' +
-      '<h2 class="bm-fx-section-title">Executive Summary</h2>' +
+      '<section class="bm-fx-summary" aria-label="Síntese executiva">' +
+      '<h2 class="bm-fx-section-title">Síntese executiva</h2>' +
       '<div class="bm-fx-summary__body">' +
       summaryHtml +
       "</div></section>" +
@@ -138,8 +138,8 @@
       '<div class="bm-fx-kpi-grid">' +
       kpiHtml +
       "</div></section>" +
-      '<section class="bm-fx-decision" aria-label="Executive Decision">' +
-      '<h2 class="bm-fx-section-title">Executive Decision</h2>' +
+      '<section class="bm-fx-decision" aria-label="Decisão executiva">' +
+      '<h2 class="bm-fx-section-title">Decisão executiva</h2>' +
       '<article class="bm-fx-decision__card">' +
       '<div class="bm-fx-decision__pri">' +
       esc(priLabel) +

@@ -29,8 +29,8 @@ STATUSES = (
 FORM_TEMPLATES = [
     {
         "id": "bem-estar-basico",
-        "title": "Ficha de bem-estar (básica)",
-        "orientation": "Responda com sinceridade. Leva poucos minutos.",
+        "title": "Questionário de bem-estar (básico)",
+        "orientation": "Preencha com sinceridade. Leva poucos minutos.",
         "fields": [
             {"id": "sono", "label": "Como tem sido seu sono nas últimas semanas?", "type": "choice", "options": ["Bom", "Regular", "Ruim"]},
             {"id": "dor", "label": "Tem sentido desconforto físico relacionado ao trabalho?", "type": "choice", "options": ["Não", "Às vezes", "Frequentemente"]},
@@ -40,7 +40,7 @@ FORM_TEMPLATES = [
     },
     {
         "id": "retorno-trabalho",
-        "title": "Ficha de retorno ao trabalho",
+        "title": "Questionário de retorno ao trabalho",
         "orientation": "Ajude a equipe a preparar um retorno seguro.",
         "fields": [
             {"id": "pronto", "label": "Sente-se pronto para retomar as atividades?", "type": "choice", "options": ["Sim", "Parcialmente", "Ainda não"]},
@@ -121,7 +121,7 @@ class DigitalFormStore:
     def mark_sent(self, token: str) -> dict[str, Any]:
         inv = self._require(token)
         self._transition(inv, "Enviada")
-        self._alert("Convite enviado", "Uma ficha foi enviada ao colaborador.", "info", token)
+        self._alert("Convite enviado", "Um questionário foi enviado ao colaborador.", "info", token)
         return self._public_invite(inv)
 
     def get_employee_view(self, token: str) -> dict[str, Any]:
@@ -135,7 +135,7 @@ class DigitalFormStore:
             "title": inv["template_title"],
             "orientation": inv["orientation"],
             "privacy": (
-                "Este acesso é individual, temporário e destinado ao preenchimento da ficha. "
+                "Este acesso é individual, temporário e destinado ao preenchimento das informações. "
                 "Não compartilhe o link. Seus dados serão tratados conforme a política de privacidade da empresa."
             ),
             "status": inv["status"],
@@ -163,18 +163,17 @@ class DigitalFormStore:
         inv["consent"] = True
         inv["answers"] = {k: answers.get(k) for k in [f["id"] for f in inv["fields"]]}
         self._transition(inv, "Respondida")
-        self._alert("Nova ficha recebida", "Uma resposta de ficha está disponível para análise.", "media", token)
+        self._alert("Nova resposta recebida", "Há informações disponíveis para análise.", "media", token)
 
         analysis = self._analyze(inv)
         inv["analysis"] = analysis
         self._transition(inv, "Analisada")
         self._transition(inv, "Aguardando validação")
-        self._alert("Nova análise disponível", "Há uma análise sugerida aguardando validação humana.", "media", token)
-        self._alert("Necessita validação", "Uma ficha requer revisão do responsável.", "alta", token)
+        self._alert("Nova análise disponível", "Há uma análise sugerida aguardando validação.", "media", token)
+        self._alert("Necessita validação", "Um questionário requer revisão do responsável.", "alta", token)
         return {
             "status": inv["status"],
-            "message": "Resposta enviada. Obrigado.",
-            # employee never receives clinical analysis payload
+            "message": "Informações recebidas. Obrigado.",
         }
 
     def validate(self, token: str, *, note: str = "") -> dict[str, Any]:
@@ -183,14 +182,14 @@ class DigitalFormStore:
             raise ValueError("Status não permite validação")
         inv["validation_note"] = (note or "")[:200]
         self._transition(inv, "Validada")
-        self._alert("Ficha validada", "A validação humana foi registrada.", "info", token)
+        self._alert("Análise validada", "A validação foi registrada.", "info", token)
         return self._staff_invite(inv)
 
     def cancel(self, token: str) -> dict[str, Any]:
         inv = self._require(token)
         inv["cancelled"] = True
         self._transition(inv, "Cancelada")
-        self._alert("Ficha cancelada", "Um convite de ficha foi cancelado.", "baixa", token)
+        self._alert("Solicitação cancelada", "Uma solicitação de preenchimento foi cancelada.", "baixa", token)
         return self._public_invite(inv)
 
     def list_invites(self) -> list[dict[str, Any]]:
@@ -229,7 +228,7 @@ class DigitalFormStore:
         if inv["channel"] == "whatsapp":
             msg = (
                 "Olá.\n"
-                "A empresa disponibilizou uma ficha para seu preenchimento.\n"
+                "A empresa disponibilizou um questionário para seu preenchimento.\n"
                 "O acesso é individual e possui prazo de validade.\n"
                 f"Acesse:\n{link}\n"
                 "Em caso de dúvidas procure o responsável."
@@ -238,10 +237,10 @@ class DigitalFormStore:
             out["whatsapp_message"] = msg
         else:
             out["email"] = {
-                "subject": "Ficha para preenchimento",
+                "subject": "Questionário para preenchimento",
                 "body": (
                     f"Olá,\n\n"
-                    f"{inv['company_label']} disponibilizou uma ficha para preenchimento.\n"
+                    f"{inv['company_label']} disponibilizou um questionário para preenchimento.\n"
                     f"O acesso é individual e possui prazo de validade.\n\n"
                     f"{link}\n\n"
                     f"Em caso de dúvidas, procure o responsável."
@@ -262,7 +261,7 @@ class DigitalFormStore:
         exp = datetime.fromisoformat(inv["expires_at"])
         if datetime.now(timezone.utc) > exp:
             self._transition(inv, "Expirada")
-            self._alert("Convite expirado", "Um convite de ficha expirou.", "baixa", inv["token"])
+            self._alert("Convite expirado", "Uma solicitação de preenchimento expirou.", "baixa", inv["token"])
 
     def _transition(self, inv: dict[str, Any], status: str) -> None:
         if status not in STATUSES:
@@ -295,36 +294,36 @@ class DigitalFormStore:
             themes.append("Desconforto físico referido")
             critical.append("Campo de desconforto físico")
             priority = "media"
-            suggestions.append("Sugere revisão ergonômica com validação do responsável.")
+            suggestions.append("A análise sugere revisão ergonômica — necessária validação do responsável.")
         if answers.get("carga") in {"Elevada", "Excessiva"}:
             themes.append("Percepção de carga elevada")
             if priority == "baixa":
                 priority = "media"
-            suggestions.append("Possível necessidade de diálogo sobre organização do trabalho.")
+            suggestions.append("Os dados analisados sugerem possível necessidade de diálogo sobre organização do trabalho.")
         if answers.get("sono") == "Ruim":
             themes.append("Sono referido como ruim")
-            suggestions.append("Sugere atenção ao bem-estar — necessária validação humana.")
+            suggestions.append("A análise sugere atenção ao bem-estar — necessária validação.")
         if answers.get("pronto") == "Ainda não":
             themes.append("Retorno ainda não sentido como pleno")
             priority = "alta"
             critical.append("Prontidão para retorno")
-            suggestions.append("Sugere avaliação do plano de retorno antes da liberação plena.")
+            suggestions.append("As evidências apontam necessidade de avaliar o plano de retorno antes da liberação plena.")
         if answers.get("apoio", "").startswith("Sim"):
             themes.append("Pedido de apoio no retorno")
             suggestions.append("Possível adaptação de posto ou jornada — necessária validação.")
 
         if not themes:
             themes.append("Sem temas críticos evidentes nas respostas")
-            suggestions.append("Sugere arquivamento após validação de rotina.")
+            suggestions.append("A análise sugere arquivamento após validação de rotina.")
 
         return {
             "engine": "rule_engine_deterministic_preview",
             "temas_predominantes": themes,
-            "recorrencias": ["Demo: recorrência não calculada sem histórico"],
+            "recorrencias": ["Recorrência não calculada sem histórico."],
             "campos_criticos": critical or ["Nenhum campo crítico automático"],
             "prioridade": priority,
             "sugestoes": suggestions,
-            "disclaimer": "Análise sugestiva. Não é diagnóstico. Necessária validação humana.",
+            "disclaimer": "A análise sugere indícios. Não é diagnóstico. Necessária validação.",
         }
 
     def _public_invite(self, inv: dict[str, Any]) -> dict[str, Any]:

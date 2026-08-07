@@ -113,7 +113,7 @@
   function renderCost(el, custo, condicionantesFin) {
     if (!el) return;
     if (!custo) {
-      el.innerHTML = "<div class='bm-chart-empty'>Modelo de custo indisponível.</div>";
+      el.innerHTML = "<div class='bm-chart-empty'>Impacto financeiro indisponível com as premissas atuais.</div>";
       return;
     }
     const ass = custo.assumption || {};
@@ -182,7 +182,7 @@
     function block(title, body) {
       if (Array.isArray(body)) {
         body = "<ul class='bm-list'>" + body.map(function (x) {
-          if (typeof x === "object") return "<li>" + esc(x.titulo || JSON.stringify(x)) + "</li>";
+          if (typeof x === "object") return "<li>" + esc(x.titulo || "Informação não disponível em texto.") + "</li>";
           return "<li>" + esc(x) + "</li>";
         }).join("") + "</ul>";
       } else {
@@ -204,9 +204,7 @@
       block("Limitações", data.limitacoes) +
       "<p class='bm-muted'>Confiança: <strong>" +
       esc(data.confianca) +
-      "</strong> · " +
-      esc(data.engine) +
-      " · LLM: não</p>";
+      "</strong>. Necessária validação humana.</p>";
   }
 
   global.BioMedExecutiveAnalytics = {

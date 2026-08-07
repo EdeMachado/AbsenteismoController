@@ -26,7 +26,7 @@
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     }).then(function (r) {
       return r.json().then(function (j) {
-        if (!r.ok) throw new Error(j.detail || "Falha");
+        if (!r.ok) throw new Error(j.detail || "Não foi possível concluir esta ação. Tente novamente.");
         return j;
       });
     });
@@ -76,7 +76,7 @@
     })
     .catch(function () {
       root.innerHTML =
-        '<div class="bm-fd-phone"><p>Não foi possível abrir a ficha.</p></div>';
+        '<div class="bm-fd-phone"><p>Não foi possível abrir este questionário. Tente novamente. Se o problema persistir, entre em contato com o administrador.</p></div>';
     });
 
   function renderForm(v) {
@@ -111,7 +111,7 @@
       esc(v.title) +
       "</h2>" +
       fields +
-      '<button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-submit" style="width:100%">Enviar</button>';
+      '<button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-submit" style="width:100%">Concluir</button>';
     document.getElementById("fd-submit").addEventListener("click", function () {
       const answers = {};
       document.querySelectorAll("[data-fid]").forEach(function (el) {
@@ -123,9 +123,9 @@
       }).then(function () {
         root.innerHTML =
           '<div class="bm-fd-phone bm-fd-success">' +
-          "<h2>Enviado</h2>" +
-          "<p>Obrigado. Sua resposta foi registrada.</p>" +
-          '<p class="bm-fd-muted">O responsável dará continuidade com validação humana.</p></div>';
+          "<h2>Informações recebidas</h2>" +
+          "<p>Obrigado. Seu preenchimento foi registrado.</p>" +
+          '<p class="bm-fd-muted">O responsável dará continuidade com a validação.</p></div>';
       });
     });
   }

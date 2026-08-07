@@ -19,15 +19,18 @@ def test_product_audit_preview_public():
     r = client.get("/preview/product-audit")
     assert r.status_code == 200
     body = r.text
-    assert "Executive Cover" in body
-    assert "CEO Opening" in body
-    assert "Decision Experience" in body
-    assert "Evidence Intelligence" in body
-    assert "Executive Closing" in body
-    assert "BioMed Signature" in body or "Executive Signature" in body
+    assert "Capa executiva" in body or "Executive Cover" in body or "bm-audit" in body
+    assert "Abertura executiva" in body or "CEO Opening" in body
+    assert "Decisão" in body
+    assert "Evidências" in body
+    assert "Encerramento" in body
+    assert "Assinatura BioMed" in body or "BioMed Signature" in body or "Executive Signature" in body
     assert "Modo Apresentação" in body
     assert "ILUSTRATIVO" in body or "ilustrativos" in body.lower()
     assert "bm-audit-panel" in body
+    assert "MetricService" not in body
+    assert "rule engine" not in body.lower()
+    assert "dataset" not in body.lower()
 
 
 def test_product_audit_assets_exist():

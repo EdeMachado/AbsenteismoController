@@ -41,7 +41,7 @@ def test_ficha_preview_and_assets():
     client = TestClient(app)
     r = client.get("/preview/ficha-digital")
     assert r.status_code == 200
-    assert "Ficha Digital" in r.text
+    assert "Questionário digital" in r.text or "Solicitar preenchimento" in r.text
     assert (FRONTEND / "static/js/ficha/digital-form.js").exists()
     assert (FRONTEND / "static/js/ficha/employee-form.js").exists()
 
@@ -124,7 +124,7 @@ def test_ficha_full_flow_security_and_ai_language():
 
     alerts = client.get("/api/preview/ficha/alerts").json()["items"]
     titles = " ".join(a["title"] + " " + a["message"] for a in alerts)
-    assert "Nova ficha recebida" in titles
+    assert "Nova resposta recebida" in titles
     assert "Necessita validação" in titles
     assert "CID" not in titles
     assert "diagnóstico" not in titles.lower()
@@ -152,7 +152,7 @@ def test_email_channel_institutional():
     token = created.json()["token"]
     client.post(f"/api/preview/ficha/invites/{token}/send")
     ch = client.get(f"/api/preview/ficha/invites/{token}/channel").json()
-    assert ch["email"]["subject"] == "Ficha para preenchimento"
+    assert ch["email"]["subject"] == "Questionário para preenchimento"
     assert "prazo de validade" in ch["email"]["body"]
     assert "whatsapp_url" not in ch
 
@@ -168,7 +168,7 @@ def test_cancel_and_expire_alerts():
     cancelled = client.post(f"/api/preview/ficha/invites/{token}/cancel")
     assert cancelled.json()["status"] == "Cancelada"
     alerts = client.get("/api/preview/ficha/alerts").json()["items"]
-    assert any(a["title"] == "Ficha cancelada" for a in alerts)
+    assert any(a["title"] == "Solicitação cancelada" for a in alerts)
 
 
 def test_no_pii_in_url_patterns():

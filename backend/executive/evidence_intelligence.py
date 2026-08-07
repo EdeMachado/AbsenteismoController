@@ -116,30 +116,44 @@ def compose_evidence_intelligence(payload: dict[str, Any]) -> dict[str, Any]:
     summary = summary_bits[:3]
 
     # --- 2 Sources (existing methodology + charts — no new analysis) ---
+    def _source_label(raw: str | None, human: str) -> str:
+        """Map legacy technical labels to institutional language (display only)."""
+        tech = {
+            "MetricService": "Métricas agregadas",
+            "DataQualityService": "Qualidade dos dados",
+            "PerformanceService.executive_score": "Score executivo de saúde",
+            "rule_engine_deterministic": "Priorização determinística",
+            "rule_engine_deterministic_v1": "Priorização determinística",
+            "AbsenteeismCostModel": "Modelo de custo laboral",
+            "Executive Health Score": "Score executivo de saúde",
+        }
+        key = (raw or "").strip()
+        return tech.get(key, key or human)
+
     sources: list[dict[str, str]] = [
         {
             "id": "metrics",
-            "label": methodology.get("metrics") or "MetricService",
-            "role": "KPIs e distribuições agregadas do período.",
+            "label": _source_label(methodology.get("metrics"), "Métricas agregadas"),
+            "role": "Indicadores e distribuições agregadas do período.",
         },
         {
             "id": "quality",
-            "label": methodology.get("quality") or "DataQualityService",
+            "label": _source_label(methodology.get("quality"), "Qualidade dos dados"),
             "role": "Índice de qualidade (IQB) e cobertura.",
         },
         {
             "id": "score",
-            "label": "Executive Health Score",
+            "label": _source_label(None, "Score executivo de saúde"),
             "role": "Score descritivo — não preditivo.",
         },
         {
             "id": "intelligence",
-            "label": methodology.get("intelligence") or "rule_engine_deterministic",
-            "role": "Priorização determinística (sem LLM).",
+            "label": _source_label(methodology.get("intelligence"), "Priorização determinística"),
+            "role": "Priorização determinística — necessária validação humana.",
         },
         {
             "id": "cost",
-            "label": methodology.get("cost") or "AbsenteeismCostModel",
+            "label": _source_label(methodology.get("cost"), "Modelo de custo laboral"),
             "role": "Custo laboral com premissa explícita (nunca inventada).",
         },
     ]
@@ -192,7 +206,7 @@ def compose_evidence_intelligence(payload: dict[str, Any]) -> dict[str, Any]:
         "hours_coverage": cobertura_horas,
         "dimensions": quality_dims,
         "note": (
-            "IQB e dimensões via DataQualityService — sem inventar denominadores."
+            "IQB e dimensões de qualidade — sem inventar denominadores."
             if iqb is not None
             else "Qualidade não quantificada nesta janela."
         ),
@@ -282,7 +296,7 @@ def compose_evidence_intelligence(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "engine": "exec10-evidence-intelligence-v1",
         "header": {
-            "kicker": "BioMed Evidence Intelligence",
+            "kicker": "BioMed · Evidências",
             "title": "Como sabemos disso?",
             "decision_title": decision_title,
             "subtitle": "Sustentação da recomendação — sem nova análise.",
@@ -303,6 +317,6 @@ def compose_evidence_intelligence(payload: dict[str, Any]) -> dict[str, Any]:
             "worker_ranking": False,
         },
         "cta_back": "Voltar à decisão",
-        "cta_decision": "Ver decisão",
+        "cta_decision": "Voltar à decisão",
         # No commercial footer / no ORBIT sell CTA
     }

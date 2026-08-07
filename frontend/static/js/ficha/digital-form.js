@@ -30,7 +30,7 @@
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     }).then(function (r) {
       return r.json().then(function (j) {
-        if (!r.ok) throw new Error(j.detail || "Falha na operação");
+        if (!r.ok) throw new Error(j.detail || "Não foi possível concluir esta ação. Tente novamente.");
         return j;
       });
     });
@@ -38,8 +38,8 @@
 
   function renderMetrics(m) {
     $("fd-metrics").innerHTML =
-      metric("Fichas enviadas", m.fichas_enviadas) +
-      metric("Respondidas", m.fichas_respondidas) +
+      metric("Questionários enviados", m.fichas_enviadas) +
+      metric("Respondidos", m.fichas_respondidas) +
       metric("Tempo médio", m.tempo_medio_resposta) +
       metric("Pendentes", m.pendentes) +
       metric("Validação pendente", m.validacao_pendente);
@@ -67,7 +67,7 @@
   function renderTracking(invites) {
     const el = $("fd-tracking");
     if (!invites.length) {
-      el.innerHTML = '<p class="bm-fd-muted">Nenhuma ficha ainda. Envie a primeira.</p>';
+      el.innerHTML = '<p class="bm-fd-muted">Nenhum questionário ainda. Solicite o primeiro preenchimento.</p>';
       return;
     }
     el.innerHTML = invites
@@ -103,7 +103,7 @@
   function renderAlerts(items) {
     const el = $("fd-alerts");
     if (!items.length) {
-      el.innerHTML = '<p class="bm-fd-muted">Nenhum alerta de ficha.</p>';
+      el.innerHTML = '<p class="bm-fd-muted">Nenhum alerta no momento.</p>';
       return;
     }
     el.innerHTML = items
@@ -164,7 +164,7 @@
           })
           .join("") +
         "</ul>" +
-        '<div class="bm-fd-row"><button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-validate">Validar</button></div>'
+        '<div class="bm-fd-row"><button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-validate">Validar análise</button></div>'
       : '<p class="bm-fd-muted">Sem análise ainda.</p>';
 
     const tl = $("fd-timeline");
@@ -240,7 +240,7 @@
       .then(function (ch) {
         $("fd-channel-out").innerHTML =
           "<h3>Link seguro gerado</h3>" +
-          '<p class="bm-fd-muted">Token opaco · sem CPF · sem matrícula · sem CID na URL</p>' +
+          '<p class="bm-fd-muted">Acesso individual · sem CPF · sem matrícula · sem CID no link</p>' +
           '<div class="bm-fd-code">' +
           esc(ch.link) +
           "</div>" +
@@ -258,7 +258,7 @@
               esc(ch.email.body) +
               "</div>"
             : "") +
-          '<div class="bm-fd-row" style="margin-top:0.75rem"><button type="button" class="bm-fd-btn bm-fd-btn-ghost" id="fd-open-employee">Simular colaborador</button></div>';
+          '<div class="bm-fd-row" style="margin-top:0.75rem"><button type="button" class="bm-fd-btn bm-fd-btn-ghost" id="fd-open-employee">Abrir como colaborador</button></div>';
         const btn = $("fd-open-employee");
         if (btn) {
           btn.addEventListener("click", function () {
@@ -270,7 +270,7 @@
         return refreshLists();
       })
       .catch(function (e) {
-        alert(e.message || "Erro");
+        alert(e.message || "Não foi possível concluir esta ação. Tente novamente.");
       });
   }
 
@@ -317,7 +317,7 @@
         });
       })
       .catch(function () {
-        $("fd-employee").innerHTML = '<div class="bm-fd-phone"><p>Não foi possível abrir a ficha.</p></div>';
+        $("fd-employee").innerHTML = '<div class="bm-fd-phone"><p>Não foi possível abrir este questionário. Tente novamente. Se o problema persistir, entre em contato com o administrador.</p></div>';
       });
   }
 
@@ -353,7 +353,7 @@
       esc(v.title) +
       "</h2>" +
       fields +
-      '<button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-submit" style="width:100%">Enviar</button>';
+      '<button type="button" class="bm-fd-btn bm-fd-btn-primary" id="fd-submit" style="width:100%">Concluir</button>';
     $("fd-submit").addEventListener("click", function () {
       const answers = {};
       $("fd-emp-frame").querySelectorAll("[data-fid]").forEach(function (el) {
@@ -365,9 +365,9 @@
       }).then(function () {
         $("fd-employee").innerHTML =
           '<div class="bm-fd-phone bm-fd-success" id="fd-emp-success">' +
-          "<h2>Enviado</h2>" +
-          "<p>Obrigado. Sua resposta foi registrada.</p>" +
-          '<p class="bm-fd-muted">O responsável dará continuidade com validação humana.</p></div>';
+          "<h2>Informações recebidas</h2>" +
+          "<p>Obrigado. Seu preenchimento foi registrado.</p>" +
+          '<p class="bm-fd-muted">O responsável dará continuidade com a validação.</p></div>';
         return refreshLists();
       });
     });

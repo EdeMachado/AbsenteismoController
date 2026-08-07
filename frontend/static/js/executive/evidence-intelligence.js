@@ -116,7 +116,7 @@
       esc(ei.cta_back || "Voltar à decisão") +
       "</button>" +
       '<p class="bm-dx-kicker">' +
-      esc(h.kicker || "BioMed Evidence Intelligence") +
+      esc(h.kicker || "BioMed · Evidências") +
       "</p></header>" +
       '<section class="bm-dx-block bm-ei-hero">' +
       "<h1>" +
@@ -130,13 +130,13 @@
       "</p></section>" +
       // 1
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence Summary</h2>' +
+      '<h2 class="bm-fx-section-title">Síntese da evidência</h2>' +
       '<div class="bm-fx-summary__body bm-dx-why">' +
       summaryHtml +
       "</div></section>" +
       // 2
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence Sources</h2>' +
+      '<h2 class="bm-fx-section-title">Fontes da evidência</h2>' +
       '<p class="bm-dx-sub">Dados que já sustentam a decisão — sem nova análise.</p>' +
       '<div class="bm-ei-sources">' +
       sourcesHtml +
@@ -147,7 +147,7 @@
       "</section>" +
       // 3
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence Timeline</h2>' +
+      '<h2 class="bm-fx-section-title">Evolução no período</h2>' +
       '<p class="bm-dx-sub">' +
       esc(ei.timeline_note || "") +
       "</p>" +
@@ -156,7 +156,7 @@
       "</div></div></section>" +
       // 4
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence Quality</h2>' +
+      '<h2 class="bm-fx-section-title">Qualidade da evidência</h2>' +
       '<div class="bm-ei-quality">' +
       '<div class="bm-ei-quality__score">' +
       '<div class="bm-ei-quality__label">IQB</div>' +
@@ -180,7 +180,7 @@
       "</section>" +
       // 5
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence Confidence</h2>' +
+      '<h2 class="bm-fx-section-title">Confiança da evidência</h2>' +
       '<div class="bm-dx-conf">' +
       '<div class="bm-dx-conf__level">' +
       esc(conf.level || "Baixa") +
@@ -189,19 +189,19 @@
       "</p></div></section>" +
       // 6
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Evidence Limitations</h2>' +
+      '<h2 class="bm-fx-section-title">Limitações</h2>' +
       '<ul class="bm-ei-list">' +
       limHtml +
       "</ul></section>" +
       // 7
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">What We Still Need</h2>' +
+      '<h2 class="bm-fx-section-title">O que ainda falta</h2>' +
       '<ul class="bm-ei-list">' +
       needHtml +
       "</ul></section>" +
       // 8
       '<section class="bm-dx-block">' +
-      '<h2 class="bm-fx-section-title">Executive Conclusion</h2>' +
+      '<h2 class="bm-fx-section-title">Conclusão executiva</h2>' +
       '<div class="bm-fx-summary__body bm-dx-why bm-ei-conclusion">' +
       conclHtml +
       "</div></section>" +
