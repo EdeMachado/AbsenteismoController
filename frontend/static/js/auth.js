@@ -83,7 +83,7 @@ function renderSidebar() {
                     <div class="sidebar-brand">
                         <span class="sidebar-brand-icon"><i class="fas fa-chart-line"></i></span>
                         <div class="sidebar-brand-info">
-                            <strong>AbsenteismoController</strong>
+                            <strong>BioMed Platform</strong>
                             <span>Inteligência GrupoBioMed</span>
                         </div>
                     </div>

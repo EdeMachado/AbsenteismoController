@@ -26,7 +26,7 @@ async function carregarConfiguracoes() {
         const itensPorPaginaEl = document.getElementById('itens_por_pagina');
         const temaEscuroEl = document.getElementById('tema_escuro');
         
-        if (nomeSistemaEl) nomeSistemaEl.value = configData.nome_sistema?.valor || 'AbsenteismoController';
+        if (nomeSistemaEl) nomeSistemaEl.value = configData.nome_sistema?.valor || 'BioMed Platform';
         if (empresaEl) empresaEl.value = configData.empresa?.valor || '';
         if (emailContatoEl) emailContatoEl.value = configData.email_contato?.valor || '';
         if (itensPorPaginaEl) itensPorPaginaEl.value = configData.itens_por_pagina?.valor || '50';

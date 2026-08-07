@@ -1,12 +1,33 @@
 /**
- * BioMed One Platform shell — RC-20 Phase 1
- * Menu built from LEGACY_FEATURE_INVENTORY (docs/release/RC20_PHASE1_FEATURE_INVENTORY.md).
- * Does not invent modules; stubs (analises/tendencias/INSS) stay out of nav.
+ * BioMed Platform shell — RC-21 Final Product
+ * One shell for all post-login surfaces. No new business features.
  */
 (function () {
   "use strict";
 
-  var CACHE = "rc20p1b";
+  var CACHE = "rc21";
+
+  var BREADCRUMB = {
+    "/": "Início",
+    "/executive": "Executive",
+    "/analytics": "Analytics",
+    "/analises": "Analytics",
+    "/dashboard": "Analytics · Visão Geral",
+    "/comparativos": "Analytics · Comparativos",
+    "/dados_powerbi": "Analytics · Power BI",
+    "/dashboard_powerbi": "Analytics · Dashboard Power BI",
+    "/produtividade": "Analytics · Produtividade",
+    "/tendencias": "Analytics · Tendências",
+    "/clientes": "Operação · Clientes",
+    "/funcionarios": "Operação · Funcionários",
+    "/perfil_funcionario": "Operação · Perfil",
+    "/upload": "Operação · Uploads",
+    "/upload_inteligente": "Operação · Upload inteligente",
+    "/auto_processor": "Operação · Processamento",
+    "/apresentacao": "Apresentações",
+    "/configuracoes": "Configurações",
+    "/preview": "Operação · Preview",
+  };
 
   function companyLabel() {
     try {
@@ -27,18 +48,23 @@
     return "Usuário";
   }
 
+  function pathKey() {
+    return (location.pathname || "/").replace(/\/$/, "") || "/";
+  }
+
   function activeKey() {
-    var p = (location.pathname || "/").replace(/\/$/, "") || "/";
+    var p = pathKey();
     if (p === "/executive" || p.indexOf("/executive") === 0) return "executive";
     if (p === "/apresentacao") return "presentation";
     if (p === "/configuracoes") return "config";
     if (
+      p === "/analytics" ||
+      p === "/analises" ||
       p === "/dashboard" ||
       p === "/comparativos" ||
       p === "/dados_powerbi" ||
       p === "/dashboard_powerbi" ||
       p === "/produtividade" ||
-      p === "/analises" ||
       p === "/tendencias"
     )
       return "analytics";
@@ -87,25 +113,27 @@
   function buildNavHtml() {
     return (
       '<aside class="bm-plat-nav" id="bm-plat-nav" aria-label="Navegação BioMed">' +
-      '<div class="bm-plat-brand"><strong>BioMed</strong><span>Inteligência em Saúde Corporativa</span></div>' +
+      '<div class="bm-plat-brand"><strong>BioMed</strong><span>Platform</span></div>' +
       '<div class="bm-plat-company"><small>Empresa ativa</small>' +
       companyLabel() +
       "</div>" +
       '<nav class="bm-plat-links">' +
       link("/", "Início", "home") +
-      link("/executive", "Visão Executiva", "executive") +
-      link("/dashboard", "Analytics", "analytics") +
+      link("/executive", "Executive", "executive") +
+      link("/analytics", "Analytics", "analytics") +
       link("/dashboard", "Visão Geral", "analytics", { sub: true }) +
       link("/comparativos", "Comparativos", "analytics", { sub: true }) +
-      link("/dados_powerbi", "Dados / Power BI", "analytics", { sub: true }) +
-      link("/dashboard_powerbi", "Dashboard Power BI", "analytics", { sub: true }) +
+      link("/dados_powerbi", "Power BI", "analytics", { sub: true }) +
       link("/produtividade", "Produtividade", "analytics", { sub: true }) +
-      link("/clientes", "Operacional", "ops") +
-      link("/clientes", "Clientes / Empresas", "ops", { sub: true }) +
+      link("/dashboard#graficosConverplast", "Setores", "analytics", { sub: true }) +
+      link("/dashboard#chartCids", "CID", "analytics", { sub: true }) +
+      link("/dashboard#chartEvolucao", "Tendências", "analytics", { sub: true }) +
+      link("/clientes", "Operação", "ops") +
+      link("/clientes", "Clientes", "ops", { sub: true }) +
+      link("/funcionarios", "Funcionários", "ops", { sub: true }) +
       link("/upload", "Uploads", "ops", { sub: true }) +
       link("/upload_inteligente", "Upload inteligente", "ops", { sub: true }) +
-      link("/funcionarios", "Funcionários", "ops", { sub: true }) +
-      link("/apresentacao", "Apresentação", "presentation") +
+      link("/apresentacao", "Apresentações", "presentation") +
       link("#", "Fichas", "fichas", { disabled: true }) +
       link("/configuracoes", "Configurações", "config") +
       "</nav>" +
@@ -114,6 +142,41 @@
       "</div>" +
       "</aside>"
     );
+  }
+
+  function buildChrome(mainHtmlSlotId) {
+    var crumb = BREADCRUMB[pathKey()] || "BioMed Platform";
+    return (
+      '<button type="button" class="bm-plat-toggle" id="bm-plat-toggle" aria-expanded="false">Menu</button>' +
+      buildNavHtml() +
+      '<div class="bm-plat-column">' +
+      '<header class="bm-plat-top" id="bm-plat-top">' +
+      '<div class="bm-plat-top-brand">BioMed Platform</div>' +
+      '<div class="bm-plat-top-meta"><span>' +
+      companyLabel() +
+      "</span><span>" +
+      userLabel() +
+      "</span></div>" +
+      "</header>" +
+      '<div class="bm-plat-crumb" id="bm-plat-crumb">' +
+      crumb +
+      "</div>" +
+      '<div class="bm-plat-main" id="' +
+      mainHtmlSlotId +
+      '"></div>' +
+      '<footer class="bm-plat-foot">BioMed Platform · Inteligência em Saúde Corporativa</footer>' +
+      "</div>"
+    );
+  }
+
+  function wireToggle(shell) {
+    var btn = document.getElementById("bm-plat-toggle");
+    if (btn) {
+      btn.addEventListener("click", function () {
+        var open = shell.classList.toggle("is-nav-open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
   }
 
   function mountFullShell(mainSelector) {
@@ -132,20 +195,10 @@
     var shell = document.createElement("div");
     shell.className = "bm-plat-shell";
     shell.id = "bm-plat-shell";
-    shell.innerHTML =
-      '<button type="button" class="bm-plat-toggle" id="bm-plat-toggle" aria-expanded="false">Menu</button>' +
-      buildNavHtml() +
-      '<div class="bm-plat-main" id="bm-plat-main-slot"></div>';
+    shell.innerHTML = buildChrome("bm-plat-main-slot");
     document.body.appendChild(shell);
     shell.querySelector("#bm-plat-main-slot").appendChild(main);
-
-    var btn = document.getElementById("bm-plat-toggle");
-    if (btn) {
-      btn.addEventListener("click", function () {
-        var open = shell.classList.toggle("is-nav-open");
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
-      });
-    }
+    wireToggle(shell);
   }
 
   function mountLegacyOverlay() {
@@ -156,15 +209,13 @@
     var wrap = document.createElement("div");
     wrap.className = "bm-plat-shell";
     wrap.id = "bm-plat-shell";
-    wrap.innerHTML =
-      '<button type="button" class="bm-plat-toggle" id="bm-plat-toggle" aria-expanded="false">Menu</button>' +
-      buildNavHtml() +
-      '<div class="bm-plat-main" id="bm-plat-legacy-slot"></div>';
+    wrap.innerHTML = buildChrome("bm-plat-legacy-slot");
 
     var legacyRoot =
       document.querySelector(".main-content") ||
       document.querySelector(".content-wrapper") ||
       document.querySelector(".app-container") ||
+      document.querySelector(".powerbi-container") ||
       document.body;
 
     var parent = legacyRoot.parentNode;
@@ -177,14 +228,7 @@
       parent.insertBefore(wrap, legacyRoot);
       wrap.querySelector("#bm-plat-legacy-slot").appendChild(legacyRoot);
     }
-
-    var btn = document.getElementById("bm-plat-toggle");
-    if (btn) {
-      btn.addEventListener("click", function () {
-        var open = wrap.classList.toggle("is-nav-open");
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
-      });
-    }
+    wireToggle(wrap);
   }
 
   window.BioMedPlatform = {

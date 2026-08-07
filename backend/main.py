@@ -712,18 +712,23 @@ app.include_router(digital_form_router)
 
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():
-    """Página de análises"""
-    file_path = os.path.join(FRONTEND_DIR, "analises.html")
+    """RC-21: Analytics organizer (replaces stub). Alias of /analytics."""
+    file_path = os.path.join(FRONTEND_DIR, "analytics.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page():
+    """BioMed Analytics organizer — links to existing REAL surfaces."""
+    file_path = os.path.join(FRONTEND_DIR, "analytics.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/tendencias", response_class=HTMLResponse)
 async def tendencias_page():
-    """Página de tendências"""
-    file_path = os.path.join(FRONTEND_DIR, "tendencias.html")
-    with open(file_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
-
+    """RC-21: redirect stub to dashboard evolução (reuse charts)."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard#chartEvolucao", status_code=302)
 # Rota de relatórios removida - exportação agora está na apresentação
 # @app.get("/relatorios", response_class=HTMLResponse)
 # async def relatorios_page():

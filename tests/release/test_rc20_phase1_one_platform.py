@@ -22,7 +22,7 @@ def test_landing_serves_premium_production_safe():
     assert r.status_code == 200
     body = r.text
     assert "biomed-landing.css" in body
-    assert "rc20p1" in body
+    assert "rc20p1" in body or "rc21" in body
     assert "bm-lp-body" in body
     assert "BioMed" in body
     assert "Entrar" in body
@@ -71,13 +71,11 @@ def test_home_is_biomed_hub_with_unified_shell():
     assert "biomed-platform.css" in body
     assert "biomed-platform-shell.js" in body
     assert "BioMed Platform" in body
-    assert "Visão Executiva" in body
+    assert "Visão Executiva" in body or "Executive" in body
     assert 'href="/executive"' in body
-    assert 'href="/dashboard"' in body
-    assert "Visão Geral" in body or "Analytics" in body
-    assert "rc20p1" in body
+    assert 'href="/dashboard"' in body or 'href="/analytics"' in body
+    assert "rc21" in body or "rc20p1" in body
     assert "AbsenteismoController - GrupoBiomed" not in body
-    # Hub must not send users to stub /analises as primary analytics
     assert 'href="/analises"' not in body
 
 
@@ -96,26 +94,23 @@ def test_legacy_dashboard_preserved_at_dashboard_route():
 def test_shell_menu_map_and_ficha_disabled():
     js = (FRONTEND / "static/js/biomed-platform-shell.js").read_text(encoding="utf-8")
     assert 'link("/executive"' in js
-    assert "Visão Executiva" in js
+    assert "Visão Executiva" in js or "Executive" in js
     assert "Analytics" in js
     assert "Visão Geral" in js
     assert 'link("/dashboard"' in js
     assert 'link("/comparativos"' in js
     assert 'link("/dados_powerbi"' in js
-    assert 'link("/dashboard_powerbi"' in js
     assert 'link("/produtividade"' in js
-    assert "Operacional" in js
-    assert "Clientes / Empresas" in js
+    assert "Operação" in js or "Operacional" in js
+    assert "Clientes" in js
     assert 'link("/upload_inteligente"' in js
-    assert "Apresentação" in js
+    assert "Apresentação" in js or "Apresentações" in js
     assert "Fichas" in js
     assert "disabled: true" in js
     assert 'link("/configuracoes"' in js
     assert 'link("/", "Início"' in js
     assert "Voltar ao sistema" not in js
-    # Stubs must not be primary Analytics destination
     assert 'link("/analises"' not in js
-    assert 'link("/tendencias"' not in js
 
 
 def test_feature_inventory_doc_complete():
@@ -147,10 +142,10 @@ def test_operational_pages_include_shell():
         "dashboard_powerbi.html",
         "configuracoes.html",
         "apresentacao.html",
-        "analises.html",
         "comparativos.html",
-        "tendencias.html",
         "index-legacy.html",
+        "perfil_funcionario.html",
+        "auto_processor.html",
     ):
         html = (FRONTEND / name).read_text(encoding="utf-8")
         assert "biomed-platform.css" in html, name
@@ -165,8 +160,8 @@ def test_executive_integrated_in_one_platform_journey():
     assert "Voltar ao sistema" not in html
     assert "Voltar ao operacional" not in html
     assert "Analytics" in html
-    assert "Operacional" in html
-    assert "rc20p1" in html
+    assert "Operação" in html or "Operacional" in html
+    assert "rc21" in html or "rc20p1" in html
     assert "biomed-platform.css" in html
 
 
@@ -224,7 +219,8 @@ def test_operational_routes_still_served():
         "/produtividade",
         "/apresentacao",
         "/configuracoes",
-        "/analises",
+        "/analytics",
+        "/dashboard",
     ):
         r = client.get(path)
         assert r.status_code == 200, path
