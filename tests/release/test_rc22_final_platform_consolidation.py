@@ -65,6 +65,7 @@ def test_shell_is_single_and_rc22():
         or 'var CACHE = "rc23"' in SHELL_JS
         or 'var CACHE = "rc23a"' in SHELL_JS
         or 'var CACHE = "rc24"' in SHELL_JS
+        or 'var CACHE = "rc25"' in SHELL_JS
     )
     assert "bm-plat-nav" in SHELL_JS
     assert "bm-plat-logout" in SHELL_JS
@@ -83,7 +84,7 @@ def test_menu_has_real_analytics_targets_only():
         "/comparativos",
         "/dados_powerbi",
         "/produtividade",
-        "/dashboard#graficosConverplast",
+        "/dashboard#chartSetores",
         "/dashboard#chartCids",
         "/dashboard#chartEvolucao",
     ):
@@ -154,9 +155,13 @@ def test_executive_integrated_same_shell():
 
 def test_analytics_real_and_dashboard_relabeled():
     client = TestClient(app)
-    body = client.get("/analytics").text
-    assert "Visão Geral" in body
-    assert 'href="/dashboard"' in body
+    # RC25: /analytics redirects to rebuilt /dashboard core
+    r = client.get("/analytics", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers.get("location") == "/dashboard"
+    body = client.get("/dashboard").text
+    assert "Analytics" in body
+    assert "data-bm-rc25" in body
     assert "em desenvolvimento" not in body.lower()
 
     dash = (FRONTEND / "index-legacy.html").read_text(encoding="utf-8")

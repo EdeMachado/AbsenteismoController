@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Produtividade — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="produtividade-core" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core">
+    <header class="bc-header">
+      <div>
+        <h1>Produtividade</h1>
+        <p class="bc-sub">Impacto, tendência e áreas críticas com a mesma base operacional.</p>
+      </div>
+      <span class="bc-chip is-brand" id="bc-company">Empresa</span>
+    </header>
+
+    <div class="bc-metrics">
+      <div class="bc-metric"><small>Horas perdidas</small><strong id="p-horas">—</strong></div>
+      <div class="bc-metric"><small>Dias perdidos</small><strong id="p-dias">—</strong></div>
+      <div class="bc-metric"><small>Registros produtividade</small><strong id="p-regs">—</strong></div>
+      <div class="bc-metric"><small>Total consolidado</small><strong id="p-total">—</strong></div>
+    </div>
+
+    <div class="bc-grid-2">
+      <div class="bc-card" data-source="/api/produtividade">
+        <h3>Distribuição por tipo</h3>
+        <p class="bc-card-sub">Categorias de impacto</p>
+        <div class="bc-chart"><canvas id="chartTipos"></canvas></div>
+      </div>
+      <div class="bc-card" data-source="/api/produtividade/evolucao">
+        <h3>Evolução</h3>
+        <p class="bc-card-sub">Tendência no tempo</p>
+        <div class="bc-chart"><canvas id="chartEvol"></canvas></div>
+      </div>
+    </div>
+
+    <section class="bc-section" style="margin-top:1.5rem">
+      <div class="bc-section-head"><h2>Áreas críticas</h2><p>Top setores do dashboard (mesmo cálculo)</p></div>
+      <div class="bc-card"><div class="bc-chart"><canvas id="chartSetores"></canvas></div></div>
+    </section>
+  </div>
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/produtividade-core.js?v=rc25"></script>
+</body>
+</html>

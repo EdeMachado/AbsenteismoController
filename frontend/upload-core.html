@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Uploads — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
+</head>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="upload-core" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core">
+    <header class="bc-header">
+      <div>
+        <h1>Uploads</h1>
+        <p class="bc-sub">Fluxo moderno de importação — mesmos endpoints de processamento.</p>
+      </div>
+      <span class="bc-chip is-brand" id="bc-company">Empresa</span>
+    </header>
+
+    <div class="bc-steps" id="bc-steps">
+      <div class="bc-step is-active" data-step="1">1. Arquivo</div>
+      <div class="bc-step" data-step="2">2. Validar</div>
+      <div class="bc-step" data-step="3">3. Processar</div>
+      <div class="bc-step" data-step="4">4. Resultado</div>
+      <div class="bc-step" data-step="5">5. Erros</div>
+      <div class="bc-step" data-step="6">6. Histórico</div>
+    </div>
+
+    <section class="bc-section bc-card">
+      <h3>Selecionar arquivo</h3>
+      <p class="bc-card-sub">Planilha mensal da empresa ativa</p>
+      <div class="bc-drop" id="bc-drop">
+        <p><strong>Arraste o arquivo aqui</strong> ou escolha no computador</p>
+        <input type="file" id="bc-file" accept=".xlsx,.xls,.csv" style="margin-top:1rem" />
+        <div class="bc-field" style="max-width:220px;margin:1rem auto 0">
+          <label for="bc-mes">Mês referência</label>
+          <input type="month" id="bc-mes" />
+        </div>
+        <button type="button" class="bc-btn" id="bc-send" style="margin-top:1rem">Enviar e processar</button>
+      </div>
+      <div id="bc-result" style="margin-top:1rem"></div>
+    </section>
+
+    <section class="bc-section">
+      <div class="bc-section-head">
+        <h2>Histórico</h2>
+        <p>Processamentos recentes da empresa ativa</p>
+      </div>
+      <div class="bc-table-wrap">
+        <table class="bc-table">
+          <thead><tr><th>Arquivo</th><th>Mês</th><th>Registros</th><th>Data</th></tr></thead>
+          <tbody id="bc-hist"><tr><td colspan="4">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/upload-core.js?v=rc25"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Empresas — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
+</head>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="empresas" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core">
+    <header class="bc-header">
+      <div>
+        <h1>Empresas</h1>
+        <p class="bc-sub">Escolha a empresa ativa com clareza — sem aparência de cadastro administrativo genérico.</p>
+      </div>
+      <div class="bc-header-meta">
+        <span class="bc-chip" id="bc-active">Ativa: —</span>
+        <a class="bc-btn bc-btn-secondary" href="/">Ir ao início</a>
+      </div>
+    </header>
+
+    <div class="bc-filters">
+      <div class="bc-field bc-search" style="flex:2">
+        <label for="bc-q">Buscar</label>
+        <input id="bc-q" type="search" placeholder="Nome ou CNPJ" />
+      </div>
+      <div class="bc-field">
+        <label for="bc-status">Status</label>
+        <select id="bc-status">
+          <option value="all">Todos</option>
+          <option value="ativo">Ativos</option>
+          <option value="sem_dados">Sem dados</option>
+          <option value="arquivado">Arquivados</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="bc-metrics" id="bc-snap" data-source="/api/clientes">
+      <div class="bc-metric"><small>Empresas</small><strong id="s-total">—</strong></div>
+      <div class="bc-metric"><small>Ativas</small><strong id="s-ativos">—</strong></div>
+      <div class="bc-metric"><small>Sem dados</small><strong id="s-empty">—</strong></div>
+      <div class="bc-metric"><small>Arquivadas</small><strong id="s-arch">—</strong></div>
+    </div>
+
+    <div class="bc-company-grid" id="bc-companies">
+      <div class="bc-loading"><strong>Carregando empresas</strong>Buscando carteira…</div>
+    </div>
+  </div>
+
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/empresas-core.js?v=rc25"></script>
+</body>
+</html>

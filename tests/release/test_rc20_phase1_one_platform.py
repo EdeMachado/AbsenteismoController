@@ -22,7 +22,14 @@ def test_landing_serves_premium_production_safe():
     assert r.status_code == 200
     body = r.text
     assert "biomed-landing.css" in body
-    assert "rc20p1" in body or "rc21" in body or "rc22" in body or "rc23" in body or "rc24" in body
+    assert (
+        "rc20p1" in body
+        or "rc21" in body
+        or "rc22" in body
+        or "rc23" in body
+        or "rc24" in body
+        or "rc25" in body
+    )
     assert "bm-lp-body" in body
     assert "BioMed" in body
     assert "Entrar" in body
@@ -74,20 +81,29 @@ def test_home_is_biomed_hub_with_unified_shell():
     assert "Visão Executiva" in body or "Executive" in body
     assert 'href="/executive"' in body
     assert 'href="/dashboard"' in body or 'href="/analytics"' in body
-    assert "rc21" in body or "rc20p1" in body or "rc22" in body or "rc23" in body or "rc24" in body
+    assert (
+        "rc21" in body
+        or "rc20p1" in body
+        or "rc22" in body
+        or "rc23" in body
+        or "rc24" in body
+        or "rc25" in body
+    )
     assert "AbsenteismoController - GrupoBiomed" not in body
     assert 'href="/analises"' not in body
 
 
 def test_legacy_dashboard_preserved_at_dashboard_route():
     client = TestClient(app)
+    # RC25: /dashboard is the new Analytics core; legacy remains at /dashboard-legacy
     r = client.get("/dashboard")
     assert r.status_code == 200
     body = r.text
-    assert "dashboard.js" in body
-    assert "auth.js" in body
     assert "biomed-platform-shell.js" in body
-    assert 'data-bm-shell="legacy"' in body
+    assert "analytics-core" in body or "data-bm-rc25" in body
+    legacy = client.get("/dashboard-legacy")
+    assert legacy.status_code == 200
+    assert "dashboard.js" in legacy.text or "graficosConverplast" in legacy.text
     assert (FRONTEND / "index-legacy.html").is_file()
 
 
@@ -102,7 +118,7 @@ def test_shell_menu_map_and_ficha_disabled():
     assert 'link("/dados_powerbi"' in js
     assert 'link("/produtividade"' in js
     assert "Operação" in js or "Operacional" in js
-    assert "Clientes" in js
+    assert "Clientes" in js or "Empresas" in js
     assert 'link("/upload_inteligente"' in js
     assert "Apresentação" in js or "Apresentações" in js
     assert "Fichas" in js
@@ -161,7 +177,7 @@ def test_executive_integrated_in_one_platform_journey():
     assert "Voltar ao sistema" not in html
     assert "Voltar ao operacional" not in html
     assert "bm-fx-steps" in html
-    assert "rc21" in html or "rc22" in html or "rc23" in html or "rc24" in html
+    assert "rc21" in html or "rc22" in html or "rc23" in html or "rc24" in html or "rc25" in html
     assert "biomed-platform.css" in html
 
 

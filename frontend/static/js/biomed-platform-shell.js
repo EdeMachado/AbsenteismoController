@@ -1,24 +1,24 @@
 /**
- * BioMed Platform shell — RC-24 Final Visual Polish
+ * BioMed Platform shell — RC-25 Core Product Redesign
  * One shell for all post-login surfaces. No new business features.
  */
 (function () {
   "use strict";
 
-  var CACHE = "rc24";
+  var CACHE = "rc25";
 
   var BREADCRUMB = {
     "/": "Início",
     "/executive": "Executive",
     "/analytics": "Analytics",
     "/analises": "Analytics",
-    "/dashboard": "Analytics · Visão Geral",
+    "/dashboard": "Analytics",
     "/comparativos": "Analytics · Comparativos",
     "/dados_powerbi": "Analytics · Power BI",
     "/dashboard_powerbi": "Analytics · Dashboard Power BI",
     "/produtividade": "Analytics · Produtividade",
     "/tendencias": "Analytics · Tendências",
-    "/clientes": "Operação · Clientes",
+    "/clientes": "Operação · Empresas",
     "/funcionarios": "Operação · Funcionários",
     "/perfil_funcionario": "Operação · Perfil",
     "/upload": "Operação · Uploads",
@@ -123,6 +123,13 @@
       p.setAttribute("data-bm-polish", "1");
       document.head.appendChild(p);
     }
+    if (!document.querySelector('link[data-bm-core]')) {
+      var c = document.createElement("link");
+      c.rel = "stylesheet";
+      c.href = "/static/css/biomed-core.css?v=" + CACHE;
+      c.setAttribute("data-bm-core", "1");
+      document.head.appendChild(c);
+    }
   }
 
   function buildNavHtml() {
@@ -140,11 +147,11 @@
       link("/comparativos", "Comparativos", "analytics", { sub: true }) +
       link("/dados_powerbi", "Power BI", "analytics", { sub: true }) +
       link("/produtividade", "Produtividade", "analytics", { sub: true }) +
-      link("/dashboard#graficosConverplast", "Setores", "analytics", { sub: true }) +
+      link("/dashboard#chartSetores", "Setores", "analytics", { sub: true }) +
       link("/dashboard#chartCids", "CID", "analytics", { sub: true }) +
       link("/dashboard#chartEvolucao", "Tendências", "analytics", { sub: true }) +
       link("/clientes", "Operação", "ops") +
-      link("/clientes", "Clientes", "ops", { sub: true }) +
+      link("/clientes", "Empresas", "ops", { sub: true }) +
       link("/funcionarios", "Funcionários", "ops", { sub: true }) +
       link("/upload", "Uploads", "ops", { sub: true }) +
       link("/upload_inteligente", "Upload inteligente", "ops", { sub: true }) +
