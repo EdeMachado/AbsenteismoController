@@ -565,7 +565,7 @@ async def configuracoes_page():
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    """Página principal - Dashboard"""
+    """BioMed Platform Home / Hub (RC-20)."""
     file_path = os.path.join(FRONTEND_DIR, "index.html")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Arquivo index.html não encontrado")
@@ -574,10 +574,19 @@ async def index():
 
 @app.get("/index.html", response_class=HTMLResponse)
 async def index_html():
-    """Página principal - Dashboard (alias para /)"""
+    """Alias da Home BioMed (/)."""
     file_path = os.path.join(FRONTEND_DIR, "index.html")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Arquivo index.html não encontrado")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_legacy_page():
+    """Dashboard operacional legado (preservado; acessível pela shell)."""
+    file_path = os.path.join(FRONTEND_DIR, "index-legacy.html")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Arquivo index-legacy.html não encontrado")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 

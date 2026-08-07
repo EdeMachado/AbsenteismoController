@@ -1,0 +1,217 @@
+/**
+ * BioMed One Platform — RC-20 Phase 1 shell
+ */
+@import url("/static/css/biomed-identity.css");
+
+.bm-plat-body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--bm-font, "BM Sans", system-ui, sans-serif);
+  color: var(--bm-ink, #132033);
+  background:
+    radial-gradient(1000px 420px at 8% -8%, rgba(15, 74, 110, 0.06), transparent 55%),
+    linear-gradient(180deg, #f4f6f8 0%, #f7f6f3 45%, #eef1f4 100%);
+}
+
+.bm-plat-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.bm-plat-nav {
+  background: #fff;
+  border-right: 1px solid var(--bm-border, #d8dee8);
+  padding: 1.25rem 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.bm-plat-brand {
+  padding: 0.25rem 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--bm-border, #d8dee8);
+}
+.bm-plat-brand strong {
+  display: block;
+  font-family: var(--bm-display, "BM Display", Georgia, serif);
+  font-size: 1.35rem;
+  font-weight: 650;
+  color: var(--bm-brand, #1a4566);
+  letter-spacing: -0.02em;
+}
+.bm-plat-brand span {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--bm-ink-muted, #5a6474);
+}
+
+.bm-plat-company {
+  margin: 0 0.5rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--bm-mist, #e8eef4);
+  border-radius: 12px;
+  font-size: 0.82rem;
+  color: var(--bm-ink, #132033);
+}
+.bm-plat-company small {
+  display: block;
+  color: var(--bm-ink-faint, #8a93a2);
+  font-size: 0.72rem;
+  margin-bottom: 0.15rem;
+}
+
+.bm-plat-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 0.25rem;
+}
+.bm-plat-links a {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--bm-ink-muted, #5a6474);
+  font-weight: 500;
+  font-size: 0.92rem;
+}
+.bm-plat-links a:hover,
+.bm-plat-links a.is-active {
+  background: rgba(26, 69, 102, 0.08);
+  color: var(--bm-brand, #1a4566);
+  font-weight: 600;
+}
+.bm-plat-links .bm-plat-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+.bm-plat-links .bm-plat-sub {
+  margin-left: 0.5rem;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.85rem;
+}
+
+.bm-plat-user {
+  margin-top: auto;
+  padding: 0.75rem 0.5rem 0;
+  border-top: 1px solid var(--bm-border, #d8dee8);
+  font-size: 0.8rem;
+  color: var(--bm-ink-muted, #5a6474);
+}
+
+.bm-plat-main {
+  padding: clamp(1.25rem, 3vw, 2rem) clamp(1.25rem, 3.5vw, 2.5rem) 3rem;
+  max-width: 1280px;
+}
+
+.bm-plat-hub-hero {
+  margin-bottom: 1.75rem;
+}
+.bm-plat-hub-hero h1 {
+  font-family: var(--bm-display, "BM Display", Georgia, serif);
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.4rem;
+}
+.bm-plat-hub-hero p {
+  margin: 0;
+  color: var(--bm-ink-muted, #5a6474);
+  max-width: 36rem;
+  line-height: 1.45;
+}
+.bm-plat-hub-company {
+  margin-top: 0.85rem !important;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--bm-brand, #1a4566) !important;
+}
+.bm-plat-hub-note {
+  color: var(--bm-ink-muted, #5a6474);
+  font-size: 0.9rem;
+  max-width: 36rem;
+  line-height: 1.45;
+}
+
+.bm-plat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 2rem;
+}
+.bm-plat-card {
+  background: #fff;
+  border: 1px solid var(--bm-border, #d8dee8);
+  border-radius: 16px;
+  padding: 1.15rem 1.2rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.bm-plat-card:hover {
+  border-color: rgba(26, 69, 102, 0.35);
+  box-shadow: var(--bm-shadow, 0 14px 36px rgba(19, 32, 51, 0.07));
+}
+.bm-plat-card strong {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--bm-brand, #1a4566);
+  margin-bottom: 0.35rem;
+}
+.bm-plat-card span {
+  font-size: 0.88rem;
+  color: var(--bm-ink-muted, #5a6474);
+  line-height: 1.4;
+}
+
+.bm-plat-toggle {
+  display: none;
+  position: fixed;
+  top: 0.85rem;
+  left: 0.85rem;
+  z-index: 60;
+  background: #fff;
+  border: 1px solid var(--bm-border, #d8dee8);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-weight: 600;
+  color: var(--bm-brand, #1a4566);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .bm-plat-toggle { display: inline-flex; }
+  .bm-plat-shell { grid-template-columns: 1fr; }
+  .bm-plat-nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(280px, 86vw);
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    z-index: 50;
+    box-shadow: 8px 0 30px rgba(19, 32, 51, 0.12);
+  }
+  .bm-plat-shell.is-nav-open .bm-plat-nav { transform: translateX(0); }
+  .bm-plat-main { padding-top: 3.5rem; }
+}
+
+/* When shell wraps legacy pages: hide old sidebar chrome */
+body.bm-plat-legacy .sidebar,
+body.bm-plat-legacy .sidebar-header,
+body.bm-plat-legacy aside.sidebar {
+  display: none !important;
+}
+body.bm-plat-legacy .main-content,
+body.bm-plat-legacy .content-wrapper,
+body.bm-plat-legacy .container-fluid {
+  margin-left: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+}

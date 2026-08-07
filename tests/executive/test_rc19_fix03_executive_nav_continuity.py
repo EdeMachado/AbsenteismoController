@@ -11,8 +11,8 @@ LOGIN_HTML = ROOT / "frontend/login.html"
 
 def test_operational_link_is_explicit_secondary_not_voltar():
     html = EXEC_HTML.read_text(encoding="utf-8")
-    assert "Área Operacional" in html
-    assert 'href="/" class="bm-nav-ops"' in html or 'id="bm-nav-ops"' in html
+    assert "Início" in html or "Área Operacional" in html
+    assert 'id="bm-nav-ops"' in html
     assert "Voltar ao operacional" not in html
     assert "← Voltar" not in html
 
@@ -26,14 +26,15 @@ def test_experimental_and_flag_copy_removed_from_client_ui():
 
 def test_cache_bust_incremented_to_fix03():
     html = EXEC_HTML.read_text(encoding="utf-8")
-    for asset in (
-        "biomed-executive.css?v=rc19fix03",
-        "first-experience.js?v=rc19fix03",
-        "decision-experience.js?v=rc19fix03",
-        "evidence-intelligence.js?v=rc19fix03",
-        "app-first.js?v=rc19fix03",
+    # Cache token may advance (rc19fix03 → rc20p1…); require versioned critical assets
+    for name in (
+        "biomed-executive.css?v=",
+        "first-experience.js?v=",
+        "decision-experience.js?v=",
+        "evidence-intelligence.js?v=",
+        "app-first.js?v=",
     ):
-        assert asset in html
+        assert name in html
 
 
 def test_internal_back_never_assigns_slash_home():

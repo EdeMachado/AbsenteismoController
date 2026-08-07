@@ -118,6 +118,9 @@ button, input, select { font: inherit; }
   font-size: 0.72rem;
   color: var(--bm-ink-faint);
   line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
 }
 .bm-nav-ops {
   display: inline-block;
