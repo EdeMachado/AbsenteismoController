@@ -26,6 +26,11 @@
     };
   }
 
+  function executiveLoginUrl() {
+    // Return to Executive after auth — never drop the user on legacy "/" alone.
+    return "/login?next=" + encodeURIComponent("/executive");
+  }
+
   function fetchJson(path, opts) {
     const params = new URLSearchParams();
     Object.keys(opts || {}).forEach(function (k) {
@@ -34,7 +39,7 @@
     const url = path + (params.toString() ? "?" + params.toString() : "");
     return fetch(url, { credentials: "same-origin", headers: tokenHeaders() }).then(function (res) {
       if (res.status === 401) {
-        window.location.href = "/login";
+        window.location.href = executiveLoginUrl();
         throw new Error("session");
       }
       if (res.status === 403) {
@@ -171,7 +176,7 @@
 
   async function load() {
     if (!localStorage.getItem("access_token")) {
-      window.location.href = "/login";
+      window.location.href = executiveLoginUrl();
       return;
     }
     setStatus("Preparando leitura executiva…");

@@ -284,6 +284,27 @@
                 alertDiv.classList.remove('show');
             }, 5000);
         }
+
+        /** Internal path only — blocks open redirects (https:, //host, javascript:, etc.). */
+        function safeInternalNext(raw) {
+            if (!raw || typeof raw !== 'string') return null;
+            const n = raw.trim();
+            if (!n.startsWith('/')) return null;
+            if (n.startsWith('//')) return null;
+            if (n.includes('\\')) return null;
+            if (n.includes('://')) return null;
+            if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(n)) return null;
+            return n;
+        }
+
+        function postLoginDestination() {
+            const params = new URLSearchParams(window.location.search);
+            const next = safeInternalNext(params.get('next'));
+            if (next) return next;
+            // Legacy without next: selected client → home; else → client picker
+            if (localStorage.getItem('cliente_selecionado')) return '/';
+            return '/clientes';
+        }
         
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -316,9 +337,9 @@
                     
                     showAlert('Login realizado com sucesso!', 'success');
                     
-                    // Redireciona para página de clientes (seleção de empresas)
+                    // Honra ?next= interno seguro; sem next preserva legado (/ ou /clientes)
                     setTimeout(() => {
-                        window.location.href = '/clientes';
+                        window.location.href = postLoginDestination();
                     }, 1000);
                 } else {
                     showAlert(data.detail || 'Erro ao fazer login');
@@ -355,15 +376,9 @@
             }
         });
         
-        // Verifica se já está logado
+        // Já autenticado: honra ?next= interno; sem next preserva legado
         if (localStorage.getItem('access_token')) {
-            // Se já tem cliente selecionado, vai para dashboard, senão vai para clientes
-            const clienteSelecionado = localStorage.getItem('cliente_selecionado');
-            if (clienteSelecionado) {
-                window.location.href = '/';
-            } else {
-                window.location.href = '/clientes';
-            }
+            window.location.href = postLoginDestination();
         }
     </script>
 </body>
