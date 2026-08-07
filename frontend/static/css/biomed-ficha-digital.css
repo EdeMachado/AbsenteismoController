@@ -1,0 +1,128 @@
+/**
+ * Ficha Digital — RC-1.2A preview styles (mobile-first employee + staff console)
+ */
+@import url("/static/css/biomed-identity.css");
+
+.bm-fd-body {
+  margin: 0;
+  font-family: var(--bm-font);
+  color: var(--bm-ink);
+  background: var(--bm-bg-accent);
+  min-height: 100vh;
+}
+.bm-fd-chrome {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem;
+  align-items: center; justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255,255,255,0.94);
+  border-bottom: 1px solid var(--bm-border);
+  position: sticky; top: 0; z-index: 30;
+}
+.bm-fd-chrome strong {
+  font-family: var(--bm-display);
+  color: var(--bm-brand);
+  font-size: 1.05rem;
+}
+.bm-fd-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.bm-fd-tab {
+  border: 1px solid var(--bm-border);
+  background: #fff; border-radius: 999px;
+  padding: 0.35rem 0.75rem; font-size: 0.78rem; font-weight: 600;
+  color: var(--bm-ink-muted); cursor: pointer;
+}
+.bm-fd-tab.is-on { background: var(--bm-brand); color: #fff; border-color: var(--bm-brand); }
+.bm-fd-shell { max-width: 920px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+.bm-fd-panel { display: none; }
+.bm-fd-panel.is-on { display: block; }
+.bm-fd-card {
+  background: #fff; border: 1px solid var(--bm-border);
+  border-radius: 16px; padding: 1.15rem 1.2rem; box-shadow: var(--bm-shadow);
+  margin-bottom: 0.85rem;
+}
+.bm-fd-card h2, .bm-fd-card h3 {
+  margin: 0 0 0.5rem; font-family: var(--bm-display);
+  color: var(--bm-brand); font-weight: 650;
+}
+.bm-fd-card h2 { font-size: 1.35rem; }
+.bm-fd-card h3 { font-size: 1.1rem; }
+.bm-fd-card p { margin: 0 0 0.55rem; line-height: 1.45; color: var(--bm-ink); }
+.bm-fd-muted { color: var(--bm-ink-muted) !important; }
+.bm-fd-field { margin-bottom: 0.85rem; }
+.bm-fd-field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
+.bm-fd-field select, .bm-fd-field input, .bm-fd-field textarea {
+  width: 100%; padding: 0.7rem 0.8rem; border-radius: 10px;
+  border: 1px solid var(--bm-border-strong, #c2cad6); font: inherit;
+}
+.bm-fd-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.75rem 1.1rem; border-radius: 12px; font-weight: 600;
+  border: 1px solid transparent; cursor: pointer; font: inherit; text-decoration: none;
+}
+.bm-fd-btn-primary { background: var(--bm-brand); color: #fff; }
+.bm-fd-btn-ghost { background: #fff; color: var(--bm-brand); border-color: var(--bm-border); }
+.bm-fd-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.bm-fd-metrics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.65rem;
+}
+.bm-fd-metric {
+  background: #fff; border: 1px solid var(--bm-border); border-radius: 12px;
+  padding: 0.85rem; box-shadow: var(--bm-shadow);
+}
+.bm-fd-metric span { display:block; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--bm-ink-faint); }
+.bm-fd-metric strong { font-family: var(--bm-display); font-size: 1.25rem; color: var(--bm-brand); }
+
+.bm-fd-timeline { list-style: none; margin: 0; padding: 0; }
+.bm-fd-timeline li {
+  position: relative; padding: 0.55rem 0 0.55rem 1.25rem;
+  border-left: 2px solid var(--bm-border); margin-left: 0.4rem;
+}
+.bm-fd-timeline li::before {
+  content: ""; position: absolute; left: -5px; top: 0.85rem;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--bm-brand);
+}
+.bm-fd-timeline strong { display:block; font-size: 0.9rem; }
+.bm-fd-timeline span { font-size: 0.75rem; color: var(--bm-ink-faint); }
+
+.bm-fd-alert {
+  border: 1px solid var(--bm-border); border-radius: 12px;
+  padding: 0.75rem 0.85rem; margin-bottom: 0.5rem; background: #fff;
+}
+.bm-fd-alert strong { display:block; font-size: 0.9rem; }
+.bm-fd-alert p { margin: 0.25rem 0 0; font-size: 0.82rem; color: var(--bm-ink-muted); }
+
+/* Employee mobile frame */
+.bm-fd-phone {
+  max-width: 390px; margin: 0 auto;
+  background: #fff; border: 1px solid var(--bm-border);
+  border-radius: 24px; box-shadow: var(--bm-shadow);
+  padding: 1.25rem 1.1rem 1.75rem; min-height: 640px;
+}
+.bm-fd-phone .logo {
+  font-family: var(--bm-display); color: var(--bm-brand);
+  font-weight: 650; font-size: 1.2rem; margin-bottom: 0.35rem;
+}
+.bm-fd-check { display: flex; gap: 0.55rem; align-items: flex-start; margin: 1rem 0; font-size: 0.88rem; }
+.bm-fd-success {
+  text-align: center; padding: 2rem 0.5rem;
+}
+.bm-fd-success h2 { color: var(--bm-teal); }
+.bm-fd-code {
+  font-family: ui-monospace, monospace; font-size: 0.78rem;
+  background: #f4f6f8; padding: 0.75rem; border-radius: 10px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.bm-fd-note { font-size: 0.75rem; color: var(--bm-ink-faint); margin-top: 0.75rem; }
+.bm-fd-bell-wrap { position: relative; display: inline-flex; align-items: center; }
+.bm-fd-bell {
+  border: 1px solid var(--bm-border); background: #fff; border-radius: 10px;
+  padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600; color: var(--bm-brand); cursor: pointer;
+}
+.bm-fd-badge {
+  position: absolute; top: -6px; right: -8px; min-width: 1.1rem; height: 1.1rem;
+  border-radius: 999px; background: #b42318; color: #fff; font-size: 0.65rem;
+  display: flex; align-items: center; justify-content: center; padding: 0 0.2rem;
+}
+.bm-fd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+@media (max-width: 560px) {
+  .bm-fd-phone { border-radius: 0; min-height: 100vh; box-shadow: none; border: 0; max-width: none; }
+}

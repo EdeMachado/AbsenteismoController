@@ -81,4 +81,7 @@ def is_public_api_path(path: str) -> bool:
         return True
     if path.rstrip("/") == "/api/health":
         return True
+    # RC-1.2A preview: digital form APIs (in-memory, synthetic, no clinical content in URLs)
+    if path.startswith("/api/preview/ficha"):
+        return True
     return False

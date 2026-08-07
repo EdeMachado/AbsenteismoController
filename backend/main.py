@@ -629,6 +629,41 @@ async def release_candidate_functional_preview():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/preview/landing", response_class=HTMLResponse)
+async def preview_landing_premium():
+    """RC-1.2A — institutional landing premium. Synthetic preview. No login."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "landing-premium.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/ficha-digital", response_class=HTMLResponse)
+async def preview_ficha_digital():
+    """RC-1.2A — Digital Employee Form journey (staff + employee). In-memory. No login."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "ficha-digital.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/f/{token}", response_class=HTMLResponse)
+async def employee_digital_form(token: str):
+    """RC-1.2A — secure employee form entry. Opaque token only in path (no CPF/matrícula/CID)."""
+    # Reject obvious PII-looking path segments in preview guard (length/charset soft check)
+    if len(token) < 16 or any(ch in token for ch in "@/\\?&= "):
+        raise HTTPException(status_code=404, detail="Link inválido")
+    file_path = os.path.join(FRONTEND_DIR, "preview", "ficha-employee.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        html = f.read().replace("__TOKEN__", token)
+    return HTMLResponse(content=html)
+
+
+# RC-1.2A digital form preview APIs (in-memory store)
+from backend.digital_form.routes import router as digital_form_router  # noqa: E402
+
+app.include_router(digital_form_router)
+
+
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():
     """Página de análises"""
