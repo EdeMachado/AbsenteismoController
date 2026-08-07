@@ -613,6 +613,14 @@ async def product_excellence_audit_preview():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/preview/release-candidate", response_class=HTMLResponse)
+async def release_candidate_consolidation_preview():
+    """RC-1.1 — product consolidation homologation. Synthetic. No login. No new features."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "release-candidate.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():
     """Página de análises"""
