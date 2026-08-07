@@ -15,6 +15,7 @@
 | MAIN_BEFORE_MERGE | `540cda0806326aa14ced57d42fd43e8a69817d08` |
 | MERGE_COMMIT | `9ed88591f08a5261abb09d7d9e03493a52dff2c3` |
 | MAIN_AFTER_MERGE | `9ed88591f08a5261abb09d7d9e03493a52dff2c3` |
+| DOC follow-up on main | `c49ac5b8ee90f55b209cf2d805b4400cc4378ba5` (este relatório; docs-only) |
 | Merge method | **merge commit** (não squash) |
 | Parents | `540cda08…` + `edb0f9a…` |
 | RC tip ancestral de main | YES |
