@@ -28,5 +28,47 @@
     "viewport": "1920x1080",
     "file": "executive_1920x1080.html",
     "pii": false
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec03_command_1440x900.png",
+    "pii": false,
+    "module": "command"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec03_analytics_1440x900.png",
+    "pii": false,
+    "module": "analytics"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec03_cost_1440x900.png",
+    "pii": false,
+    "module": "cost"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec03_questions_1440x900.png",
+    "pii": false,
+    "module": "questions"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec03_analyze_drawer_1440x900.png",
+    "pii": false,
+    "module": "analyze"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec03_presentation_slide1_1440x900.png",
+    "pii": false,
+    "module": "presentation"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec03_presentation_mid_1440x900.png",
+    "pii": false,
+    "module": "presentation"
   }
 ]
