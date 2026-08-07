@@ -74,8 +74,11 @@ def test_home_is_biomed_hub_with_unified_shell():
     assert "Visão Executiva" in body
     assert 'href="/executive"' in body
     assert 'href="/dashboard"' in body
+    assert "Visão Geral" in body or "Analytics" in body
     assert "rc20p1" in body
     assert "AbsenteismoController - GrupoBiomed" not in body
+    # Hub must not send users to stub /analises as primary analytics
+    assert 'href="/analises"' not in body
 
 
 def test_legacy_dashboard_preserved_at_dashboard_route():
@@ -95,19 +98,49 @@ def test_shell_menu_map_and_ficha_disabled():
     assert 'link("/executive"' in js
     assert "Visão Executiva" in js
     assert "Analytics" in js
+    assert "Visão Geral" in js
+    assert 'link("/dashboard"' in js
+    assert 'link("/comparativos"' in js
+    assert 'link("/dados_powerbi"' in js
+    assert 'link("/dashboard_powerbi"' in js
+    assert 'link("/produtividade"' in js
     assert "Operacional" in js
+    assert "Clientes / Empresas" in js
+    assert 'link("/upload_inteligente"' in js
     assert "Apresentação" in js
     assert "Fichas" in js
     assert "disabled: true" in js
     assert 'link("/configuracoes"' in js
     assert 'link("/", "Início"' in js
     assert "Voltar ao sistema" not in js
+    # Stubs must not be primary Analytics destination
+    assert 'link("/analises"' not in js
+    assert 'link("/tendencias"' not in js
+
+
+def test_feature_inventory_doc_complete():
+    doc = (ROOT / "docs/release/RC20_PHASE1_FEATURE_INVENTORY.md").read_text(encoding="utf-8")
+    for marker in (
+        "LEGACY_FEATURE_INVENTORY",
+        "NEW_FEATURE_INVENTORY",
+        "MISSING_IN_NEW",
+        "DATA_SOURCE_MAP",
+        "GRAPH_INVENTORY",
+        "TARGET_MENU",
+        "FEATURE_MIGRATION_MAP",
+        "EXECUTIVE_KEEP",
+        "ANALYTICS_MOVE",
+        "OPERATIONS_MOVE",
+        "INVENTORY_COMPLETE=yes",
+    ):
+        assert marker in doc
 
 
 def test_operational_pages_include_shell():
     for name in (
         "clientes.html",
         "upload.html",
+        "upload_inteligente.html",
         "funcionarios.html",
         "produtividade.html",
         "dados_powerbi.html",

@@ -60,7 +60,7 @@ async function carregarAlertasMenu() {
 function renderizarMenu() {
     const menuHTML = `
         <nav class="sidebar-nav">
-            <a href="/" class="nav-item">
+            <a href="/dashboard" class="nav-item">
                 <i class="fas fa-chart-line"></i>
                 <span>Dashboard</span>
             </a>

@@ -1,11 +1,12 @@
 /**
  * BioMed One Platform shell — RC-20 Phase 1
- * Injects unified navigation; does not alter business APIs.
+ * Menu built from LEGACY_FEATURE_INVENTORY (docs/release/RC20_PHASE1_FEATURE_INVENTORY.md).
+ * Does not invent modules; stubs (analises/tendencias/INSS) stay out of nav.
  */
 (function () {
   "use strict";
 
-  var CACHE = "rc20p1";
+  var CACHE = "rc20p1b";
 
   function companyLabel() {
     try {
@@ -32,19 +33,21 @@
     if (p === "/apresentacao") return "presentation";
     if (p === "/configuracoes") return "config";
     if (
-      p === "/analises" ||
-      p === "/tendencias" ||
+      p === "/dashboard" ||
       p === "/comparativos" ||
       p === "/dados_powerbi" ||
       p === "/dashboard_powerbi" ||
-      p === "/dashboard"
+      p === "/produtividade" ||
+      p === "/analises" ||
+      p === "/tendencias"
     )
       return "analytics";
     if (
       p === "/clientes" ||
       p === "/funcionarios" ||
       p === "/upload" ||
-      p === "/produtividade" ||
+      p === "/upload_inteligente" ||
+      p === "/auto_processor" ||
       p === "/perfil_funcionario" ||
       p === "/preview"
     )
@@ -91,13 +94,17 @@
       '<nav class="bm-plat-links">' +
       link("/", "Início", "home") +
       link("/executive", "Visão Executiva", "executive") +
-      link("/analises", "Analytics", "analytics") +
-      link("/dashboard", "Dashboard", "analytics", { sub: true }) +
-      link("/dados_powerbi", "Meus Dados", "analytics", { sub: true }) +
+      link("/dashboard", "Analytics", "analytics") +
+      link("/dashboard", "Visão Geral", "analytics", { sub: true }) +
+      link("/comparativos", "Comparativos", "analytics", { sub: true }) +
+      link("/dados_powerbi", "Dados / Power BI", "analytics", { sub: true }) +
+      link("/dashboard_powerbi", "Dashboard Power BI", "analytics", { sub: true }) +
+      link("/produtividade", "Produtividade", "analytics", { sub: true }) +
       link("/clientes", "Operacional", "ops") +
-      link("/upload", "Upload", "ops", { sub: true }) +
+      link("/clientes", "Clientes / Empresas", "ops", { sub: true }) +
+      link("/upload", "Uploads", "ops", { sub: true }) +
+      link("/upload_inteligente", "Upload inteligente", "ops", { sub: true }) +
       link("/funcionarios", "Funcionários", "ops", { sub: true }) +
-      link("/produtividade", "Produtividade", "ops", { sub: true }) +
       link("/apresentacao", "Apresentação", "presentation") +
       link("#", "Fichas", "fichas", { disabled: true }) +
       link("/configuracoes", "Configurações", "config") +

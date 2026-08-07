@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BioMed — Plataforma</title>
-  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc20p1" />
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc20p1b" />
 </head>
 <body class="bm-plat-body" data-bm-shell="hub">
   <div id="bm-plat-content">
     <section class="bm-plat-hub-hero" aria-label="Início">
       <h1>BioMed Platform</h1>
-      <p>Uma única plataforma para visão executiva, análise e operação — com a empresa ativa sempre no contexto.</p>
+      <p>Uma única plataforma com a inteligência executiva e todas as funções operacionais já existentes — empresa ativa no contexto.</p>
       <p class="bm-plat-hub-company" id="bm-hub-company">Empresa ativa: —</p>
     </section>
 
@@ -20,20 +20,28 @@
         <span>Estado, impacto e decisão em minutos.</span>
       </a>
       <a class="bm-plat-card" href="/dashboard">
-        <strong>Indicadores</strong>
-        <span>Dashboard operacional da empresa ativa.</span>
+        <strong>Analytics — Visão Geral</strong>
+        <span>KPIs, gráficos, filtros e alertas do dashboard operacional.</span>
       </a>
-      <a class="bm-plat-card" href="/analises">
-        <strong>Analytics</strong>
-        <span>Leituras, tendências e comparativos.</span>
+      <a class="bm-plat-card" href="/comparativos">
+        <strong>Comparativos</strong>
+        <span>Período versus período com variações reais.</span>
+      </a>
+      <a class="bm-plat-card" href="/dados_powerbi">
+        <strong>Dados / Power BI</strong>
+        <span>Registros, edição e leituras detalhadas.</span>
+      </a>
+      <a class="bm-plat-card" href="/produtividade">
+        <strong>Produtividade</strong>
+        <span>Consolidado mensal por categoria.</span>
       </a>
       <a class="bm-plat-card" href="/clientes">
         <strong>Operacional</strong>
-        <span>Empresas, upload, equipes e produtividade.</span>
+        <span>Empresas, uploads, funcionários.</span>
       </a>
       <a class="bm-plat-card" href="/apresentacao">
         <strong>Apresentação</strong>
-        <span>Materiais para reunião e alinhamento.</span>
+        <span>Deck e exportação PPTX.</span>
       </a>
       <a class="bm-plat-card" href="/configuracoes">
         <strong>Configurações</strong>
@@ -42,10 +50,11 @@
     </div>
 
     <p class="bm-plat-hub-note">
-      Fichas digitais permanecem em preparação e não estão disponíveis nesta etapa.
+      Causas, setores, CID e tendências detalhadas permanecem dentro da Visão Geral (/dashboard) — não há páginas stub no menu.
+      Fichas digitais e Presentation premium continuam bloqueadas nesta etapa.
     </p>
   </div>
-  <script src="/static/js/biomed-platform-shell.js?v=rc20p1"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc20p1b"></script>
   <script>
     (function () {
       if (!localStorage.getItem("access_token")) {
