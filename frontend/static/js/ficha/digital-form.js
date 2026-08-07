@@ -113,7 +113,7 @@
           esc(a.title) +
           "</strong><p>" +
           esc(a.message) +
-          "</p><p class="bm-fd-note">" +
+          '</p><p class="bm-fd-note">' +
           esc(a.timestamp) +
           " · sem conteúdo clínico</p></div>"
         );

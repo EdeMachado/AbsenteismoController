@@ -1,6 +1,7 @@
 # RC-1.2A — Landing Premium + Ficha Digital do Colaborador
 
 **Branch:** `cursor/rc12a-landing-ficha-digital-f8f5`  
+**HEAD:** `(pending)`
 **Status:** Draft · sem merge · sem deploy · sem produção
 
 ## Preview
