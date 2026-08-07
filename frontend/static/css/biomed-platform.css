@@ -111,6 +111,23 @@
   border-top: 1px solid var(--bm-border, #d8dee8);
   font-size: 0.8rem;
   color: var(--bm-ink-muted, #5a6474);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.bm-plat-logout {
+  border: 1px solid var(--bm-border, #d8dee8);
+  background: #fff;
+  color: var(--bm-brand, #1a4566);
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bm-plat-logout:hover {
+  border-color: rgba(26, 69, 102, 0.35);
 }
 
 .bm-plat-top {
@@ -327,4 +344,39 @@ body.bm-plat-legacy .powerbi-container {
 body.bm-plat-legacy .powerbi-container {
   display: block !important;
   height: auto !important;
+}
+
+/* RC-21B — kill legacy parallel chrome under platform shell */
+body[data-bm-shell] .header-user-widget,
+body.bm-plat-body .header-user-widget,
+body.bm-plat-legacy .header-user-widget {
+  display: none !important;
+}
+body[data-bm-shell] .sidebar,
+body.bm-plat-legacy .sidebar,
+body.bm-plat-body .sidebar {
+  display: none !important;
+}
+body[data-bm-shell] .bm-nav--minimal,
+body[data-bm-shell] .bm-nav-ops,
+body[data-bm-shell] .bm-brand-sub {
+  display: none !important;
+}
+body.bm-plat-legacy .container {
+  display: block !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+body.bm-plat-legacy .header {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* Do not show parallel logout/admin pills when shell already shows user */
+body[data-bm-shell] .header-logout-btn,
+body[data-bm-shell] .header-login-btn {
+  display: none !important;
 }

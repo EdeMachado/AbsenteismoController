@@ -164,13 +164,13 @@ def test_executive_html_responsive_and_modules():
     assert 'id="first"' in html
     assert "bm-first-experience" in html
     assert "first-experience.js" in html
-    # RC-1.9 FIX-03 / RC-20: flag copy must not appear in client UI chrome
+    # RC-21B: platform shell owns Início; Executive keeps in-module steps only
+    assert "bm-fx-steps" in html or 'data-bm-shell="hub"' in html
+    assert "Voltar ao sistema" not in html
     assert "ENABLE_EXECUTIVE_UI" not in html
     assert "experiência experimental" not in html.lower()
     assert "biomed-executive.css" in html
     assert 'data-theme="dark"' not in html
-    assert "Início" in html
-    assert "Voltar ao sistema" not in html
 
 
 def test_design_system_has_tokens():

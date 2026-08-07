@@ -50,6 +50,9 @@ function getCurrentClientId(defaultId = null) {
 window.getCurrentClientId = getCurrentClientId;
 
 function renderSidebar() {
+    // RC-21B: platform shell owns navigation — do not rebuild legacy sidebar
+    if (document.body && document.body.getAttribute("data-bm-shell")) return;
+
     const sidebar = document.querySelector('.sidebar');
     if (!sidebar) return;
 
@@ -299,6 +302,9 @@ function displayUserInfo() {
 }
 
 function renderHeaderUser() {
+    // RC-21B: platform shell owns user chrome — skip legacy admin header widget
+    if (document.body && document.body.getAttribute("data-bm-shell")) return;
+
     const headerActions = document.querySelector('.header .header-actions') || document.querySelector('.header');
     if (!headerActions) return;
 

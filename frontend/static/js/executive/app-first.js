@@ -228,16 +228,23 @@
     load();
   });
 
-  document.getElementById("bm-nav-toggle").addEventListener("click", function () {
-    const nav = document.getElementById("bm-nav");
-    const open = nav.classList.toggle("is-open");
-    this.setAttribute("aria-expanded", open ? "true" : "false");
-  });
+  var navToggle = document.getElementById("bm-nav-toggle");
+  if (navToggle) {
+    navToggle.addEventListener("click", function () {
+      const nav = document.getElementById("bm-nav");
+      if (!nav) return;
+      const open = nav.classList.toggle("is-open");
+      this.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
 
-  document.getElementById("bm-nav-first").addEventListener("click", function (e) {
-    e.preventDefault();
-    showView("first", "push");
-  });
+  var navFirst = document.getElementById("bm-nav-first");
+  if (navFirst) {
+    navFirst.addEventListener("click", function (e) {
+      e.preventDefault();
+      showView("first", "push");
+    });
+  }
   const navDec = document.getElementById("bm-nav-decision");
   if (navDec) {
     navDec.addEventListener("click", function (e) {

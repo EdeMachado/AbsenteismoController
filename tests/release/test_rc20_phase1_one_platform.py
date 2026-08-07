@@ -155,13 +155,13 @@ def test_operational_pages_include_shell():
 
 def test_executive_integrated_in_one_platform_journey():
     html = (FRONTEND / "executive.html").read_text(encoding="utf-8")
-    assert "Início" in html
-    assert 'href="/"' in html
+    assert 'data-bm-shell="hub"' in html
+    assert "biomed-platform-shell.js" in html
+    assert "bm-nav-ops" not in html
     assert "Voltar ao sistema" not in html
     assert "Voltar ao operacional" not in html
-    assert "Analytics" in html
-    assert "Operação" in html or "Operacional" in html
-    assert "rc21" in html or "rc20p1" in html
+    assert "bm-fx-steps" in html
+    assert "rc21" in html
     assert "biomed-platform.css" in html
 
 

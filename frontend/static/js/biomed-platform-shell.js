@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  var CACHE = "rc21";
+  var CACHE = "rc21b";
 
   var BREADCRUMB = {
     "/": "Início",
@@ -138,7 +138,10 @@
       link("/configuracoes", "Configurações", "config") +
       "</nav>" +
       '<div class="bm-plat-user">' +
+      '<span>' +
       userLabel() +
+      "</span>" +
+      '<button type="button" class="bm-plat-logout" id="bm-plat-logout">Sair</button>' +
       "</div>" +
       "</aside>"
     );
@@ -175,6 +178,17 @@
       btn.addEventListener("click", function () {
         var open = shell.classList.toggle("is-nav-open");
         btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
+    var logout = document.getElementById("bm-plat-logout");
+    if (logout && !logout._bmBound) {
+      logout._bmBound = true;
+      logout.addEventListener("click", function () {
+        try {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("user");
+        } catch (e) {}
+        window.location.href = "/login";
       });
     }
   }
