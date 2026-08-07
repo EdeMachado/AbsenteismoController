@@ -646,6 +646,29 @@ async def preview_ficha_digital():
         return HTMLResponse(content=f.read())
 
 
+@app.get("/preview/executive-presentation-rc", response_class=HTMLResponse)
+async def preview_executive_presentation_rc():
+    """RC-1.4 — Executive Presentation Premium. Synthetic. No login. No production data."""
+    import json
+    from backend.executive.presentation_preview import build_synthetic_premium_deck
+
+    file_path = os.path.join(FRONTEND_DIR, "preview", "executive-presentation-rc.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        html = f.read()
+    deck = build_synthetic_premium_deck()
+    inject = (
+        "<script>window.__RC14_DECK__ = "
+        + json.dumps(deck, ensure_ascii=False)
+        + ";</script>\n"
+    )
+    html = html.replace(
+        '<script src="/static/js/executive/presentation-premium.js"></script>',
+        inject + '<script src="/static/js/executive/presentation-premium.js"></script>',
+        1,
+    )
+    return HTMLResponse(content=html)
+
+
 @app.get("/f/{token}", response_class=HTMLResponse)
 async def employee_digital_form(token: str):
     """RC-1.2A — secure employee form entry. Opaque token only in path (no CPF/matrícula/CID)."""

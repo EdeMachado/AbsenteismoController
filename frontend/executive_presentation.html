@@ -5,31 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BioMed Executive Presentation</title>
   <link rel="stylesheet" href="/static/css/biomed-executive.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <link rel="stylesheet" href="/static/css/biomed-presentation-premium.css" />
 </head>
-<body class="bm-presentation-body">
+<body class="bm-presentation-body bm-rc14-body">
   <div class="bm-pres-shell">
-    <header class="bm-pres-top">
+    <header class="bm-pres-top bm-rc14-chrome">
       <div>
-        <div class="bm-brand">BioMed</div>
-        <p class="bm-muted" style="margin:0">Apresentação executiva experimental · sem PII · flag ENABLE_EXECUTIVE_PRESENTATION</p>
+        <strong>BioMed</strong>
+        <div class="bm-rc14-muted">Apresentação executiva · sem identificação nominal</div>
       </div>
-      <div class="bm-pres-controls">
-        <a class="bm-btn bm-btn-ghost" href="/executive">← Command Center</a>
-        <button type="button" class="bm-btn bm-btn-ghost" id="bm-pres-prev">Anterior</button>
-        <span id="bm-pres-counter" class="bm-muted">—</span>
-        <button type="button" class="bm-btn" id="bm-pres-next">Próximo</button>
+      <div class="bm-pres-controls bm-rc14-actions">
+        <a class="bm-rc14-btn" href="/executive">Voltar</a>
+        <button type="button" class="bm-rc14-btn" id="bm-pres-prev">Voltar</button>
+        <span id="bm-pres-counter" class="bm-rc14-muted">—</span>
+        <button type="button" class="bm-rc14-btn is-primary" id="bm-pres-next">Continuar</button>
       </div>
     </header>
-    <div id="bm-pres-status" class="bm-loading" role="status">Montando deck…</div>
+    <div id="bm-pres-status" class="bm-loading" role="status">Preparando leitura executiva…</div>
     <main id="bm-pres-stage" class="bm-pres-stage" aria-live="polite"></main>
-    <nav id="bm-pres-thumbs" class="bm-pres-thumbs" aria-label="Slides"></nav>
-    <footer class="bm-pres-foot">
-      <span>Exportação: modo tela nesta sprint · PDF/PPTX reutilizam narrativa canônica (futuro).</span>
-      <span>Legado <a href="/apresentacao">/apresentacao</a> preservado.</span>
-    </footer>
+    <nav id="bm-pres-thumbs" class="bm-pres-thumbs" hidden aria-hidden="true"></nav>
   </div>
-  <script src="/static/js/executive/charts.js"></script>
+  <script src="/static/js/executive/presentation-premium.js"></script>
   <script src="/static/js/executive/presentation.js"></script>
 </body>
 </html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BioMed — Apresentação Executiva Premium (RC-1.4)</title>
+  <link rel="stylesheet" href="/static/css/biomed-presentation-premium.css" />
+</head>
+<body class="bm-rc14-body" id="bm-rc14-body">
+  <div class="bm-rc14-shell">
+    <header class="bm-rc14-chrome">
+      <div>
+        <strong>BioMed Executive Meeting</strong>
+        <div class="bm-rc14-muted">RC-1.4 · demonstração · valores ILUSTRATIVOS · sem dados reais</div>
+      </div>
+      <div class="bm-rc14-actions">
+        <span class="bm-rc14-muted" data-rc14-counter>—</span>
+        <button type="button" class="bm-rc14-btn" id="bm-rc14-prev">Voltar</button>
+        <button type="button" class="bm-rc14-btn is-primary" id="bm-rc14-next">Continuar</button>
+        <button type="button" class="bm-rc14-btn" id="bm-rc14-fs">Tela cheia</button>
+      </div>
+    </header>
+    <div class="bm-rc14-progress" aria-hidden="true"><i data-rc14-progress></i></div>
+    <main class="bm-rc14-stage" data-rc14-stage aria-live="polite"></main>
+  </div>
+
+  <script src="/static/js/executive/presentation-premium.js"></script>
+  <script>
+    (function () {
+      var deck = window.__RC14_DECK__;
+      if (!deck || !window.BioMedPresentationPremium) {
+        document.querySelector("[data-rc14-stage]").innerHTML =
+          '<p class="bm-rc14-muted" style="color:#fff">Não foi possível carregar a apresentação.</p>';
+        return;
+      }
+      var ctrl = window.BioMedPresentationPremium.mount(document.querySelector(".bm-rc14-shell"), deck);
+      document.getElementById("bm-rc14-next").addEventListener("click", ctrl.next);
+      document.getElementById("bm-rc14-prev").addEventListener("click", ctrl.prev);
+      document.getElementById("bm-rc14-fs").addEventListener("click", function () {
+        var el = document.documentElement;
+        if (!document.fullscreenElement) {
+          (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el);
+          document.getElementById("bm-rc14-body").classList.add("is-fs");
+        } else {
+          (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+          document.getElementById("bm-rc14-body").classList.remove("is-fs");
+        }
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
+          e.preventDefault();
+          ctrl.next();
+        }
+        if (e.key === "ArrowLeft" || e.key === "PageUp") {
+          e.preventDefault();
+          ctrl.prev();
+        }
+        if (e.key === "Escape") {
+          document.getElementById("bm-rc14-body").classList.remove("is-fs");
+        }
+      });
+      // touch swipe
+      var startX = null;
+      document.addEventListener("touchstart", function (e) {
+        startX = e.changedTouches[0].screenX;
+      }, { passive: true });
+      document.addEventListener("touchend", function (e) {
+        if (startX == null) return;
+        var dx = e.changedTouches[0].screenX - startX;
+        if (Math.abs(dx) > 50) {
+          if (dx < 0) ctrl.next();
+          else ctrl.prev();
+        }
+        startX = null;
+      }, { passive: true });
+    })();
+  </script>
+</body>
+</html>

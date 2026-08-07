@@ -250,30 +250,36 @@ def test_hours_estimate_from_days_when_jornada():
 
 def test_presentation_omits_unavailable_slides():
     payload = {
-        "hero": {"mensagem": "ok"},
-        "kpis_primary": [{"id": "eventos", "label": "Eventos", "value": 1}],
+        "hero": {"mensagem": "ok", "empresa": "Alpha"},
+        "kpis_primary": [{"id": "eventos", "label": "Eventos", "value": 1, "available": True}],
         "charts": [],
         "custo": {"calculavel": False},
         "intelligence": {"confianca": "baixa", "plano_acao": []},
         "qualidade": {"iqb": 70},
         "methodology": {"how": []},
-        "biomed_performance": {"producao": {}},
+        "biomed_performance": None,
         "conditionants": [],
     }
     deck = compose_presentation(payload)
     ids = {s["id"] for s in deck["slides"]}
     omitted = {o["id"] for o in deck["omitted"]}
-    assert "resumo" in ids
-    assert "kpis" in ids
-    assert "custo" in omitted  # not calculable
-    assert "evolucao" in omitted  # no chart
+    assert "cover" in ids
+    assert "state" in ids
+    assert "financial" in ids  # hours/days/eventos allow the slide even without cost
+    assert "changed" in omitted  # no evolution chart
+    assert "where" in omitted
     assert deck["privacy"]["pii_excluded"] is True
+    assert deck["mode"] == "ceo"
 
 
 def test_presentation_includes_cost_when_calculable():
     payload = {
-        "hero": {"mensagem": "ok"},
-        "kpis_primary": [{"id": "eventos", "value": 1}],
+        "hero": {"mensagem": "ok", "empresa": "Alpha"},
+        "kpis_primary": [
+            {"id": "eventos", "value": 1, "available": True},
+            {"id": "horas", "value": 10, "available": True},
+            {"id": "dias", "value": 2, "available": True},
+        ],
         "charts": [
             {
                 "id": "evolucao_temporal",
@@ -287,30 +293,46 @@ def test_presentation_includes_cost_when_calculable():
             "calculavel": True,
             "custo_estimado": 1000,
             "linguagem": "impacto laboral estimado",
-            "assumption": {"estado": "ILUSTRATIVO"},
+            "assumption": {"estado": "ILUSTRATIVO", "valor": 35},
             "hours": {"horas": 10, "kind": "registradas"},
             "breakdown": {},
         },
         "recorrencia_agregada": {"n_2plus": 1, "n_3plus": 0, "n_5plus": 0},
         "afastamentos_longos": {"n_eventos": 1},
         "qualidade": {"iqb": 80},
-        "biomed_performance": {"producao": {"executadas": 1}},
+        "biomed_performance": {"action_counts": {"realizadas": 1, "concluidas": 1, "pendentes": 0}},
         "conditionants": [{"status": "adiada"}],
         "intelligence": {
             "confianca": "moderada",
-            "plano_acao": [{"title": "Ação", "priority": "alta"}],
+            "plano_acao": [{"title": "Ação", "priority": "alta", "deadline": "30 dias"}],
             "resumo_executivo": "resumo",
             "mensagem_executiva": "msg",
         },
         "methodology": {"how": ["x"]},
         "limitations": ["lim"],
+        "decision_experience": {
+            "header": {"title": "Decisão"},
+            "six_answers": {"first_step": "Validar"},
+            "business_impact": {
+                "savings_potential": {"available": True, "value": 100, "assumption_state": "ILUSTRATIVO"},
+                "cost_if_nothing": {"available": True, "value": 1000, "assumption_state": "ILUSTRATIVO"},
+            },
+            "roadmap": [
+                {"horizon": "30 dias", "focus": "A"},
+                {"horizon": "90 dias", "focus": "B"},
+                {"horizon": "180 dias", "focus": "C"},
+            ],
+        },
+        "impacto_economico_biomed": {"economia_potencial": 100, "linguagem": "estimativa"},
     }
     deck = compose_presentation(payload)
     ids = [s["id"] for s in deck["slides"]]
-    assert "custo" in ids
-    assert "recorrencia" in ids
-    custo_slide = next(s for s in deck["slides"] if s["id"] == "custo")
-    assert custo_slide["privacy"]["pii_excluded"] is True
+    assert "financial" in ids
+    assert "recurrence" in ids
+    assert "closing" in ids
+    fin = next(s for s in deck["slides"] if s["id"] == "financial")
+    assert fin["financial"]["premissa"] == "ILUSTRATIVO"
+    assert fin["privacy"]["pii_excluded"] is True
     blob = json.dumps(deck, ensure_ascii=False).lower()
     assert "cpf" not in blob or "pii" in blob
     assert "mat-a1" not in blob
@@ -318,7 +340,7 @@ def test_presentation_includes_cost_when_calculable():
 
 
 def test_slide_defs_count():
-    assert len(SLIDE_DEFS) == 18
+    assert len(SLIDE_DEFS) == 15
 
 
 # --- Aggregate integration ---

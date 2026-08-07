@@ -1,39 +1,112 @@
-"""Executive Presentation deck composer — EXEC-03.
+"""Executive Presentation Premium — RC-1.4.
 
-Builds sequential slides from aggregate payload. Omits unavailable slides.
-No PII. Legacy /apresentacao remains untouched.
+CEO meeting deck: short, visual, financial, evidence-based.
+Each slide answers one executive question. Auto-omits when evidence is insufficient.
+Legacy /apresentacao untouched. Business APIs unchanged (same /api/executive/presentation).
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 
+# Premium CEO structure (RC-1.4). Max ~15; omitted when evidence insufficient.
 SLIDE_DEFS: list[dict[str, Any]] = [
-    {"id": "resumo", "title": "Resumo executivo", "required": ["hero"]},
-    {"id": "kpis", "title": "KPIs principais", "required": ["kpis_primary"]},
-    {"id": "evolucao", "title": "Evolução do absenteísmo", "required": ["chart:evolucao_temporal"]},
-    {"id": "impacto_dias_horas", "title": "Impacto em dias e horas", "required": ["kpis_primary"]},
-    {"id": "custo", "title": "Custo do absenteísmo", "required": ["custo_calculavel"]},
-    {"id": "cid", "title": "Principais causas / CID", "required": ["chart:pareto_cid"]},
-    {"id": "setores", "title": "Setores críticos", "required": ["chart:setores"]},
-    {"id": "recorrencia", "title": "Recorrência", "required": ["recorrencia_agregada"]},
-    {"id": "afastamentos", "title": "Afastamentos prolongados", "required": ["afastamentos_longos"]},
-    {"id": "padroes_temporais", "title": "Padrões temporais", "required": ["padroes_temporais"]},
-    {"id": "qualidade", "title": "Qualidade dos dados", "required": ["qualidade"]},
-    {"id": "atuacao_biomed", "title": "Atuação BioMed", "required": ["biomed_performance"]},
-    {"id": "resultado", "title": "Resultado observado", "required": ["biomed_performance"]},
-    {"id": "condicionantes", "title": "Condicionantes empresariais", "required": ["conditionants"]},
-    {"id": "intelligence", "title": "BioMed Intelligence", "required": ["intelligence"]},
-    {"id": "plano_acao", "title": "Plano de Ação", "required": ["plano_acao"]},
-    {"id": "prioridades", "title": "Prioridades para próximo ciclo", "required": ["plano_acao"]},
-    {"id": "metodologia", "title": "Metodologia / limitações", "required": ["methodology"]},
+    {"id": "cover", "title": "Capa", "question": None, "required": ["hero"]},
+    {"id": "state", "title": "Estado da empresa", "question": "Como está a empresa agora?", "required": ["hero"]},
+    {
+        "id": "financial",
+        "title": "Impacto financeiro",
+        "question": "Quanto estamos perdendo?",
+        "required": ["impacto_operacional"],
+    },
+    {
+        "id": "where",
+        "title": "Onde está o problema?",
+        "question": "Onde está o problema?",
+        "required": ["chart:setores"],
+    },
+    {
+        "id": "causes",
+        "title": "O que mais afasta?",
+        "question": "Por que estamos perdendo?",
+        "required": ["chart:pareto_cid"],
+    },
+    {
+        "id": "recurrence",
+        "title": "Como o problema se repete?",
+        "question": "Por que estamos perdendo?",
+        "required": ["recorrencia_agregada"],
+    },
+    {
+        "id": "when",
+        "title": "Quando acontece?",
+        "question": "Por que estamos perdendo?",
+        "required": ["padroes_temporais"],
+    },
+    {
+        "id": "changed",
+        "title": "O que mudou?",
+        "question": "O que mudou no período?",
+        "required": ["chart:evolucao_temporal"],
+    },
+    {
+        "id": "biomed",
+        "title": "Atuação BioMed",
+        "question": "O que já foi feito?",
+        "required": ["biomed_performance"],
+    },
+    {
+        "id": "savings",
+        "title": "Quanto podemos melhorar?",
+        "question": "Quanto podemos melhorar/economizar?",
+        "required": ["savings_valid"],
+    },
+    {
+        "id": "inaction",
+        "title": "E se nada mudar?",
+        "question": "Quanto podemos melhorar/economizar?",
+        "required": ["inaction_valid"],
+    },
+    {
+        "id": "priorities",
+        "title": "As 3 prioridades",
+        "question": "O que precisamos decidir agora?",
+        "required": ["plano_acao"],
+    },
+    {
+        "id": "roadmap",
+        "title": "Roteiro",
+        "question": "O que precisamos decidir agora?",
+        "required": ["plano_acao"],
+    },
+    {
+        "id": "decision",
+        "title": "Decisão executiva",
+        "question": "O que precisa ser decidido hoje?",
+        "required": ["decision_valid"],
+    },
+    {
+        "id": "closing",
+        "title": "Encerramento",
+        "question": None,
+        "required": ["hero"],
+    },
 ]
+
+# Kept for regression callers that still import the symbol name
+LEGACY_SLIDE_COUNT = 18
+PREMIUM_SLIDE_COUNT = len(SLIDE_DEFS)
 
 
 def _has(payload: dict[str, Any], key: str) -> bool:
     if key == "custo_calculavel":
         return bool((payload.get("custo") or {}).get("calculavel"))
+    if key == "impacto_operacional":
+        # Hours/days KPIs always allow the financial slide; cost may be NÃO INFORMADO
+        kpis = payload.get("kpis_primary") or payload.get("kpis") or []
+        ids = {k.get("id") for k in kpis}
+        return bool(ids & {"horas", "dias", "eventos"}) or bool(payload.get("custo"))
     if key == "plano_acao":
         return bool(((payload.get("intelligence") or {}).get("plano_acao") or []))
     if key == "afastamentos_longos":
@@ -44,9 +117,28 @@ def _has(payload: dict[str, Any], key: str) -> bool:
         return bool(payload.get("recorrencia_agregada"))
     if key == "conditionants":
         return bool(payload.get("conditionants"))
+    if key == "savings_valid":
+        eco = payload.get("impacto_economico_biomed") or {}
+        dx = payload.get("decision_experience") or {}
+        bi = (dx.get("business_impact") or {}).get("savings_potential") or {}
+        return bool(eco.get("economia_potencial") is not None or (bi.get("available") and bi.get("value") is not None))
+    if key == "inaction_valid":
+        dx = payload.get("decision_experience") or {}
+        bi = (dx.get("business_impact") or {}).get("cost_if_nothing") or {}
+        return bool(bi.get("available") and bi.get("value") is not None)
+    if key == "roadmap_valid":
+        dx = payload.get("decision_experience") or {}
+        return bool(dx.get("roadmap"))
+    if key == "decision_valid":
+        dx = payload.get("decision_experience") or {}
+        fx = payload.get("first_experience") or {}
+        return bool(dx.get("header") or fx.get("decision") or ((payload.get("intelligence") or {}).get("plano_acao")))
     if key.startswith("chart:"):
         cid = key.split(":", 1)[1]
-        return any(c.get("id") == cid and (c.get("categories") or not c.get("empty_reason")) for c in (payload.get("charts") or []))
+        return any(
+            c.get("id") == cid and (c.get("categories") or not c.get("empty_reason"))
+            for c in (payload.get("charts") or [])
+        )
     val = payload.get(key)
     if val is None:
         return False
@@ -55,118 +147,314 @@ def _has(payload: dict[str, Any], key: str) -> bool:
     return True
 
 
+def _kpi(payload: dict[str, Any], kid: str) -> Optional[dict[str, Any]]:
+    for k in payload.get("kpis_primary") or payload.get("kpis") or []:
+        if k.get("id") == kid:
+            return k
+    return None
+
+
+def _conf_label(raw: Any) -> str:
+    s = str(raw or "baixa").lower()
+    if s in {"alta", "high"}:
+        return "Confiança alta"
+    if s in {"media", "média", "moderada", "medium"}:
+        return "Confiança moderada"
+    return "Evidência insuficiente"
+
+
+def _assumption_label(estado: Optional[str]) -> str:
+    m = {
+        "REAL": "REAL",
+        "ESTIMADO": "ESTIMADO",
+        "ILUSTRATIVO": "ILUSTRATIVO",
+        "NAO_INFORMADO": "NÃO INFORMADO",
+        "NÃO INFORMADO": "NÃO INFORMADO",
+    }
+    return m.get(str(estado or "NAO_INFORMADO"), str(estado or "NÃO INFORMADO"))
+
+
 def compose_presentation(payload: dict[str, Any]) -> dict[str, Any]:
+    """Compose RC-1.4 premium CEO deck from aggregate payload."""
     charts = {c.get("id"): c for c in (payload.get("charts") or [])}
     intel = payload.get("intelligence") or {}
     custo = payload.get("custo") or {}
-    slides = []
-    omitted = []
+    hero = payload.get("hero") or {}
+    dx = payload.get("decision_experience") or {}
+    fx = payload.get("first_experience") or {}
+    client = payload.get("client") or {}
+    periodo = payload.get("periodo") or {}
+    slides: list[dict[str, Any]] = []
+    omitted: list[dict[str, Any]] = []
+
+    company = (
+        hero.get("empresa")
+        or client.get("nome_fantasia")
+        or client.get("nome")
+        or "Empresa"
+    )
+    period_label = hero.get("periodo") or (
+        f"{periodo.get('inicio') or ''} → {periodo.get('fim') or ''}".strip(" →")
+        or "Período selecionado"
+    )
+    conf = _conf_label(intel.get("confianca") or hero.get("confianca"))
 
     for defn in SLIDE_DEFS:
         ok = all(_has(payload, r) for r in defn["required"])
         if not ok:
-            omitted.append({"id": defn["id"], "title": defn["title"], "reason": "dados insuficientes"})
+            omitted.append(
+                {
+                    "id": defn["id"],
+                    "title": defn["title"],
+                    "reason": "evidência insuficiente — slide omitido",
+                }
+            )
             continue
-        slide = {
+
+        slide: dict[str, Any] = {
             "id": defn["id"],
             "title": defn["title"],
-            "chart": None,
+            "question": defn.get("question"),
+            "kind": defn["id"],
+            "insight": None,
+            "confianca_label": conf,
+            "privacy": {"pii_excluded": True, "worker_ranking": False},
+            # legacy keys for older renderer compatibility
             "leitura": "",
             "recomendacao": None,
+            "chart": None,
             "confianca": intel.get("confianca") or "baixa",
-            "metodologia": "MetricService · DataQualityService · Cost Model · Rule Engine",
-            "fonte": "agregados canônicos — sem PII",
-            "privacy": {"pii_excluded": True, "worker_ranking": False},
+            "metodologia": "Métricas agregadas · Qualidade dos dados · Modelo de custo · Priorização determinística",
+            "fonte": "Agregados canônicos — sem identificação nominal",
         }
-        if defn["id"] == "resumo":
-            slide["leitura"] = (payload.get("hero") or {}).get("mensagem") or intel.get("resumo_executivo")
-            slide["kpis"] = payload.get("kpis_primary")
-            slide["score"] = (payload.get("hero") or {}).get("score")
-        elif defn["id"] == "kpis":
-            slide["kpis"] = payload.get("kpis_primary")
-            slide["leitura"] = "Indicadores primários do período selecionado."
-        elif defn["id"] == "evolucao":
-            slide["chart"] = charts.get("evolucao_temporal")
-            slide["leitura"] = "Evolução mensal de eventos com média móvel quando série suficiente."
-        elif defn["id"] == "impacto_dias_horas":
-            slide["kpis"] = [
-                k
-                for k in (payload.get("kpis_primary") or [])
-                if k.get("id") in {"dias", "horas", "eventos"}
-            ]
-            slide["leitura"] = "; ".join(intel.get("o_que_mudou") or [])
-        elif defn["id"] == "custo":
-            slide["custo"] = custo
-            slide["leitura"] = custo.get("linguagem")
-            slide["chart"] = (custo.get("breakdown") or {}).get("evolucao_chart")
-            slide["recomendacao"] = (
-                "Substituir premissa ilustrativa pelo custo hora real da empresa, se ainda ilustrativa."
-                if (custo.get("assumption") or {}).get("estado") == "ILUSTRATIVO"
-                else None
-            )
-        elif defn["id"] == "cid":
-            slide["chart"] = charts.get("pareto_cid")
-            slide["leitura"] = "Pareto de grupos alfabéticos CID (não capítulo oficial)."
-            slide["recomendacao"] = (intel.get("o_que_recomendamos") or [None])[0]
-        elif defn["id"] == "setores":
-            slide["chart"] = charts.get("setores")
-            slide["leitura"] = "Ranking de impacto setorial (eventos/dias)."
-        elif defn["id"] == "recorrencia":
-            slide["recorrencia"] = payload.get("recorrencia_agregada")
-            slide["leitura"] = (
-                "Distribuição agregada de recorrência — sem identificação nominal."
-            )
-        elif defn["id"] == "afastamentos":
-            slide["afastamentos_longos"] = payload.get("afastamentos_longos")
-            slide["leitura"] = "Impacto de afastamentos prolongados quando mensurável."
-        elif defn["id"] == "padroes_temporais":
-            slide["padroes"] = payload.get("padroes_temporais")
-            slide["leitura"] = "Padrões temporais disponíveis na base."
-        elif defn["id"] == "qualidade":
-            slide["qualidade"] = payload.get("qualidade")
-            slide["leitura"] = "Confiabilidade da base (IQB e dimensões)."
-        elif defn["id"] in {"atuacao_biomed", "resultado"}:
-            slide["biomed_performance"] = payload.get("biomed_performance")
-            slide["leitura"] = (
-                "Atuação e resultado observados — associação temporal sem causalidade exclusiva."
-            )
-            # Economic link when hours delta + cost available
-            slide["impacto_economico"] = payload.get("impacto_economico_biomed")
-        elif defn["id"] == "condicionantes":
-            slide["conditionants"] = payload.get("conditionants")
-            slide["leitura"] = payload.get("conditionants_summary")
-        elif defn["id"] == "intelligence":
-            slide["intelligence"] = {
-                "resumo": intel.get("resumo_executivo"),
-                "o_que_mudou": intel.get("o_que_mudou"),
-                "risco": intel.get("onde_esta_o_risco"),
-                "recomendamos": intel.get("o_que_recomendamos"),
+
+        if defn["id"] == "cover":
+            slide["cover"] = {
+                "eyebrow": "BioMed Executive Intelligence",
+                "company": company,
+                "period": period_label,
+                "context": "Reunião executiva",
             }
-            slide["leitura"] = intel.get("mensagem_executiva")
-        elif defn["id"] in {"plano_acao", "prioridades"}:
-            slide["plano_acao"] = intel.get("plano_acao")
-            slide["leitura"] = "Ações propostas com validação médica obrigatória."
+            slide["leitura"] = company
+
+        elif defn["id"] == "state":
+            phrase = (
+                (fx.get("hero") or {}).get("opening_phrase")
+                or hero.get("mensagem")
+                or intel.get("resumo_executivo")
+                or "Leitura descritiva do período disponível."
+            )
+            slide["state_phrase"] = phrase
+            slide["insight"] = None
+            slide["leitura"] = phrase
+
+        elif defn["id"] == "financial":
+            horas = _kpi(payload, "horas")
+            dias = _kpi(payload, "dias")
+            ass = custo.get("assumption") or {}
+            estado = _assumption_label(ass.get("estado"))
+            calculavel = bool(custo.get("calculavel"))
+            slide["financial"] = {
+                "horas": (horas or {}).get("value") if horas and horas.get("available") is not False else None,
+                "dias": (dias or {}).get("value") if dias and dias.get("available") is not False else None,
+                "custo": custo.get("custo_estimado") if calculavel else None,
+                "calculavel": calculavel,
+                "custo_hora": ass.get("valor"),
+                "premissa": estado,
+                "formula": "HORAS PERDIDAS × CUSTO HORA",
+                "custo_hora_nao_informado": estado == "NÃO INFORMADO" or not calculavel,
+            }
+            if calculavel:
+                slide["insight"] = custo.get("linguagem") or (
+                    "O custo estimado concentra o impacto direto das horas perdidas no período."
+                )
+            else:
+                slide["insight"] = "Custo hora não informado. Horas e dias permanecem visíveis sem inventar valor financeiro."
+            slide["custo"] = custo if calculavel else None
+            slide["kpis"] = [k for k in (horas, dias) if k]
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "where":
+            slide["chart"] = charts.get("setores")
+            slide["insight"] = "Concentração setorial — priorizar o ponto de maior impacto."
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "causes":
+            slide["chart"] = charts.get("pareto_cid")
+            slide["insight"] = "Principais grupos de causas concentrados — lista reduzida ao essencial."
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "recurrence":
+            slide["recorrencia"] = payload.get("recorrencia_agregada")
+            slide["insight"] = "Recorrência agregada — sem nomes, sem identificação individual."
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "when":
+            slide["padroes"] = payload.get("padroes_temporais")
+            slide["insight"] = "Padrão temporal observado na base — sem fabricar análise."
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "changed":
+            slide["chart"] = charts.get("evolucao_temporal")
+            mudou = intel.get("o_que_mudou") or []
+            slide["insight"] = (mudou[0] if mudou else "Evolução descritiva do período selecionado.")
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "biomed":
+            bp = payload.get("biomed_performance") or {}
+            counts = bp.get("action_counts") or bp.get("acoes") or {}
+            pend = payload.get("conditionants") or []
+            slide["biomed"] = {
+                "realizadas": counts.get("realizadas") or counts.get("iniciadas") or counts.get("total"),
+                "concluidas": counts.get("concluidas") or counts.get("concluido"),
+                "pendentes": counts.get("pendentes") or len(pend) or None,
+                "condicionantes": payload.get("conditionants_summary"),
+                "nota": "Associação temporal — sem causalidade exclusiva à BioMed.",
+            }
+            slide["biomed_performance"] = bp
+            slide["conditionants"] = pend
+            slide["insight"] = payload.get("conditionants_summary") or (
+                "Atuação, resultado observado e efetividade — sem autopromoção."
+            )
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "savings":
+            eco = payload.get("impacto_economico_biomed") or {}
+            bi = ((dx.get("business_impact") or {}).get("savings_potential") or {})
+            val = eco.get("economia_potencial")
+            if val is None:
+                val = bi.get("value")
+            slide["savings"] = {
+                "valor": val,
+                "premissa": _assumption_label(
+                    ((custo.get("assumption") or {}).get("estado")) or bi.get("assumption_state")
+                ),
+                "nota": eco.get("linguagem")
+                or bi.get("note")
+                or "Estimativa sob premissa explícita — não é promessa de economia.",
+            }
+            slide["insight"] = slide["savings"]["nota"]
+            slide["leitura"] = slide["insight"]
+            slide["impacto_economico"] = eco
+
+        elif defn["id"] == "inaction":
+            bi = ((dx.get("business_impact") or {}).get("cost_if_nothing") or {})
+            slide["inaction"] = {
+                "valor": bi.get("value"),
+                "premissa": _assumption_label(bi.get("assumption_state")),
+                "nota": bi.get("note")
+                or bi.get("caveat")
+                or "Custo de não agir somente com modelo válido — sem projeção para impressionar.",
+            }
+            slide["insight"] = slide["inaction"]["nota"]
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "priorities":
+            plan = (intel.get("plano_acao") or [])[:3]
+            slide["priorities"] = [
+                {
+                    "prioridade": a.get("priority") or a.get("prioridade") or f"P{i+1}",
+                    "problema": a.get("problem") or a.get("problema") or a.get("contexto") or "",
+                    "acao": a.get("title") or a.get("titulo") or "",
+                    "impacto": a.get("impact") or a.get("impacto") or "—",
+                    "prazo": a.get("deadline") or a.get("prazo") or "—",
+                }
+                for i, a in enumerate(plan)
+            ]
+            slide["plano_acao"] = plan
+            slide["insight"] = "No máximo três prioridades — validação humana obrigatória."
+            slide["leitura"] = slide["insight"]
             slide["recomendacao"] = "Sem autoexecução."
-        elif defn["id"] == "metodologia":
-            slide["methodology"] = payload.get("methodology")
-            slide["limitacoes"] = payload.get("limitations") or intel.get("limitacoes")
-            slide["leitura"] = "Fontes canônicas e limitações explícitas."
+
+        elif defn["id"] == "roadmap":
+            road = dx.get("roadmap") or []
+            # Keep only 30 / 90 / 180
+            filtered = []
+            for r in road:
+                h = str(r.get("horizon") or r.get("prazo") or "")
+                if any(x in h for x in ("30", "90", "180")):
+                    filtered.append(
+                        {
+                            "horizon": h,
+                            "focus": r.get("focus") or r.get("foco") or r.get("acao") or "",
+                        }
+                    )
+            if not filtered:
+                filtered = [
+                    {"horizon": "30 dias", "focus": "Validar e iniciar a prioridade nº 1"},
+                    {"horizon": "90 dias", "focus": "Acompanhar evidência e ajustar plano"},
+                    {"horizon": "180 dias", "focus": "Revisar impacto e próxima decisão"},
+                ]
+            slide["roadmap"] = filtered[:3]
+            slide["insight"] = "Roteiro executivo — 30, 90 e 180 dias."
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "decision":
+            decisions = []
+            if dx.get("header"):
+                decisions.append(
+                    {
+                        "titulo": (dx.get("header") or {}).get("title") or "Decisão prioritária",
+                        "detalhe": (dx.get("six_answers") or {}).get("first_step")
+                        or (dx.get("six_answers") or {}).get("problem")
+                        or "",
+                    }
+                )
+            for a in (intel.get("plano_acao") or [])[:2]:
+                decisions.append(
+                    {
+                        "titulo": a.get("title") or a.get("titulo") or "Ação",
+                        "detalhe": a.get("deadline") or a.get("prazo") or "",
+                    }
+                )
+            slide["decisions"] = decisions[:3]
+            slide["insight"] = "O que precisa ser decidido hoje — no máximo três decisões."
+            slide["leitura"] = slide["insight"]
+
+        elif defn["id"] == "closing":
+            horas = _kpi(payload, "horas")
+            ass = custo.get("assumption") or {}
+            eco = payload.get("impacto_economico_biomed") or {}
+            p1 = ((intel.get("plano_acao") or [{}])[0].get("title") if intel.get("plano_acao") else None) or (
+                (dx.get("header") or {}).get("title")
+            )
+            slide["closing"] = {
+                "perda": custo.get("custo_estimado") if custo.get("calculavel") else None,
+                "perda_label": "Custo estimado" if custo.get("calculavel") else "Horas perdidas",
+                "perda_alt": (horas or {}).get("value") if not custo.get("calculavel") else None,
+                "economia": eco.get("economia_potencial"),
+                "prioridade": p1 or "Validar prioridade nº 1",
+                "proxima_revisao": "Em 30 dias",
+                "premissa": _assumption_label(ass.get("estado")),
+                "signature": "BioMed Executive Signature",
+                "tagline": "Transformando evidências em decisões.",
+            }
+            slide["leitura"] = slide["closing"]["tagline"]
 
         slides.append(slide)
 
+    minutes = max(3, min(5, 1 + len(slides) // 3))
     return {
-        "engine_version": "exec03-presentation-v1",
+        "engine_version": "rc14-executive-presentation-premium-v1",
+        "mode": "ceo",
+        "estimated_minutes": minutes,
         "slides": slides,
         "omitted": omitted,
+        "questions": [
+            "Quanto estamos perdendo?",
+            "Por que estamos perdendo?",
+            "Quanto podemos melhorar/economizar?",
+            "O que precisamos decidir agora?",
+        ],
         "export": {
             "tela": True,
-            "pdf": "futuro",
-            "pptx": "reutilizar exportadores legados quando possível",
+            "pdf": "premium",
+            "pptx": "arquitetura preservada — reutilizar exportadores legados quando possível",
         },
         "privacy": {
             "pii_excluded": True,
             "worker_ranking": False,
             "presentation_default": "aggregate",
         },
-        "legacy_note": "Módulo /apresentacao legado preservado; esta é a experiência experimental.",
+        "legacy_note": "Módulo /apresentacao legado preservado; esta é a experiência executiva premium RC-1.4.",
     }
