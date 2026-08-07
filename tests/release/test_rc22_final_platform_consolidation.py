@@ -64,6 +64,7 @@ def test_shell_is_single_and_rc22():
         'var CACHE = "rc22"' in SHELL_JS
         or 'var CACHE = "rc23"' in SHELL_JS
         or 'var CACHE = "rc23a"' in SHELL_JS
+        or 'var CACHE = "rc24"' in SHELL_JS
     )
     assert "bm-plat-nav" in SHELL_JS
     assert "bm-plat-logout" in SHELL_JS
