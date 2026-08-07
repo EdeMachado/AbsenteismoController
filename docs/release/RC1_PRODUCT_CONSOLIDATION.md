@@ -1,7 +1,7 @@
 # RC-1.1 — Product Consolidation
 
 **Branch:** `cursor/rc1-product-consolidation-f8f5`  
-**HEAD:** 
+**HEAD:** `4a5b37de220007a2054021b8f82763c6945453ec`
 **Status:** Draft · sem merge · sem deploy · sem produção
 
 ## Resumo executivo
