@@ -1,5 +1,5 @@
 /**
- * BioMed Platform — RC-21 definitive shell
+ * BioMed Platform — RC-21 definitive shell + RC-22 content isolation
  */
 @import url("/static/css/biomed-identity.css");
 
@@ -379,4 +379,212 @@ body.bm-plat-legacy .header {
 body[data-bm-shell] .header-logout-btn,
 body[data-bm-shell] .header-login-btn {
   display: none !important;
+}
+
+/* ============================================================
+   RC-22 — Final platform consolidation (content identity layer)
+   Preserve functional content; kill legacy chrome leakage.
+   ============================================================ */
+
+body.bm-plat-legacy,
+body.bm-plat-legacy .main-content,
+body.bm-plat-legacy .main-page,
+body.bm-plat-legacy .content-wrapper {
+  font-family: var(--bm-font, "BM Sans", "Segoe UI", sans-serif) !important;
+  color: var(--bm-ink, #132033);
+  background: transparent !important;
+}
+
+body.bm-plat-legacy {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  background:
+    radial-gradient(1000px 420px at 8% -8%, rgba(15, 74, 110, 0.06), transparent 55%),
+    linear-gradient(180deg, #f4f6f8 0%, #f7f6f3 45%, #eef1f4 100%) !important;
+}
+
+/* Legacy nav chrome — never visible under platform shell */
+body.bm-plat-legacy aside.sidebar,
+body.bm-plat-legacy .sidebar-nav,
+body.bm-plat-legacy .sidebar-header,
+body.bm-plat-legacy .sidebar-logo,
+body.bm-plat-legacy .sidebar-subtitle,
+body.bm-plat-legacy #userInfo,
+body.bm-plat-legacy .nav-item,
+body[data-bm-shell] aside.sidebar,
+body[data-bm-shell] .sidebar-nav {
+  display: none !important;
+}
+
+/* Preserve Power BI filter panels (not navigation chrome) */
+body.bm-plat-legacy .sidebar-left,
+body.bm-plat-legacy .sidebar-right,
+body.bm-plat-legacy .powerbi-container .sidebar-left,
+body.bm-plat-legacy .powerbi-container .sidebar-right {
+  display: block !important;
+}
+
+body.bm-plat-legacy .header,
+body.bm-plat-legacy .clientes-header,
+body.bm-plat-legacy .dashboard-header {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 1.1rem;
+  padding: 0.15rem 0 0.85rem !important;
+  border-bottom: 1px solid var(--bm-border, #d8dee8) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.bm-plat-legacy .header-title,
+body.bm-plat-legacy .dashboard-title,
+body.bm-plat-legacy h1.header-title {
+  margin: 0 !important;
+  font-family: var(--bm-display, "BM Display", Georgia, serif) !important;
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem) !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em;
+  color: var(--bm-brand, #1a4566) !important;
+}
+
+body.bm-plat-legacy .content,
+body.bm-plat-legacy .main-page,
+body.bm-plat-legacy .clientes-page {
+  padding: 0.25rem 0 1.5rem !important;
+}
+
+body.bm-plat-legacy .card,
+body.bm-plat-legacy .stat-card,
+body.bm-plat-legacy .kpi-card,
+body.bm-plat-legacy .chart-card,
+body.bm-plat-legacy .filters,
+body.bm-plat-legacy .insights-section,
+body.bm-plat-legacy .snapshot-card,
+body.bm-plat-legacy .clientes-alerts,
+body.bm-plat-legacy .clientes-highlights,
+body.bm-plat-legacy .clientes-help {
+  background: var(--bm-paper, #fff) !important;
+  border: 1px solid var(--bm-border, #d8dee8) !important;
+  border-radius: var(--bm-radius-sm, 12px) !important;
+  box-shadow: var(--bm-shadow, 0 1px 2px rgba(19, 32, 51, 0.05)) !important;
+}
+
+body.bm-plat-legacy .btn,
+body.bm-plat-legacy .btn-primary,
+body.bm-plat-legacy button.btn-primary {
+  background: var(--bm-brand, #1a4566) !important;
+  border-color: var(--bm-brand, #1a4566) !important;
+  color: #fff !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+body.bm-plat-legacy .btn-secondary,
+body.bm-plat-legacy button.btn-secondary {
+  background: #fff !important;
+  color: var(--bm-brand, #1a4566) !important;
+  border: 1px solid var(--bm-border, #d8dee8) !important;
+  border-radius: 10px !important;
+}
+
+body.bm-plat-legacy input,
+body.bm-plat-legacy select,
+body.bm-plat-legacy textarea {
+  border-radius: 10px !important;
+  border-color: var(--bm-border, #d8dee8) !important;
+  font-family: inherit !important;
+}
+
+body.bm-plat-legacy table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+body.bm-plat-legacy th {
+  color: var(--bm-ink-muted, #5a6474) !important;
+  font-weight: 600 !important;
+}
+
+/* Operação · Clientes — kill indigo/green legacy hero */
+body.bm-plat-legacy .clientes-hero {
+  background:
+    linear-gradient(135deg, rgba(26, 69, 102, 0.96), rgba(42, 107, 90, 0.88)) !important;
+  border-radius: var(--bm-radius, 18px) !important;
+  box-shadow: var(--bm-shadow) !important;
+  color: #fff !important;
+}
+body.bm-plat-legacy .btn-hero {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+body.bm-plat-legacy .filter-chip {
+  border-radius: 999px !important;
+  border-color: var(--bm-border, #d8dee8) !important;
+  background: #fff !important;
+  color: var(--bm-ink, #132033) !important;
+}
+body.bm-plat-legacy .filter-chip.active {
+  background: var(--bm-brand, #1a4566) !important;
+  border-color: var(--bm-brand, #1a4566) !important;
+  color: #fff !important;
+}
+
+/* Apresentação — encapsulate legacy deck in platform shell */
+body.bm-plat-legacy .apresentacao-container {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 68vh;
+  max-height: none !important;
+  overflow: visible !important;
+  background: transparent !important;
+  border-radius: var(--bm-radius, 18px);
+  border: 1px solid var(--bm-border, #d8dee8);
+  background: var(--bm-paper, #fff) !important;
+}
+body.bm-plat-legacy .apresentacao-header {
+  background: linear-gradient(135deg, var(--bm-brand, #1a4566), var(--bm-teal, #2a6b5a)) !important;
+  border-radius: var(--bm-radius, 18px) var(--bm-radius, 18px) 0 0;
+  box-shadow: none !important;
+}
+body.bm-plat-legacy .apresentacao-header h1 {
+  font-family: var(--bm-display, "BM Display", Georgia, serif) !important;
+  font-size: 1.15rem !important;
+  font-weight: 650 !important;
+}
+body.bm-plat-legacy .apresentacao-content {
+  background: var(--bm-sand, #f2f0eb) !important;
+}
+body.bm-plat-legacy .apresentacao-controls {
+  background: #fff !important;
+  border-top: 1px solid var(--bm-border, #d8dee8) !important;
+}
+body.bm-plat-legacy .btn-nav {
+  border-radius: 10px !important;
+}
+body.bm-plat-legacy .btn-nav.btn-exit {
+  background: var(--bm-brand, #1a4566) !important;
+}
+
+/* Upload / ops bodies often force flat greys */
+body.bm-plat-legacy.upload-body,
+body.bm-plat-legacy.clientes-body {
+  background: transparent !important;
+}
+
+/* Executive remains premium module inside same shell */
+body.bm-fx-body.bm-plat-body .bm-shell--platform {
+  background: transparent;
+}
+body.bm-fx-body .bm-fx-steps {
+  margin-bottom: 0.75rem;
+}
+
+/* Empty / loading tone */
+body.bm-plat-legacy .clientes-empty,
+body.bm-plat-legacy .loading,
+body.bm-plat-legacy .empty-state {
+  color: var(--bm-ink-muted, #5a6474) !important;
 }

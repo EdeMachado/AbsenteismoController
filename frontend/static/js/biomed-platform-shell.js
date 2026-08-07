@@ -1,11 +1,11 @@
 /**
- * BioMed Platform shell — RC-21 Final Product
+ * BioMed Platform shell — RC-22 Final Consolidation
  * One shell for all post-login surfaces. No new business features.
  */
 (function () {
   "use strict";
 
-  var CACHE = "rc21b";
+  var CACHE = "rc22";
 
   var BREADCRUMB = {
     "/": "Início",
