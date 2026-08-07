@@ -1,6 +1,7 @@
 """Global pytest bootstrap for disposable SQLite (FIT-06 CI).
 
-Ensures TestClient startup never targets a missing directory or production path.
+Ensures TestClient startup never targets a missing directory or production path,
+and that the empty disposable DB has schema for global-app tests (no fixtures).
 """
 from __future__ import annotations
 
@@ -25,3 +26,10 @@ os.environ.setdefault("SECRET_KEY", "pytest-secret-not-for-production")
 
 # Ensure default relative database/ exists as a safety net for any leftover imports.
 Path("database").mkdir(exist_ok=True)
+
+# Empty CI SQLite needs tables before tests that use the global app engine
+# (e.g. FIT-04 CORS login header check) without a per-test fixture.
+import backend.models  # noqa: E402,F401 — register metadata on Base
+from backend.database import Base, engine  # noqa: E402
+
+Base.metadata.create_all(bind=engine)
