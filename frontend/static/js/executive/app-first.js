@@ -1,10 +1,12 @@
 /**
- * EXEC-08 — bootstrap for first CEO experience only.
+ * EXEC-08/09 — bootstrap: first experience → Decision Experience (full view).
  */
 (function () {
   "use strict";
 
   const FX = window.BioMedFirstExperience;
+  const DX = window.BioMedDecisionExperience;
+  let lastPayload = null;
 
   function tokenHeaders() {
     const token = localStorage.getItem("access_token");
@@ -51,34 +53,58 @@
     el.textContent = msg;
   }
 
-  function openDecision(decision) {
-    const modal = document.getElementById("bm-decision-modal");
-    const body = document.getElementById("bm-decision-body");
-    if (!modal || !body) return;
-    body.innerHTML =
-      "<p><strong>" +
-      (decision.title || "") +
-      "</strong></p>" +
-      "<p>" +
-      (decision.description || "") +
-      "</p>" +
-      "<p><em>Impacto esperado:</em> " +
-      (decision.expected_impact || "—") +
-      "</p>" +
-      "<p><em>Prazo:</em> " +
-      (decision.deadline || "—") +
-      "</p>" +
-      "<p class='bm-muted' style='margin-top:1rem'>Validação humana obrigatória. Sem autoexecução.</p>";
-    modal.classList.add("is-open");
+  function showView(id) {
+    document.querySelectorAll(".bm-module").forEach(function (el) {
+      el.classList.toggle("is-visible", el.id === id || el.dataset.module === id);
+    });
+    document.querySelectorAll("#bm-nav-links a").forEach(function (a) {
+      a.classList.toggle("is-active", a.dataset.module === id);
+    });
+    const title = document.getElementById("bm-page-title");
+    const lede = document.getElementById("bm-page-lede");
+    const navDec = document.getElementById("bm-nav-decision");
+    if (id === "decision") {
+      if (title) title.textContent = "Executive Decision";
+      if (lede) lede.textContent = "Conversa visual — problema, evidência, custo, caminho e primeiro passo.";
+      if (navDec) navDec.hidden = false;
+      history.replaceState(null, "", "#decision");
+    } else {
+      if (title) title.textContent = "Abertura executiva";
+      if (lede) lede.textContent = "Primeiros 30 segundos — estado, indicadores e uma decisão.";
+      if (navDec) navDec.hidden = true;
+      history.replaceState(null, "", "#first");
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openDecisionExperience() {
+    if (!lastPayload || !lastPayload.decision_experience || !DX) {
+      setStatus("Decision Experience indisponível neste payload.", true);
+      return;
+    }
+    DX.render(
+      document.getElementById("bm-decision-experience"),
+      lastPayload.decision_experience,
+      function () {
+        showView("first");
+      }
+    );
+    showView("decision");
   }
 
   function renderAll(payload) {
+    lastPayload = payload;
     const fx = payload.first_experience;
     if (!fx || !FX) {
       setStatus("Primeira experiência indisponível neste payload.", true);
       return;
     }
-    FX.render(document.getElementById("bm-first-experience"), fx, openDecision);
+    FX.render(document.getElementById("bm-first-experience"), fx, openDecisionExperience);
+    if ((location.hash || "").replace("#", "") === "decision") {
+      openDecisionExperience();
+    } else {
+      showView("first");
+    }
   }
 
   async function load() {
@@ -110,16 +136,20 @@
     this.setAttribute("aria-expanded", open ? "true" : "false");
   });
 
-  document.getElementById("bm-decision-close").addEventListener("click", function () {
-    document.getElementById("bm-decision-modal").classList.remove("is-open");
+  document.getElementById("bm-nav-first").addEventListener("click", function (e) {
+    e.preventDefault();
+    showView("first");
   });
-  document.getElementById("bm-decision-modal").addEventListener("click", function (e) {
-    if (e.target === this) this.classList.remove("is-open");
-  });
+  const navDec = document.getElementById("bm-nav-decision");
+  if (navDec) {
+    navDec.addEventListener("click", function (e) {
+      e.preventDefault();
+      openDecisionExperience();
+    });
+  }
+
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") {
-      document.getElementById("bm-decision-modal").classList.remove("is-open");
-    }
+    if (e.key === "Escape") showView("first");
   });
 
   (function initDates() {

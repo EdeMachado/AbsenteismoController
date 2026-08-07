@@ -11,9 +11,10 @@
     <aside class="bm-nav bm-nav--minimal" id="bm-nav" aria-label="Navegação executiva">
       <button type="button" class="bm-nav-toggle" id="bm-nav-toggle" aria-expanded="false" aria-controls="bm-nav-links">Menu</button>
       <div class="bm-brand">BioMed</div>
-      <div class="bm-brand-sub">Executive Intelligence<br />primeira experiência</div>
+      <div class="bm-brand-sub">Executive Intelligence<br />experiência experimental</div>
       <nav id="bm-nav-links" class="bm-nav-links">
-        <a href="#first" class="is-active" data-module="first">Abertura</a>
+        <a href="#first" class="is-active" data-module="first" id="bm-nav-first">Abertura</a>
+        <a href="#decision" data-module="decision" id="bm-nav-decision" hidden>Decisão</a>
       </nav>
       <p class="bm-nav-foot">
         Flag <code>ENABLE_EXECUTIVE_UI</code>. Experiência experimental.
@@ -22,10 +23,10 @@
     </aside>
 
     <main class="bm-main bm-main--first" id="bm-main">
-      <header class="bm-topbar bm-topbar--first">
+      <header class="bm-topbar bm-topbar--first" id="bm-topbar">
         <div>
           <h1 class="bm-title" id="bm-page-title">Abertura executiva</h1>
-          <p class="bm-lede">Primeiros 30 segundos — estado, indicadores e uma decisão.</p>
+          <p class="bm-lede" id="bm-page-lede">Primeiros 30 segundos — estado, indicadores e uma decisão.</p>
         </div>
         <form class="bm-filters" id="bm-filters" aria-label="Filtros do período">
           <div class="bm-field">
@@ -42,22 +43,19 @@
 
       <div id="bm-status" class="bm-loading" role="status" aria-live="polite">Preparando leitura executiva…</div>
 
-      <!-- EXEC-08 — First CEO experience only -->
       <section id="first" class="bm-module is-visible" data-module="first" aria-label="Primeira experiência executiva">
         <div id="bm-first-experience"></div>
+      </section>
+
+      <!-- EXEC-09 — full Decision Experience (not a modal) -->
+      <section id="decision" class="bm-module" data-module="decision" aria-label="Executive Decision Experience">
+        <div id="bm-decision-experience"></div>
       </section>
     </main>
   </div>
 
-  <div class="bm-modal" id="bm-decision-modal" role="dialog" aria-modal="true" aria-labelledby="bm-decision-title">
-    <div class="bm-modal__panel">
-      <h2 class="bm-section-title" id="bm-decision-title">Entender esta decisão</h2>
-      <div id="bm-decision-body" class="bm-muted"></div>
-      <p style="margin-top:1rem"><button type="button" class="bm-btn" id="bm-decision-close">Fechar</button></p>
-    </div>
-  </div>
-
   <script src="/static/js/executive/first-experience.js"></script>
+  <script src="/static/js/executive/decision-experience.js"></script>
   <script src="/static/js/executive/app-first.js"></script>
 </body>
 </html>

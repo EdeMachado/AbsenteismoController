@@ -169,8 +169,9 @@ def test_first_experience_static_assets():
     assert "bm-first-experience" in html
     assert "first-experience.js" in html
     assert "app-first.js" in html
-    assert "Executive Decision" not in html or "bm-first-experience" in html
-    # Out of scope for EXEC-08 landing
+    # EXEC-09 replaces modal with full Decision Experience view
+    assert "bm-decision-experience" in html
+    assert "bm-decision-modal" not in html
     assert "chart-temporal" not in html
     assert "Executive Analytics" not in html
     assert (FRONTEND / "static" / "js" / "executive" / "first-experience.js").exists()

@@ -23,6 +23,7 @@ from backend.executive.exec03_enrichment import (
     weekday_distribution,
 )
 from backend.executive.first_experience import compose_first_experience
+from backend.executive.decision_experience import compose_decision_experience
 from backend.executive.intelligence import ExecutiveIntelligenceEngine
 from backend.executive.presentation import compose_presentation
 from backend.executive.questions import QUESTIONS, answer_question
@@ -650,6 +651,8 @@ class ExecutiveAggregateService:
         }
         # EXEC-08 — first CEO experience (premium opening screen)
         payload["first_experience"] = compose_first_experience(payload)
+        # EXEC-09 — decision experience (visual conversation, not a modal)
+        payload["decision_experience"] = compose_decision_experience(payload)
 
         assert_no_pii_in_payload(payload)
         return payload

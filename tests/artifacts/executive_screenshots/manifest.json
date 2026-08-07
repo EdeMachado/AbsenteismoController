@@ -70,5 +70,82 @@
     "file": "exec03_presentation_mid_1440x900.png",
     "pii": false,
     "module": "presentation"
+  },
+  {
+    "viewport": "1920x1080",
+    "file": "exec09_after_decision_1920x1080.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "390x844",
+    "file": "exec09_after_decision_390x844.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_after_decision_full_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_after_decision_top_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_before_abertura_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1920x1080",
+    "file": "exec09_before_abertura_1920x1080.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_flow_back_abertura_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_flow_confidence_footer_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_flow_cta_visible_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_flow_orbit_footer_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
+  },
+  {
+    "viewport": "1440x900",
+    "file": "exec09_flow_roadmap_1440x900.png",
+    "pii": false,
+    "sprint": "EXEC-09",
+    "module": "decision_experience"
   }
 ]

@@ -151,6 +151,7 @@ def test_executive_static_assets_exist():
         "analytics.js",
         "first-experience.js",
         "app-first.js",
+        "decision-experience.js",
     ):
         assert (FRONTEND / "static" / "js" / "executive" / name).exists()
 
