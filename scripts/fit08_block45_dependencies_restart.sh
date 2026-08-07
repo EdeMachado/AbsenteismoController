@@ -68,7 +68,16 @@ sha_file() { sha256sum "$1" | awk '{print $1}'; }
 size_file() { stat -c '%s' "$1"; }
 
 ingestion_tables() {
-  sqlite3 "$DB" "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ingestion_%' ORDER BY name;"
+  # Python sqlite3 only — não depende do binário sqlite3
+  "$PY" - <<PY
+import sqlite3
+con = sqlite3.connect("file:$DB?mode=ro", uri=True)
+rows = con.execute(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ingestion_%' ORDER BY name"
+).fetchall()
+con.close()
+print("\\n".join(r[0] for r in rows), end="")
+PY
 }
 
 echo "=== FIT-08 BLOCO 4+5 — DEPS + IMPORT + RESTART ÚNICO ==="
