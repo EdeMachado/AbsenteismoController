@@ -597,6 +597,14 @@ async def executive_identity_preview_alias():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/preview/product-audit", response_class=HTMLResponse)
+async def product_audit_preview():
+    """EXEC-11A — consolidated product audit (EXEC-08→11). Synthetic. No login."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "product-audit.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():
     """Página de análises"""
