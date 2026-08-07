@@ -1,11 +1,128 @@
 /**
- * BioMed Platform shell — RC-24 Final Visual Polish
+ * BioMed Platform shell — P0 tenant isolation hotfix
  * One shell for all post-login surfaces. No new business features.
  */
 (function () {
   "use strict";
 
-  var CACHE = "rc24";
+  var CACHE = "p0tenant1";
+
+  function installTenantIsolationGuard() {
+    if (window.__bmTenantIsolationInstalled) return;
+    window.__bmTenantIsolationInstalled = true;
+
+    var tenantEpoch = 0;
+
+    function readTenantId() {
+      try {
+        var raw = localStorage.getItem("cliente_selecionado");
+        if (!raw || raw === "null" || raw === "undefined") return null;
+        var parsed = parseInt(raw, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function notifyTenantChange(previousValue, nextValue) {
+      if (String(previousValue || "") === String(nextValue || "")) return;
+      tenantEpoch += 1;
+      try {
+        window.dispatchEvent(
+          new CustomEvent("biomed:tenant-changed", {
+            detail: { previous: previousValue || null, current: nextValue || null, epoch: tenantEpoch },
+          })
+        );
+      } catch (e) {}
+      if (typeof window.limparTodosDadosDashboard === "function") {
+        try {
+          window.limparTodosDadosDashboard();
+        } catch (e) {}
+      }
+    }
+
+    try {
+      var originalSetItem = localStorage.setItem.bind(localStorage);
+      localStorage.setItem = function (key, value) {
+        var previous = key === "cliente_selecionado" ? localStorage.getItem(key) : null;
+        originalSetItem(key, value);
+        if (key === "cliente_selecionado") notifyTenantChange(previous, value);
+      };
+
+      var originalRemoveItem = localStorage.removeItem.bind(localStorage);
+      localStorage.removeItem = function (key) {
+        var previous = key === "cliente_selecionado" ? localStorage.getItem(key) : null;
+        originalRemoveItem(key);
+        if (key === "cliente_selecionado") notifyTenantChange(previous, null);
+      };
+    } catch (e) {}
+
+    function tenantFromRequest(input) {
+      try {
+        var rawUrl = typeof input === "string" ? input : input && input.url;
+        if (!rawUrl) return null;
+        var url = new URL(rawUrl, window.location.origin);
+        var rawTenant = url.searchParams.get("client_id");
+        if (!rawTenant) return null;
+        var parsed = parseInt(rawTenant, 10);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      var requestTenant = tenantFromRequest(input);
+      var activeTenantAtStart = readTenantId();
+      var epochAtStart = tenantEpoch;
+
+      if (requestTenant !== null) {
+        if (activeTenantAtStart === null || requestTenant !== activeTenantAtStart) {
+          console.error("[TENANT-GUARD] Request blocked: tenant context mismatch", {
+            requestTenant: requestTenant,
+            activeTenant: activeTenantAtStart,
+          });
+          return Promise.reject(new DOMException("Tenant context mismatch", "AbortError"));
+        }
+      }
+
+      return nativeFetch(input, init).then(function (response) {
+        if (requestTenant !== null) {
+          var activeTenantNow = readTenantId();
+          if (
+            tenantEpoch !== epochAtStart ||
+            activeTenantNow !== activeTenantAtStart ||
+            activeTenantNow !== requestTenant
+          ) {
+            console.warn("[TENANT-GUARD] Stale tenant response discarded", {
+              requestTenant: requestTenant,
+              activeTenant: activeTenantNow,
+              startedAtEpoch: epochAtStart,
+              currentEpoch: tenantEpoch,
+            });
+            throw new DOMException("Stale tenant response discarded", "AbortError");
+          }
+        }
+        return response;
+      });
+    };
+
+    window.addEventListener("storage", function (event) {
+      if (event.key === "cliente_selecionado") {
+        notifyTenantChange(event.oldValue, event.newValue);
+      }
+    });
+
+    window.BioMedTenantIsolation = {
+      currentTenantId: readTenantId,
+      currentEpoch: function () {
+        return tenantEpoch;
+      },
+    };
+  }
+
+  installTenantIsolationGuard();
 
   var BREADCRUMB = {
     "/": "Início",
@@ -123,6 +240,12 @@
       p.setAttribute("data-bm-polish", "1");
       document.head.appendChild(p);
     }
+    if (!document.querySelector('style[data-bm-tenant-hotfix]')) {
+      var tenantStyle = document.createElement("style");
+      tenantStyle.setAttribute("data-bm-tenant-hotfix", "1");
+      tenantStyle.textContent = "#graficosConverplast{display:block!important;}";
+      document.head.appendChild(tenantStyle);
+    }
   }
 
   function buildNavHtml() {
@@ -140,7 +263,7 @@
       link("/comparativos", "Comparativos", "analytics", { sub: true }) +
       link("/dados_powerbi", "Power BI", "analytics", { sub: true }) +
       link("/produtividade", "Produtividade", "analytics", { sub: true }) +
-      link("/dashboard#graficosConverplast", "Setores", "analytics", { sub: true }) +
+      link("/dashboard#chartSetores", "Setores", "analytics", { sub: true }) +
       link("/dashboard#chartCids", "CID", "analytics", { sub: true }) +
       link("/dashboard#chartEvolucao", "Tendências", "analytics", { sub: true }) +
       link("/clientes", "Operação", "ops") +
