@@ -83,11 +83,13 @@ def test_menu_has_real_analytics_targets_only():
         "/comparativos",
         "/dados_powerbi",
         "/produtividade",
-        "/dashboard#graficosConverplast",
+        "/dashboard#chartSetores",
         "/dashboard#chartCids",
         "/dashboard#chartEvolucao",
     ):
         assert href in SHELL_JS, href
+    # P0 tenant isolation: shared charts must no longer use a Converplast-named menu target.
+    assert 'link("/dashboard#graficosConverplast"' not in SHELL_JS
     # stubs / orphan filenames must not be menu targets
     for bad in ("analises.html", "tendencias.html", "inss.html", "download_app.html", "baixar_icone.html"):
         assert bad not in SHELL_JS
