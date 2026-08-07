@@ -1,7 +1,7 @@
 # RC-1.2 — Functional Consolidation & Micro-UX
 
 **Branch:** `cursor/rc12-functional-consolidation-f8f5`  
-**HEAD:** `5496a0918e4e3538bb4223008f5c41a88ab08a50`
+**HEAD:** `f8d111ef6e5db02ac6635066db05b8af89a765eb`
 **Status:** Draft · sem merge · sem deploy · sem produção
 
 ## Preview
