@@ -1,0 +1,175 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=768"><title>exec-768x1024</title></head><body data-viewport="768x1024" style="width:768px;min-height:1024px"><div id="fixture-root"><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BioMed Executive Intelligence</title>
+  <link rel="stylesheet" href="/static/css/biomed-executive.css" />
+  <script>window.Chart=function(){return {destroy:function(){}}};</script>
+</head>
+<body>
+  <div class="bm-shell">
+    <aside class="bm-nav" aria-label="Navegação executiva">
+      <div class="bm-brand">BioMed</div>
+      <div class="bm-brand-sub">Executive Intelligence · experimental</div>
+      <nav id="bm-nav-links"></nav>
+      <p class="bm-muted" style="margin-top:1.5rem;font-size:0.75rem">
+        Flag <code>ENABLE_EXECUTIVE_UI</code>. Não substitui o dashboard legado.
+      </p>
+      <a href="/" class="bm-muted" style="display:block;margin-top:0.75rem;font-size:0.8rem">← Voltar ao operacional</a>
+    </aside>
+
+    <main class="bm-main">
+      <header class="bm-topbar">
+        <div>
+          <h1 class="bm-title">Command Center</h1>
+          <p class="bm-lede">
+            Leitura executiva em saúde corporativa — métricas canônicas, qualidade e recomendações auditáveis.
+          </p>
+        </div>
+        <form class="bm-filters" id="bm-filters">
+          <div class="bm-field">
+            <label for="periodo_inicio">Início</label>
+            <input id="periodo_inicio" name="periodo_inicio" type="month" />
+          </div>
+          <div class="bm-field">
+            <label for="periodo_fim">Fim</label>
+            <input id="periodo_fim" name="periodo_fim" type="month" />
+          </div>
+          <div class="bm-field">
+            <label for="efetivo">Efetivo (opcional)</label>
+            <input id="efetivo" name="efetivo" type="number" min="1" placeholder="não inventado" />
+          </div>
+          <button type="submit" class="bm-btn">Atualizar</button>
+        </form>
+      </header>
+
+      <div id="bm-status" class="bm-loading" role="status">Carregando painel executivo…</div>
+
+      <section id="command" class="bm-module is-visible" data-module="command">
+        <div class="bm-pill-row" id="bm-context-pills"></div>
+        <div class="bm-kpi-grid" id="bm-kpis"></div>
+        <div class="bm-grid-2">
+          <article class="bm-card">
+            <h2 class="bm-section-title">Executive Health Score</h2>
+            <div id="bm-score"></div>
+          </article>
+          <article class="bm-card">
+            <h2 class="bm-section-title">Qualidade dos dados</h2>
+            <div id="bm-quality"></div>
+            <div class="bm-drawer-note" id="bm-methodology">
+              Fontes: MetricService · DataQualityService · Performance Engine · Rule Engine (sem LLM).
+            </div>
+          </article>
+        </div>
+        <div class="bm-grid-2">
+          <article class="bm-card">
+            <h2 class="bm-section-title">Pareto — grupos alfabéticos CID</h2>
+            <p class="bm-muted" style="margin-top:0">Não é capítulo CID oficial.</p>
+            <div class="bm-chart"><canvas id="chart-pareto" aria-label="Pareto CID"></canvas></div>
+          </article>
+          <article class="bm-card">
+            <h2 class="bm-section-title">Setores — volume</h2>
+            <div class="bm-chart"><canvas id="chart-setores" aria-label="Setores"></canvas></div>
+          </article>
+        </div>
+        <div class="bm-grid-2">
+          <article class="bm-card">
+            <h2 class="bm-section-title">Narrativa técnica BioMed</h2>
+            <div id="bm-narrative" class="bm-muted"></div>
+          </article>
+          <article class="bm-card">
+            <h2 class="bm-section-title">Insights</h2>
+            <div id="bm-insights"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="absenteeism" class="bm-module" data-module="absenteeism">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Absenteísmo</h2>
+          <p class="bm-muted">KPIs e Pareto refletem o período selecionado. Evolução temporal detalhada permanece no legado até série mensal canônica estável.</p>
+          <div id="bm-abs-kpis" class="bm-kpi-grid"></div>
+        </article>
+      </section>
+
+      <section id="epidemiology" class="bm-module" data-module="epidemiology">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Epidemiologia</h2>
+          <p class="bm-muted">Distribuição por grupo alfabético CID com participação acumulada (Pareto).</p>
+          <div class="bm-chart"><canvas id="chart-epi" aria-label="Epidemiologia"></canvas></div>
+        </article>
+      </section>
+
+      <section id="sectors" class="bm-module" data-module="sectors">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Setores e risco</h2>
+          <p class="bm-muted">Volume e dias perdidos. Risco relativo só com denominador explícito.</p>
+          <div class="bm-chart"><canvas id="chart-sectors-mod" aria-label="Setores"></canvas></div>
+        </article>
+      </section>
+
+      <section id="performance" class="bm-module" data-module="performance">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Performance BioMed</h2>
+          <div id="bm-performance"></div>
+        </article>
+        <article class="bm-card" style="margin-top:1rem">
+          <h2 class="bm-section-title">Condicionantes empresariais</h2>
+          <div id="bm-conditionants"></div>
+        </article>
+        <article class="bm-card" style="margin-top:1rem">
+          <h2 class="bm-section-title">ROI</h2>
+          <div id="bm-roi"></div>
+        </article>
+      </section>
+
+      <section id="actions" class="bm-module" data-module="actions">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Plano de Ação</h2>
+          <p class="bm-muted">Fluxo: IA propõe → médico valida → empresa aprova → execução → monitoramento → avaliação. Sem autoexecução.</p>
+          <div id="bm-actions"></div>
+        </article>
+      </section>
+
+      <section id="intelligence" class="bm-module" data-module="intelligence">
+        <h2 class="bm-section-title">BioMed Intelligence</h2>
+        <p class="bm-muted">Motor de regras determinístico. Sem LLM. Somente agregados — sem PII.</p>
+        <div id="bm-intel"></div>
+      </section>
+
+      <section id="productivity" class="bm-module" data-module="productivity">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Produtividade</h2>
+          <p class="bm-muted">Módulo preparado. Dados operacionais de produtividade permanecem no fluxo legado (<code>/produtividade</code>) até binding canônico.</p>
+        </article>
+      </section>
+
+      <section id="quality" class="bm-module" data-module="quality">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Dados / Qualidade</h2>
+          <div id="bm-quality-full"></div>
+        </article>
+      </section>
+
+      <section id="admin" class="bm-module" data-module="admin">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Administração</h2>
+          <p class="bm-muted">Tenant via seletor legado. Ficha clínica / entrevista estruturada: navegação futura apenas — não implementada nesta sprint.</p>
+          <ul class="bm-list">
+            <li>Ficha clínica / entrevista estruturada — arquitetura reservada</li>
+            <li>Sem upload de exames, anexos ou prontuário</li>
+            <li>Sem ranking nominal de trabalhadores</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/js/executive/api.js"></script>
+  <script src="/static/js/executive/charts.js"></script>
+  <script src="/static/js/executive/command-center.js"></script>
+  <script src="/static/js/executive/app.js"></script>
+</body>
+</html>
+</div><script>document.documentElement.style.width="768px";</script></body></html>

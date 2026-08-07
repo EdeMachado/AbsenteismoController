@@ -22,6 +22,7 @@ else:
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("ENABLE_INTELLIGENT_INGESTION", "false")
 os.environ.setdefault("ENABLE_BIOMED_PERFORMANCE_ENGINE", "false")
+os.environ.setdefault("ENABLE_EXECUTIVE_UI", "false")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-not-for-production")
 
 # Ensure default relative database/ exists as a safety net for any leftover imports.

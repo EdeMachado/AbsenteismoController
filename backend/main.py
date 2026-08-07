@@ -357,6 +357,15 @@ except Exception:
     # Never break legacy app if experimental package import fails
     pass
 
+# EXEC-01 BioMed Executive Intelligence — registered ONLY when ENABLE_EXECUTIVE_UI=true.
+# Default off: legacy dashboard unchanged.
+try:
+    from backend.executive.api import register_executive_routes
+
+    register_executive_routes(app, FRONTEND_DIR)
+except Exception:
+    pass
+
 # ==================== HELPER FUNCTIONS ====================
 
 def validar_client_id(db: Session, client_id: int) -> Client:
