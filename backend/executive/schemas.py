@@ -1,4 +1,4 @@
-"""Schemas for EXEC-01 executive aggregate and intelligence payloads."""
+"""Schemas for EXEC-01/02 executive aggregate and intelligence payloads."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ class KpiCard:
     unavailable_reason: Optional[str] = None
     trend: Optional[str] = None  # melhora | estabilidade | piora | None
     confidence: Optional[str] = None
+    tier: str = "secondary"  # primary | secondary
+    empty_label: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -30,6 +32,7 @@ class ChartSeries:
     series: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     suppressed: bool = False
+    empty_reason: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -60,7 +63,9 @@ class ActionItem:
     indicator: Optional[str] = None
     baseline: Optional[str] = None
     meta: Optional[str] = None
+    result: Optional[str] = None
     medical_validation_required: bool = True
+    medical_validation: str = "pendente"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -79,6 +84,13 @@ class IntelligenceBundle:
     limitacoes: list[str]
     confianca: str
     engine: str = "rule_engine_deterministic_v1"
+    # EXEC-02 structured reading order
+    o_que_mudou: list[str] = field(default_factory=list)
+    onde_esta_o_risco: list[str] = field(default_factory=list)
+    por_que_importa: list[str] = field(default_factory=list)
+    o_que_recomendamos: list[str] = field(default_factory=list)
+    o_que_precisa_validacao: list[str] = field(default_factory=list)
+    mensagem_executiva: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

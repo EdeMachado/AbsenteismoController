@@ -81,4 +81,6 @@ settings.ini
 
 # Documentation temporária
 *.md.bak
-docs/temp/
+docs/temp/database/exec02_synth.sqlite
+database/exec02_token.txt
+database/chrome-ud/

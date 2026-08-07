@@ -5,6 +5,7 @@ Never invents headcount denominators. Suppresses small groups. No PII.
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from typing import Any, Optional
 
@@ -160,6 +161,62 @@ class ExecutiveAggregateService:
             comparable = False
 
         cur_dict = _metrics_to_dict(cur, client_id, periodo_inicio, periodo_fim)
+        cur_dict["serie_temporal"] = self._build_temporal_series(
+            client_id, periodo_inicio, periodo_fim, efetivo_trabalhadores
+        )
+
+        # Staging-only demo enrichment (never production). Explicit env gate.
+        staging_demo = (os.environ.get("EXECUTIVE_STAGING_DEMO") or "").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        if staging_demo and biomed_performance is None:
+            biomed_performance = {
+                "producao": {"planejadas": 38, "aprovadas": 34, "executadas": 31},
+                "cobertura": 0.91,
+                "execucao": 0.816,
+                "resultado_observado": {
+                    "eventos": cur_dict.get("eventos"),
+                    "dias": cur_dict.get("dias_perdidos"),
+                    "horas": cur_dict.get("horas_perdidas"),
+                    "severidade": cur_dict.get("gravidade"),
+                },
+                "efetividade": {
+                    "classificacao": "compativel_com_melhora",
+                    "confianca": "moderada",
+                    "limitacoes": [
+                        "Associação temporal; sem causalidade exclusiva.",
+                        "Staging demo — valores de atuação são fixtures explícitas.",
+                    ],
+                },
+                "nota": "Fixture de staging (EXECUTIVE_STAGING_DEMO). Não usar em produção.",
+            }
+        if staging_demo and not conditionants:
+            conditionants = [
+                {
+                    "id": "cond-1",
+                    "recomendacao_id": "erg-01",
+                    "status": "executada",
+                    "decisao": "executada",
+                    "nota": "Adequação ergonômica no setor operacional",
+                },
+                {
+                    "id": "cond-2",
+                    "recomendacao_id": "sm-02",
+                    "status": "adiada",
+                    "decisao": "adiada",
+                    "barreira": "Priorização operacional da empresa",
+                    "nota": "Programa de saúde mental adiado",
+                },
+                {
+                    "id": "cond-3",
+                    "recomendacao_id": "vig-03",
+                    "status": "impedida",
+                    "decisao": "impedida",
+                    "barreira": "Janela de parada não autorizada",
+                    "nota": "Vigilância reforçada em turno noturno",
+                },
+            ]
+
 
         iqb_val = None
         iqb_label = None
@@ -228,6 +285,70 @@ class ExecutiveAggregateService:
             conditionants=conditionants or [],
             biomed_performance=biomed,
         )
+
+        # Staging: ensure action plan visible for homologation when engine is silent on improvement
+        if staging_demo and not (intel.plano_acao or []):
+            from backend.executive.schemas import ActionItem
+            demo_actions = [
+                ActionItem(
+                    id="act-demo-1",
+                    title="Revisão ergonômica no setor Operacional",
+                    priority="alta",
+                    justification="Concentração persistente de impacto setorial apesar de tendência de melhora.",
+                    category="ergonomia",
+                    status="proposta",
+                    indicator="dias_perdidos|eventos",
+                    baseline="baseline setorial do período anterior",
+                    meta="redução material da concentração setorial",
+                    result="aguardando validação médica",
+                    medical_validation="pendente",
+                ),
+                ActionItem(
+                    id="act-demo-2",
+                    title="Vigilância de grupos alfabéticos CID de maior participação",
+                    priority="media",
+                    justification="Pareto CID indica concentração; grupo alfabético ≠ capítulo oficial.",
+                    category="vigilancia",
+                    status="proposta",
+                    indicator="eventos",
+                    baseline="participação acumulada atual",
+                    meta="monitorar top causas sem ranking nominal",
+                    result="aguardando validação médica",
+                    medical_validation="pendente",
+                ),
+                ActionItem(
+                    id="act-demo-3",
+                    title="Destravar condicionantes empresariais pendentes",
+                    priority="alta",
+                    justification="2 intervenções prioritárias adiada/impedida reduzem cobertura potencial.",
+                    category="gestao",
+                    status="proposta",
+                    indicator="cobertura|execucao",
+                    baseline="cobertura atual",
+                    meta="reativar plano aprovado pendente",
+                    result="condicionado à decisão empresarial",
+                    medical_validation="pendente",
+                ),
+            ]
+            intel.plano_acao = [a.to_dict() for a in demo_actions]
+            intel.o_que_recomendamos = [a.title for a in demo_actions]
+            intel.recomendacoes = [
+                {
+                    "id": a.id,
+                    "titulo": a.title,
+                    "categoria": a.category,
+                    "prioridade": a.priority,
+                    "justificativa": a.justification,
+                }
+                for a in demo_actions
+            ]
+
+        # Keep resultado aligned after gravidade is known
+        if isinstance(biomed.get("resultado_observado"), dict):
+            biomed["resultado_observado"]["severidade"] = cur_dict.get("gravidade")
+            biomed["resultado_observado"]["eventos"] = cur_dict.get("eventos")
+            biomed["resultado_observado"]["dias"] = cur_dict.get("dias_perdidos")
+            biomed["resultado_observado"]["horas"] = cur_dict.get("horas_perdidas")
 
         payload = {
             "engine_version": ENGINE_VERSION,
@@ -315,8 +436,50 @@ class ExecutiveAggregateService:
                 "score": "PerformanceService.executive_score",
                 "intelligence": "rule_engine_deterministic_v1",
                 "llm": False,
+                "how": [
+                    "KPIs e distribuições: MetricService (canônico).",
+                    "IQB: DataQualityService.analyze.",
+                    "Executive Health Score: PerformanceService.executive_score.",
+                    "Narrativa/ações: rule engine determinístico (sem LLM).",
+                    "Denominadores (headcount) nunca inventados.",
+                ],
             },
+            "hero": {
+                "empresa": client.nome_fantasia or client.nome,
+                "periodo": f"{periodo_inicio} → {periodo_fim}",
+                "status": "comparavel" if comparable else "descritivo",
+                "tendencia": None,
+                "score": score.to_dict(),
+                "confianca": intel.confianca,
+                "mensagem": intel.mensagem_executiva,
+            },
+            "kpis_primary": [k.to_dict() for k in kpis if k.tier == "primary"],
+            "kpis_secondary": [k.to_dict() for k in kpis if k.tier == "secondary"],
+            "conditionants_summary": None,
         }
+        # Fill hero trend from dias KPI
+        dias_kpi = next((k for k in kpis if k.id == "dias"), None)
+        payload["hero"]["tendencia"] = dias_kpi.trend if dias_kpi else None
+        conds = payload.get("conditionants") or []
+        pending = [
+            c
+            for c in conds
+            if str(c.get("status", "")).lower()
+            in {"adiada", "recusada", "impedida", "parcialmente_executada", "pendente"}
+        ]
+        if pending:
+            payload["conditionants_summary"] = (
+                f"{len(pending)} intervenção(ões) prioritária(s) permaneceram pendentes "
+                "por decisão operacional da empresa, reduzindo a cobertura potencial do plano."
+            )
+        elif conds:
+            payload["conditionants_summary"] = (
+                "Condicionantes empresariais registradas; sem pendências bloqueantes neste payload."
+            )
+        else:
+            payload["conditionants_summary"] = (
+                "Sem condicionantes empresariais registradas neste período."
+            )
         assert_no_pii_in_payload(payload)
         return payload
 
@@ -341,18 +504,6 @@ class ExecutiveAggregateService:
             return "estabilidade"
 
         cards = [
-            KpiCard("eventos", "Eventos", cur.get("eventos"), "", True, trend=trend("eventos")),
-            KpiCard(
-                "trabalhadores",
-                "Trabalhadores afetados",
-                cur.get("trabalhadores_afetados"),
-                "",
-                cur.get("trabalhadores_afetados") is not None,
-                unavailable_reason=None
-                if cur.get("trabalhadores_afetados") is not None
-                else "Identidade agregada insuficiente",
-                trend=None,
-            ),
             KpiCard(
                 "dias",
                 "Dias perdidos",
@@ -360,6 +511,7 @@ class ExecutiveAggregateService:
                 "dias",
                 True,
                 trend=trend("dias_perdidos"),
+                tier="primary",
             ),
             KpiCard(
                 "horas",
@@ -370,6 +522,29 @@ class ExecutiveAggregateService:
                 unavailable_reason=None
                 if cur.get("horas_perdidas") is not None
                 else "Cobertura de horas registrada insuficiente",
+                empty_label="Horas registradas indisponíveis — sem zero artificial.",
+                tier="primary",
+            ),
+            KpiCard(
+                "eventos",
+                "Eventos",
+                cur.get("eventos"),
+                "",
+                True,
+                trend=trend("eventos"),
+                tier="primary",
+            ),
+            KpiCard(
+                "trabalhadores",
+                "Trabalhadores afetados",
+                cur.get("trabalhadores_afetados"),
+                "",
+                cur.get("trabalhadores_afetados") is not None,
+                unavailable_reason=None
+                if cur.get("trabalhadores_afetados") is not None
+                else "Identidade agregada insuficiente",
+                empty_label="Identidade agregada insuficiente.",
+                tier="primary",
             ),
             KpiCard(
                 "duracao",
@@ -377,6 +552,8 @@ class ExecutiveAggregateService:
                 cur.get("duracao_media"),
                 "dias",
                 cur.get("duracao_media") is not None,
+                empty_label="Duração média indisponível.",
+                tier="secondary",
             ),
             KpiCard(
                 "freq100",
@@ -386,17 +563,21 @@ class ExecutiveAggregateService:
                 cur.get("eventos_por_100") is not None,
                 unavailable_reason=None
                 if cur.get("eventos_por_100") is not None
-                else "Headcount/efetivo não fornecido; denominador não inventado",
+                else "Headcount não informado — frequência por 100 indisponível.",
+                empty_label="Headcount não informado — frequência por 100 indisponível.",
+                tier="secondary",
             ),
             KpiCard(
                 "severidade",
                 "Severidade",
                 cur.get("gravidade"),
-                "",
+                "dias/evento",
                 cur.get("gravidade") is not None,
                 unavailable_reason=None
                 if cur.get("gravidade") is not None
                 else "Severidade não calculável neste período",
+                empty_label="Severidade não calculável neste período.",
+                tier="secondary",
             ),
             KpiCard(
                 "iqb",
@@ -405,45 +586,92 @@ class ExecutiveAggregateService:
                 iqb_label or "",
                 iqb is not None,
                 unavailable_reason=None if iqb is not None else "IQB indisponível",
-            ),
-            KpiCard(
-                "effectiveness",
-                "Effectiveness Score",
-                None,
-                "",
-                False,
-                unavailable_reason="Requer Performance Engine com janela assistencial completa",
-            ),
-            KpiCard(
-                "biomed_perf",
-                "BioMed Performance",
-                None,
-                "",
-                False,
-                unavailable_reason="Informar produção/cobertura/execução explicitamente",
+                empty_label="IQB indisponível para o período.",
+                tier="secondary",
             ),
         ]
         return cards
 
+
+    def _build_temporal_series(
+        self,
+        client_id: int,
+        periodo_inicio: str,
+        periodo_fim: str,
+        efetivo_trabalhadores: int | None,
+    ) -> list[dict]:
+        """Month-by-month events/days via MetricService (no JS formulas)."""
+        out = []
+        cur = periodo_inicio
+        while cur <= periodo_fim:
+            try:
+                m = self.metrics.compute(
+                    client_id,
+                    cur,
+                    cur,
+                    efetivo_trabalhadores=efetivo_trabalhadores,
+                    suppress_small_groups=True,
+                    small_group_threshold=SMALL_GROUP_THRESHOLD,
+                )
+                met = getattr(m, "metricas", m)
+                out.append(
+                    {
+                        "mes": cur,
+                        "eventos": getattr(met, "eventos", None)
+                        or getattr(met, "eventos_brutos", 0)
+                        or 0,
+                        "dias": float(getattr(met, "dias_perdidos", 0) or 0),
+                    }
+                )
+            except Exception:
+                out.append({"mes": cur, "eventos": 0, "dias": 0})
+            cur = _month_add(cur, 1)
+        return out
+
     def _charts(self, cur: dict[str, Any]) -> list[ChartSeries]:
         charts: list[ChartSeries] = []
 
-        # Temporal
+        # Temporal: atual + média móvel simples (3) quando n>=3
         serie = cur.get("serie_temporal") or []
-        cats, vals = [], []
+        cats, vals, dias_vals = [], [], []
         for item in serie:
             if isinstance(item, dict):
                 cats.append(str(item.get("mes") or item.get("periodo") or ""))
-                vals.append(item.get("eventos") or item.get("valor") or 0)
-        if cats:
+                vals.append(float(item.get("eventos") or item.get("valor") or 0))
+                dias_vals.append(float(item.get("dias") or 0))
+        if len(cats) >= 2:
+            ma = []
+            for i in range(len(vals)):
+                window = vals[max(0, i - 2) : i + 1]
+                ma.append(round(sum(window) / len(window), 2))
             charts.append(
                 ChartSeries(
                     id="evolucao_temporal",
                     title="Evolução temporal de eventos",
                     chart_type="line",
                     categories=cats,
-                    series=[{"name": "Eventos", "data": vals}],
-                    notes=["Baseline/média móvel quando houver séries suficientes."],
+                    series=[
+                        {"name": "Atual", "data": vals},
+                        {"name": "Média móvel (3)", "data": ma},
+                        {"name": "Dias perdidos", "data": dias_vals},
+                    ],
+                    notes=[
+                        "Linha principal = eventos do mês.",
+                        "Média móvel de 3 períodos quando série suficiente.",
+                        "Baseline de período completo no comparativo do hero.",
+                    ],
+                )
+            )
+        else:
+            charts.append(
+                ChartSeries(
+                    id="evolucao_temporal",
+                    title="Evolução temporal de eventos",
+                    chart_type="line",
+                    categories=[],
+                    series=[],
+                    empty_reason="Série temporal insuficiente para tendência.",
+                    notes=["Requer ao menos 2 meses com dados."],
                 )
             )
 

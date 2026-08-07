@@ -1,44 +1,32 @@
 [
   {
     "viewport": "390x844",
-    "html": "executive_390x844.html",
-    "png": "executive_390x844.png",
-    "pii": false,
-    "kind": "structural_fixture"
+    "file": "executive_390x844.html",
+    "pii": false
   },
   {
     "viewport": "768x1024",
-    "html": "executive_768x1024.html",
-    "png": "executive_768x1024.png",
-    "pii": false,
-    "kind": "structural_fixture"
+    "file": "executive_768x1024.html",
+    "pii": false
   },
   {
     "viewport": "1024x768",
-    "html": "executive_1024x768.html",
-    "png": "executive_1024x768.png",
-    "pii": false,
-    "kind": "structural_fixture"
+    "file": "executive_1024x768.html",
+    "pii": false
   },
   {
     "viewport": "1366x768",
-    "html": "executive_1366x768.html",
-    "png": "executive_1366x768.png",
-    "pii": false,
-    "kind": "structural_fixture"
+    "file": "executive_1366x768.html",
+    "pii": false
   },
   {
     "viewport": "1440x900",
-    "html": "executive_1440x900.html",
-    "png": "executive_1440x900.png",
-    "pii": false,
-    "kind": "structural_fixture"
+    "file": "executive_1440x900.html",
+    "pii": false
   },
   {
     "viewport": "1920x1080",
-    "html": "executive_1920x1080.html",
-    "png": "executive_1920x1080.png",
-    "pii": false,
-    "kind": "structural_fixture"
+    "file": "executive_1920x1080.html",
+    "pii": false
   }
 ]

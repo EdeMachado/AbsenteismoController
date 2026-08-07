@@ -228,6 +228,89 @@ class ExecutiveIntelligenceEngine:
             evidencias.append(f"baseline_eventos={base.get('eventos')}")
             evidencias.append(f"baseline_dias={base.get('dias_perdidos')}")
 
+
+        # EXEC-02 structured narrative (technical BioMed tone)
+        o_que_mudou = []
+        if d_dias is not None:
+            o_que_mudou.append(
+                f"Dias perdidos: variação de {d_dias*100:.1f}% versus baseline comparável ({trend_dias})."
+            )
+        else:
+            o_que_mudou.append("Série/baseline insuficiente para quantificar variação de dias perdidos.")
+        if d_evt is not None:
+            o_que_mudou.append(
+                f"Eventos: variação de {d_evt*100:.1f}% versus baseline ({trend_evt})."
+            )
+        else:
+            o_que_mudou.append("Comparativo de eventos indisponível sem baseline válido.")
+
+        onde_risco = list(fatores)
+        por_que = [
+            "Impacto operacional concentra-se onde volume e severidade se sobrepõem.",
+            "Leitura agregada orienta priorização; não substitui avaliação clínica individual.",
+        ]
+        recomendamos = [
+            str(r.get("titulo") or r.get("id"))
+            for r in reco_dicts[:5]
+        ] or ["Sem recomendações acionáveis com a evidência atual."]
+        precisa_validacao = [
+            "Toda ação proposta requer validação médica antes de aprovação empresarial.",
+            "Não há execução automática de recomendações.",
+        ]
+        if not_exec:
+            precisa_validacao.append(
+                f"{len(not_exec)} condicionante(s) empresarial(is) permanece(m) "
+                "pendente(s)/parcial(is), reduzindo a cobertura potencial do plano."
+            )
+
+        # Short executive message (no marketing)
+        if trend_dias == "melhora" and current.get("setores_criticos"):
+            mensagem = (
+                f"Absenteísmo em tendência de melhora, com concentração persistente "
+                f"de impacto no setor {current['setores_criticos'][0]}."
+            )
+        elif trend_dias == "piora":
+            mensagem = (
+                "Absenteísmo em tendência de piora na janela comparável; "
+                "priorizar fatores de concentração setorial e CID."
+            )
+        elif trend_dias == "estabilidade":
+            mensagem = (
+                "Absenteísmo estável na janela comparável; monitorar concentração de risco."
+            )
+        else:
+            mensagem = (
+                "Leitura descritiva do período; tendência formal indisponível "
+                "por insuficiência de baseline/série."
+            )
+
+        # Favorable BioMed lines only when data sustains
+        if cov is not None and exe is not None and d_dias is not None and d_dias < 0:
+            biomed_lines.append(
+                f"A BioMed executou {float(exe)*100:.0f}% das ações aprovadas no período. "
+                f"Observou-se redução de {abs(d_dias)*100:.0f}% nos dias perdidos em janela comparável."
+            )
+            biomed_lines.append(
+                "A associação temporal é compatível com melhora operacional, "
+                "sem permitir atribuição causal exclusiva."
+            )
+
+        resumo = (
+            f"{client_name}: {int(cur_evt)} eventos e {cur_dias:.1f} dias perdidos no período. "
+            f"{evt_txt} {dias_txt} "
+            f"{' '.join(biomed_lines)} {cond_txt} "
+            "Não é possível estabelecer causalidade exclusiva."
+        )
+
+        for i, a in enumerate(actions):
+            a.baseline = (
+                f"eventos={base.get('eventos')}" if base else "baseline n/d"
+            )
+            a.meta = "redução material vs baseline"
+            a.result = "aguardando ciclo de monitoramento"
+            a.deadline = None
+            a.medical_validation = "pendente"
+
         return IntelligenceBundle(
             resumo_executivo=resumo,
             diagnostico_situacional=diagnostico,
@@ -239,4 +322,10 @@ class ExecutiveIntelligenceEngine:
             evidencias=evidencias,
             limitacoes=limitations,
             confianca=conf,
+            o_que_mudou=o_que_mudou,
+            onde_esta_o_risco=onde_risco,
+            por_que_importa=por_que,
+            o_que_recomendamos=recomendamos,
+            o_que_precisa_validacao=precisa_validacao,
+            mensagem_executiva=mensagem,
         )

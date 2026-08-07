@@ -1,10 +1,10 @@
 /**
- * BioMed Executive Intelligence — page bootstrap.
+ * BioMed Executive Intelligence — page bootstrap (EXEC-02).
+ * Single command-center fetch; no redundant API calls.
  */
 (function () {
   "use strict";
 
-  const Api = window.BioMedExecutiveApi;
   const CC = window.BioMedCommandCenter;
   const Charts = window.BioMedExecutiveCharts;
 
@@ -18,37 +18,21 @@
     return h;
   }
 
-  // Patch API fetch to include Bearer when present
-  const _origFetch = window.fetch.bind(window);
-  // api.js uses fetch directly; wrap via monkeypatch on module helper by overriding fetchJson pattern:
-  // Re-bind ExecutiveApi methods to include auth.
-  function withAuth(fn) {
-    return function (opts) {
-      const params = new URLSearchParams();
-      Object.keys(opts || {}).forEach(function (k) {
-        if (opts[k] != null && opts[k] !== "") params.set(k, opts[k]);
-      });
-      const path = fn.path + (params.toString() ? "?" + params.toString() : "");
-      return _origFetch(path, { credentials: "same-origin", headers: tokenHeaders() }).then(
-        function (res) {
-          if (res.status === 401) {
-            window.location.href = "/login";
-            throw new Error("Não autenticado");
-          }
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          return res.json();
-        }
-      );
-    };
+  function fetchJson(path, opts) {
+    const params = new URLSearchParams();
+    Object.keys(opts || {}).forEach(function (k) {
+      if (opts[k] != null && opts[k] !== "") params.set(k, opts[k]);
+    });
+    const url = path + (params.toString() ? "?" + params.toString() : "");
+    return fetch(url, { credentials: "same-origin", headers: tokenHeaders() }).then(function (res) {
+      if (res.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Não autenticado");
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    });
   }
-
-  const authApi = {
-    commandCenter: withAuth({ path: "/api/executive/command-center" }),
-    intelligence: withAuth({ path: "/api/executive/intelligence" }),
-    actionPlan: withAuth({ path: "/api/executive/action-plan" }),
-    performance: withAuth({ path: "/api/executive/performance" }),
-    meta: withAuth({ path: "/api/executive/meta" }),
-  };
 
   function destroyCharts() {
     chartHandles.forEach(function (c) {
@@ -76,6 +60,8 @@
         e.preventDefault();
         showModule(it.id);
         history.replaceState(null, "", "#" + it.id);
+        document.getElementById("bm-nav").classList.remove("is-open");
+        document.getElementById("bm-nav-toggle").setAttribute("aria-expanded", "false");
       });
       nav.appendChild(a);
     });
@@ -88,141 +74,121 @@
     document.querySelectorAll("#bm-nav-links a").forEach(function (a) {
       a.classList.toggle("is-active", a.dataset.module === id);
     });
-    const title = document.querySelector(".bm-title");
-    const active = (lastPayload && lastPayload.navigation || []).find(function (n) {
+    const title = document.getElementById("bm-page-title");
+    const active = ((lastPayload && lastPayload.navigation) || []).find(function (n) {
       return n.id === id;
     });
     if (title && active) title.textContent = active.label;
   }
 
+  function chartSummary(spec) {
+    if (!spec || spec.empty_reason) return spec && spec.empty_reason ? spec.empty_reason : "";
+    const cats = spec.categories || [];
+    return (spec.title || "") + ": " + cats.length + " categorias.";
+  }
+
   function renderCharts(charts) {
     destroyCharts();
+    const temporal = findChart(charts, "evolucao_temporal");
     const pareto = findChart(charts, "pareto_cid");
     const setores = findChart(charts, "setores");
-    const c1 = document.getElementById("chart-pareto");
-    const c2 = document.getElementById("chart-setores");
-    const c3 = document.getElementById("chart-epi");
-    const c4 = document.getElementById("chart-sectors-mod");
-    if (pareto && c1) chartHandles.push(Charts.paretoChart(c1, pareto));
-    if (setores && c2) chartHandles.push(Charts.barChart(c2, setores));
-    if (pareto && c3) chartHandles.push(Charts.paretoChart(c3, pareto));
-    if (setores && c4) chartHandles.push(Charts.barChart(c4, setores, Charts.palette.accent));
-  }
 
-  function renderPerformance(bp, cond, roi) {
-    const el = document.getElementById("bm-performance");
-    const elC = document.getElementById("bm-conditionants");
-    const elR = document.getElementById("bm-roi");
-    if (el) {
-      const p = (bp && bp.producao) || {};
-      el.innerHTML =
-        '<div class="bm-kpi-grid">' +
-        kpiMini("Planejadas", p.planejadas) +
-        kpiMini("Aprovadas", p.aprovadas) +
-        kpiMini("Executadas", p.executadas) +
-        kpiMini("Cobertura", bp && bp.cobertura != null ? (bp.cobertura * 100).toFixed(0) + "%" : null) +
-        kpiMini("Execução", bp && bp.execucao != null ? (bp.execucao * 100).toFixed(1) + "%" : null) +
-        "</div>" +
-        '<p class="bm-muted">' +
-        (bp && bp.nota ? bp.nota : "") +
-        "</p>" +
-        "<h3 class=\"bm-section-title\">Resultado observado</h3>" +
-        '<ul class="bm-list">' +
-        "<li>Eventos: " +
-        ((bp && bp.resultado_observado && bp.resultado_observado.eventos) != null
-          ? bp.resultado_observado.eventos
-          : "—") +
-        "</li>" +
-        "<li>Dias: " +
-        ((bp && bp.resultado_observado && bp.resultado_observado.dias) != null
-          ? bp.resultado_observado.dias
-          : "—") +
-        "</li>" +
-        "</ul>";
-    }
-    if (elC) {
-      if (!cond || !cond.length) {
-        elC.innerHTML =
-          '<p class="bm-muted">Nenhum condicionante empresarial registrado neste payload. Status possíveis: recomendada, aprovada, executada, parcialmente executada, adiada, recusada, impedida.</p>';
-      } else {
-        elC.innerHTML =
-          '<table class="bm-table"><thead><tr><th>ID</th><th>Status</th><th>Nota</th></tr></thead><tbody></tbody></table>';
-        const tb = elC.querySelector("tbody");
-        cond.forEach(function (c) {
-          const tr = document.createElement("tr");
-          tr.innerHTML = "<td></td><td></td><td></td>";
-          tr.children[0].textContent = c.id || c.recomendacao_id || "—";
-          tr.children[1].textContent = c.status || c.decisao || "—";
-          tr.children[2].textContent = c.barreira || c.nota || "";
-          tb.appendChild(tr);
-        });
-      }
-    }
-    if (elR) {
-      elR.innerHTML =
-        '<span class="bm-badge bm-badge-na">' +
-        ((roi && roi.kind) || "ROI_NAO_CALCULAVEL") +
-        "</span>" +
-        '<p class="bm-muted" style="margin-top:0.75rem"></p>';
-      elR.querySelector("p").textContent = ((roi && roi.limitacoes) || []).join(" ");
-    }
-  }
+    const tSum = document.getElementById("chart-temporal-summary");
+    const pSum = document.getElementById("chart-pareto-summary");
+    const sSum = document.getElementById("chart-setores-summary");
+    if (tSum) tSum.textContent = chartSummary(temporal);
+    if (pSum) pSum.textContent = chartSummary(pareto);
+    if (sSum) sSum.textContent = chartSummary(setores);
 
-  function kpiMini(label, value) {
-    return (
-      '<article class="bm-card bm-kpi"><div class="bm-kpi-label">' +
-      label +
-      '</div><div class="bm-kpi-value">' +
-      (value == null || value === "" ? "N/D" : value) +
-      "</div></article>"
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-temporal", "chart-temporal", temporal, Charts.lineChart)
     );
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-pareto", "chart-pareto", pareto, Charts.paretoChart)
+    );
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-setores", "chart-setores", setores, Charts.barChart)
+    );
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-abs-temporal", "chart-abs-temporal", temporal, Charts.lineChart)
+    );
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-epi", "chart-epi", pareto, Charts.paretoChart)
+    );
+    chartHandles.push(
+      Charts.renderOrEmpty("wrap-sectors-mod", "chart-sectors-mod", setores, function (c, s) {
+        return Charts.barChart(c, s, Charts.palette.accent);
+      })
+    );
+    chartHandles = chartHandles.filter(Boolean);
   }
 
-  function renderContext(payload) {
-    const row = document.getElementById("bm-context-pills");
-    if (!row) return;
-    row.innerHTML = "";
-    const pills = [
-      ["Empresa", payload.client && payload.client.label],
-      [
-        "Período",
-        payload.periodo &&
-          payload.periodo.atual &&
-          payload.periodo.atual.inicio + " → " + payload.periodo.atual.fim,
-      ],
-      ["Comparativo", payload.periodo && payload.periodo.comparabilidade],
-      [
-        "IQB",
-        payload.qualidade && payload.qualidade.iqb != null
-          ? String(payload.qualidade.iqb)
-          : "n/d",
-      ],
-    ];
-    pills.forEach(function (p) {
-      const s = document.createElement("span");
-      s.className = "bm-badge bm-badge-na";
-      s.textContent = p[0] + ": " + (p[1] || "—");
-      row.appendChild(s);
-    });
+  function setBanner(id, text) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!text) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = text;
   }
 
   function renderAll(payload) {
     lastPayload = payload;
     renderNav(payload.navigation);
-    renderContext(payload);
-    CC.renderKpis(document.getElementById("bm-kpis"), payload.kpis);
-    CC.renderKpis(document.getElementById("bm-abs-kpis"), (payload.kpis || []).slice(0, 6));
-    CC.renderScore(document.getElementById("bm-score"), payload.executive_score);
+    CC.renderHero(document.getElementById("bm-hero"), payload.hero);
+    CC.renderKpis(
+      document.getElementById("bm-kpis-primary"),
+      payload.kpis_primary || (payload.kpis || []).filter(function (k) {
+        return k.tier === "primary";
+      }),
+      "primary"
+    );
+    CC.renderKpis(
+      document.getElementById("bm-kpis-secondary"),
+      payload.kpis_secondary || (payload.kpis || []).filter(function (k) {
+        return k.tier !== "primary";
+      }),
+      "secondary"
+    );
+    CC.renderKpis(
+      document.getElementById("bm-abs-kpis"),
+      payload.kpis_primary || (payload.kpis || []).slice(0, 4),
+      "primary"
+    );
     CC.renderQuality(document.getElementById("bm-quality"), payload.qualidade);
     CC.renderQuality(document.getElementById("bm-quality-full"), payload.qualidade);
     CC.renderNarrative(document.getElementById("bm-narrative"), payload.narrative_lines);
-    CC.renderInsights(document.getElementById("bm-insights"), payload.insights);
-    const actions =
-      (payload.intelligence && payload.intelligence.plano_acao) || [];
-    CC.renderActions(document.getElementById("bm-actions"), actions);
-    CC.renderIntelSections(document.getElementById("bm-intel"), payload.intelligence);
-    renderPerformance(payload.biomed_performance, payload.conditionants, payload.roi);
+    CC.renderRecommendations(
+      document.getElementById("bm-recommendations"),
+      (payload.intelligence && payload.intelligence.recomendacoes) || []
+    );
+    const actions = (payload.intelligence && payload.intelligence.plano_acao) || [];
+    CC.renderActionsBoard(document.getElementById("bm-actions-preview"), actions.slice(0, 4));
+    CC.renderActionsBoard(document.getElementById("bm-actions"), actions);
+    CC.renderPerformance(document.getElementById("bm-performance"), payload.biomed_performance);
+    CC.renderPerformance(document.getElementById("bm-performance-brief"), payload.biomed_performance);
+    CC.renderConditionants(
+      document.getElementById("bm-conditionants"),
+      payload.conditionants,
+      payload.conditionants_summary
+    );
+    setBanner("bm-conditionants-banner", payload.conditionants_summary);
+    setBanner("bm-conditionants-banner-2", payload.conditionants_summary);
+    CC.renderIntel(document.getElementById("bm-intel"), payload.intelligence);
+    CC.renderRoi(document.getElementById("bm-roi"), payload.roi);
     renderCharts(payload.charts);
+
+    const methodBody = document.getElementById("bm-method-body");
+    if (methodBody) {
+      const how = (payload.methodology && payload.methodology.how) || [];
+      methodBody.innerHTML = "<ul class='bm-list'>" + how.map(function (h) {
+        return "<li>" + h + "</li>";
+      }).join("") + "</ul>";
+    }
+
     const hash = (location.hash || "#command").replace("#", "") || "command";
     showModule(hash);
   }
@@ -258,7 +224,7 @@
     }
     setStatus("Carregando painel executivo…");
     try {
-      const payload = await authApi.commandCenter(filterOpts());
+      const payload = await fetchJson("/api/executive/command-center", filterOpts());
       renderAll(payload);
       setStatus("");
     } catch (err) {
@@ -274,14 +240,36 @@
     load();
   });
 
-  // default period: last 6 months
+  document.getElementById("bm-nav-toggle").addEventListener("click", function () {
+    const nav = document.getElementById("bm-nav");
+    const open = nav.classList.toggle("is-open");
+    this.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  document.getElementById("bm-how").addEventListener("click", function () {
+    document.getElementById("bm-method-modal").classList.add("is-open");
+  });
+  document.getElementById("bm-method-close").addEventListener("click", function () {
+    document.getElementById("bm-method-modal").classList.remove("is-open");
+  });
+  document.getElementById("bm-method-modal").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("is-open");
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      document.getElementById("bm-method-modal").classList.remove("is-open");
+    }
+  });
+  document.querySelectorAll("[data-goto]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      showModule(btn.getAttribute("data-goto"));
+      history.replaceState(null, "", "#" + btn.getAttribute("data-goto"));
+    });
+  });
+
   (function initDates() {
-    const now = new Date();
-    const fim = now.toISOString().slice(0, 7);
-    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    const inicio = start.toISOString().slice(0, 7);
-    document.getElementById("periodo_fim").value = fim;
-    document.getElementById("periodo_inicio").value = inicio;
+    document.getElementById("periodo_inicio").value = "2026-01";
+    document.getElementById("periodo_fim").value = "2026-03";
   })();
 
   load();
