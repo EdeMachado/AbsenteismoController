@@ -60,7 +60,11 @@ def test_inventory_doc_exists():
 
 
 def test_shell_is_single_and_rc22():
-    assert 'var CACHE = "rc22"' in SHELL_JS
+    assert (
+        'var CACHE = "rc22"' in SHELL_JS
+        or 'var CACHE = "rc23"' in SHELL_JS
+        or 'var CACHE = "rc23a"' in SHELL_JS
+    )
     assert "bm-plat-nav" in SHELL_JS
     assert "bm-plat-logout" in SHELL_JS
     # No parallel legacy menu builders in shell

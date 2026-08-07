@@ -1,11 +1,11 @@
 /**
- * BioMed Platform shell — RC-22 Final Consolidation
+ * BioMed Platform shell — RC-23 Product Experience
  * One shell for all post-login surfaces. No new business features.
  */
 (function () {
   "use strict";
 
-  var CACHE = "rc22";
+  var CACHE = "rc23a";
 
   var BREADCRUMB = {
     "/": "Início",
@@ -102,12 +102,20 @@
   }
 
   function ensureStyles() {
-    if (document.querySelector('link[data-bm-plat]')) return;
-    var l = document.createElement("link");
-    l.rel = "stylesheet";
-    l.href = "/static/css/biomed-platform.css?v=" + CACHE;
-    l.setAttribute("data-bm-plat", "1");
-    document.head.appendChild(l);
+    if (!document.querySelector('link[data-bm-plat]')) {
+      var l = document.createElement("link");
+      l.rel = "stylesheet";
+      l.href = "/static/css/biomed-platform.css?v=" + CACHE;
+      l.setAttribute("data-bm-plat", "1");
+      document.head.appendChild(l);
+    }
+    if (!document.querySelector('link[data-bm-exp]')) {
+      var e = document.createElement("link");
+      e.rel = "stylesheet";
+      e.href = "/static/css/biomed-experience.css?v=" + CACHE;
+      e.setAttribute("data-bm-exp", "1");
+      document.head.appendChild(e);
+    }
   }
 
   function buildNavHtml() {
@@ -187,6 +195,12 @@
         try {
           localStorage.removeItem("access_token");
           localStorage.removeItem("user");
+          localStorage.removeItem("cliente_selecionado");
+          localStorage.removeItem("cliente_selecionado_nome");
+          localStorage.removeItem("cliente_nome");
+          localStorage.removeItem("cliente_cnpj");
+          localStorage.removeItem("cliente_tema");
+          localStorage.removeItem("cliente_logo_url");
         } catch (e) {}
         window.location.href = "/login";
       });

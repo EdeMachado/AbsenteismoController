@@ -1,0 +1,618 @@
+/**
+ * BioMed Experience — RC-23 Product Experience Rebuild
+ * Visual/layout only. Same data, same APIs, same business rules.
+ * Goal: content under the platform shell must feel built in 2026.
+ */
+@import url("/static/css/biomed-identity.css");
+
+:root {
+  --bmx-gap: 1.25rem;
+  --bmx-gap-lg: 1.75rem;
+  --bmx-radius: 16px;
+  --bmx-radius-sm: 12px;
+  --bmx-surface: #ffffff;
+  --bmx-surface-2: #f7f9fb;
+  --bmx-ink: var(--bm-ink, #132033);
+  --bmx-muted: var(--bm-ink-muted, #5a6474);
+  --bmx-border: var(--bm-border, #d8dee8);
+  --bmx-brand: var(--bm-brand, #1a4566);
+  --bmx-teal: var(--bm-teal, #2a6b5a);
+  --bmx-shadow: 0 1px 2px rgba(19, 32, 51, 0.04), 0 18px 40px rgba(19, 32, 51, 0.06);
+}
+
+/* ============================================================
+   Global content stage under platform shell
+   ============================================================ */
+body.bm-plat-legacy,
+body.bm-plat-body {
+  font-family: var(--bm-font, "BM Sans", "Segoe UI", sans-serif) !important;
+}
+
+body.bm-plat-legacy .bm-plat-main,
+#bm-plat-content,
+#bm-plat-legacy-slot {
+  width: 100%;
+  max-width: none;
+}
+
+body.bm-plat-legacy .main-content,
+body.bm-plat-legacy .main-page,
+body.bm-plat-legacy .content-wrapper,
+body.bm-plat-legacy .content,
+body.bm-plat-legacy .clientes-page {
+  padding: 0.25rem 0 2rem !important;
+  margin: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* Kill leftover nav chrome hard */
+body.bm-plat-legacy .sidebar,
+body.bm-plat-legacy aside.sidebar,
+body.bm-plat-legacy .sidebar-nav,
+body.bm-plat-legacy .powerbi-container > .sidebar,
+body[data-bm-shell] .sidebar:not(.sidebar-left):not(.sidebar-right) {
+  display: none !important;
+}
+
+body.bm-plat-legacy .powerbi-container {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+/* ============================================================
+   Typography & page titles
+   ============================================================ */
+body.bm-plat-legacy .header-title,
+body.bm-plat-legacy .dashboard-title,
+body.bm-plat-legacy .upload-header h1,
+body.bm-plat-legacy h1.header-title {
+  font-family: var(--bm-display, "BM Display", Georgia, serif) !important;
+  font-size: clamp(1.55rem, 2.4vw, 2rem) !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--bmx-brand) !important;
+  margin: 0 !important;
+}
+
+body.bm-plat-legacy .header,
+body.bm-plat-legacy .clientes-header {
+  margin-bottom: 1.35rem !important;
+  padding-bottom: 1rem !important;
+  border-bottom: 1px solid var(--bmx-border) !important;
+  gap: 1rem !important;
+}
+
+/* ============================================================
+   Buttons — modern, no Material rainbow
+   ============================================================ */
+body.bm-plat-legacy .btn,
+body.bm-plat-legacy button.btn,
+body.bm-plat-legacy .btn-primary,
+body.bm-plat-legacy .btn-success,
+body.bm-plat-legacy .btn-info,
+body.bm-plat-legacy .btn-warning,
+body.bm-plat-legacy .btn-hero,
+body.bm-plat-legacy .btn-print-header {
+  background: var(--bmx-brand) !important;
+  border: 1px solid var(--bmx-brand) !important;
+  color: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  padding: 0.65rem 1.1rem !important;
+  min-height: 42px;
+  line-height: 1.2 !important;
+}
+body.bm-plat-legacy .btn-secondary,
+body.bm-plat-legacy button.btn-secondary,
+body.bm-plat-legacy .btn-outline {
+  background: #fff !important;
+  color: var(--bmx-brand) !important;
+  border: 1px solid var(--bmx-border) !important;
+}
+body.bm-plat-legacy .btn-danger,
+body.bm-plat-legacy .btn-exit {
+  background: #8f2f2a !important;
+  border-color: #8f2f2a !important;
+}
+body.bm-plat-legacy .btn-sm {
+  min-height: 34px;
+  padding: 0.4rem 0.75rem !important;
+  font-size: 0.85rem !important;
+}
+
+/* ============================================================
+   Forms / filters — wide, calm
+   ============================================================ */
+body.bm-plat-legacy .filters,
+body.bm-plat-legacy .periodo-selector,
+body.bm-plat-legacy .toolbar,
+body.bm-plat-legacy .clientes-filters,
+body.bm-plat-legacy .analysis-header {
+  background: var(--bmx-surface) !important;
+  border: 1px solid var(--bmx-border) !important;
+  border-radius: var(--bmx-radius) !important;
+  box-shadow: var(--bmx-shadow) !important;
+  padding: 1.15rem 1.25rem !important;
+  margin-bottom: var(--bmx-gap-lg) !important;
+}
+
+body.bm-plat-legacy input,
+body.bm-plat-legacy select,
+body.bm-plat-legacy textarea,
+body.bm-plat-legacy .form-control {
+  border-radius: 12px !important;
+  border: 1px solid var(--bmx-border) !important;
+  background: #fff !important;
+  color: var(--bmx-ink) !important;
+  min-height: 42px;
+  font-family: inherit !important;
+  box-shadow: none !important;
+}
+body.bm-plat-legacy input:focus,
+body.bm-plat-legacy select:focus,
+body.bm-plat-legacy textarea:focus {
+  border-color: var(--bmx-brand) !important;
+  outline: 2px solid rgba(26, 69, 102, 0.12) !important;
+}
+
+body.bm-plat-legacy .filter-chip {
+  background: #fff !important;
+  color: var(--bmx-ink) !important;
+  border: 1px solid var(--bmx-border) !important;
+  border-radius: 999px !important;
+  padding: 0.55rem 1rem !important;
+}
+body.bm-plat-legacy .filter-chip.active {
+  background: var(--bmx-brand) !important;
+  border-color: var(--bmx-brand) !important;
+  color: #fff !important;
+}
+
+/* ============================================================
+   KPI / cards — BI Premium density
+   ============================================================ */
+body.bm-plat-legacy .cards-grid,
+body.bm-plat-legacy .clientes-snapshot,
+body.bm-plat-legacy .stats-row,
+body.bm-plat-legacy .kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: var(--bmx-gap) !important;
+  margin-bottom: var(--bmx-gap-lg) !important;
+}
+
+body.bm-plat-legacy .card,
+body.bm-plat-legacy .stat-card,
+body.bm-plat-legacy .kpi-card,
+body.bm-plat-legacy .snapshot-card,
+body.bm-plat-legacy .cliente-card,
+body.bm-plat-legacy .chart-card {
+  background: var(--bmx-surface) !important;
+  border: 1px solid var(--bmx-border) !important;
+  border-radius: var(--bmx-radius) !important;
+  box-shadow: var(--bmx-shadow) !important;
+  padding: 1.15rem 1.25rem !important;
+  min-height: 0 !important;
+}
+
+body.bm-plat-legacy .card-title,
+body.bm-plat-legacy .stat-label,
+body.bm-plat-legacy .card-label {
+  color: var(--bmx-muted) !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+body.bm-plat-legacy .card-value,
+body.bm-plat-legacy .stat-value,
+body.bm-plat-legacy .kpi-value {
+  font-family: var(--bm-display, "BM Display", Georgia, serif) !important;
+  font-size: clamp(1.6rem, 2.5vw, 2.15rem) !important;
+  font-weight: 650 !important;
+  color: var(--bmx-ink) !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* ============================================================
+   Charts — full width breathing room (Dashboard BI Premium)
+   ============================================================ */
+body.bm-plat-legacy .chart-container,
+body.bm-plat-legacy .chart-wrapper,
+body.bm-plat-legacy .chart-card {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 320px !important;
+  height: auto !important;
+  margin: 0 0 var(--bmx-gap) !important;
+  padding: 1.15rem 1.25rem 1.35rem !important;
+  background: var(--bmx-surface) !important;
+  border: 1px solid var(--bmx-border) !important;
+  border-radius: var(--bmx-radius) !important;
+  box-shadow: var(--bmx-shadow) !important;
+}
+
+body.bm-plat-legacy #graficosConverplast,
+body.bm-plat-legacy #graficosComparativos,
+body.bm-plat-legacy #graficosRodaOuro,
+body.bm-plat-legacy .charts-section,
+body.bm-plat-legacy .charts-grid {
+  display: block !important;
+  margin-top: 0.5rem !important;
+  padding-top: 0.25rem !important;
+  border-top: 0 !important;
+  width: 100% !important;
+}
+
+body.bm-plat-legacy .bmx-chart-row,
+body.bm-plat-legacy #graficosConverplast > div,
+body.bm-plat-legacy #graficosComparativos > div {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 1.25rem !important;
+  margin-bottom: 1.25rem !important;
+  width: 100% !important;
+}
+
+body.bm-plat-legacy .chart-wrapper {
+  height: 340px !important;
+  max-height: none !important;
+}
+
+body.bm-plat-legacy .bmx-kpi-row,
+body.bm-plat-legacy .cards-grid.bmx-kpi-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 1.25rem !important;
+}
+
+/* Full-bleed content width — kill leftover admin max-widths */
+body.bm-plat-legacy .main-page,
+body.bm-plat-legacy .main-content,
+body.bm-plat-legacy .clientes-page,
+body.bm-plat-legacy .upload-container,
+body.bm-plat-legacy .content {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+body.bm-plat-legacy .clientes-snapshot,
+body.bm-plat-legacy .clientes-filters,
+body.bm-plat-legacy .clientes-grid,
+body.bm-plat-legacy .clientes-hero {
+  width: 100% !important;
+  max-width: none !important;
+}
+body.bm-plat-legacy .snapshot-card.loading,
+body.bm-plat-legacy .clientes-empty {
+  width: 100% !important;
+  min-height: 88px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tables */
+body.bm-plat-legacy table,
+body.bm-plat-legacy .table,
+body.bm-plat-legacy .data-table,
+body.bm-plat-legacy .consolidado-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: var(--bmx-surface) !important;
+  border: 1px solid var(--bmx-border) !important;
+  border-radius: var(--bmx-radius) !important;
+  overflow: hidden;
+}
+body.bm-plat-legacy th,
+body.bm-plat-legacy .consolidado-table th,
+body.bm-plat-legacy .table-header,
+body.bm-plat-legacy thead {
+  background: var(--bmx-surface-2) !important;
+  background-image: none !important;
+  color: var(--bmx-muted) !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid var(--bmx-border) !important;
+}
+body.bm-plat-legacy td {
+  border-bottom: 1px solid var(--bmx-border) !important;
+  color: var(--bmx-ink) !important;
+}
+body.bm-plat-legacy tr:hover td {
+  background: rgba(26, 69, 102, 0.03) !important;
+}
+
+/* Kill purple PowerBI / Bootstrap leftovers */
+body.bm-plat-legacy [style*="#667eea"],
+body.bm-plat-legacy [style*="#764ba2"],
+body.bm-plat-legacy [style*="#00bcf2"] {
+  /* cannot override inline style attr fully; class-level below */
+}
+body.bm-plat-legacy .table-header,
+body.bm-plat-legacy .consolidado-table th,
+body.bm-plat-legacy .powerbi-container .btn-primary,
+body.bm-plat-legacy .upload-area,
+body.bm-plat-legacy .nav-item.active {
+  background: var(--bmx-brand) !important;
+  background-image: none !important;
+  border-color: var(--bmx-brand) !important;
+  color: #fff !important;
+}
+body.bm-plat-legacy .upload-area {
+  background: var(--bmx-surface-2) !important;
+  color: var(--bmx-ink) !important;
+  border: 2px dashed var(--bmx-border) !important;
+  border-radius: var(--bmx-radius) !important;
+  padding: 2.5rem 1.5rem !important;
+}
+body.bm-plat-legacy .upload-area:hover,
+body.bm-plat-legacy .upload-zone:hover {
+  border-color: var(--bmx-brand) !important;
+  background: rgba(26, 69, 102, 0.04) !important;
+}
+body.bm-plat-legacy .upload-zone {
+  border: 2px dashed var(--bmx-border) !important;
+  border-radius: var(--bmx-radius) !important;
+  background: var(--bmx-surface-2) !important;
+  padding: 2.75rem 1.5rem !important;
+}
+body.bm-plat-legacy .upload-container,
+body.bm-plat-legacy .upload-zone,
+body.bm-plat-legacy .search-box {
+  max-width: none !important;
+  width: 100% !important;
+}
+body.bm-plat-legacy .search-box {
+  max-width: 420px !important;
+}
+
+/* ============================================================
+   Clientes — remove indigo/green “old admin” hero
+   ============================================================ */
+body.bm-plat-legacy .clientes-hero {
+  background:
+    linear-gradient(135deg, rgba(26, 69, 102, 0.97), rgba(42, 107, 90, 0.9)) !important;
+  border-radius: 20px !important;
+  padding: 1.75rem 1.85rem !important;
+  box-shadow: var(--bmx-shadow) !important;
+}
+body.bm-plat-legacy .clientes-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  gap: var(--bmx-gap) !important;
+}
+body.bm-plat-legacy .cliente-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+body.bm-plat-legacy .cliente-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(19, 32, 51, 0.1) !important;
+}
+
+/* ============================================================
+   Apresentação — immersive deck inside shell (not legacy margins)
+   ============================================================ */
+/* Apresentação — edge-to-edge immersive stage (no wasted admin margins) */
+body.bm-plat-legacy:has(.apresentacao-container) .bm-plat-main,
+body.bm-plat-legacy:has(.apresentacao-container) #bm-plat-legacy-slot {
+  padding: 0 !important;
+}
+body.bm-plat-legacy:has(.apresentacao-container) .bm-plat-crumb {
+  display: none !important;
+}
+body.bm-plat-legacy .apresentacao-container {
+  width: 100% !important;
+  min-height: calc(100vh - 112px) !important;
+  height: calc(100vh - 112px) !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  background: #0f2a3d !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-shadow: none !important;
+}
+body.bm-plat-legacy .apresentacao-header {
+  background: linear-gradient(120deg, #12324a 0%, #1a4566 55%, #2a6b5a 100%) !important;
+  padding: 0.95rem 1.25rem !important;
+  border-radius: 0 !important;
+  flex: 0 0 auto;
+}
+body.bm-plat-legacy .apresentacao-header h1 {
+  font-family: var(--bm-display, "BM Display", Georgia, serif) !important;
+  font-size: 1.2rem !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em !important;
+}
+body.bm-plat-legacy .apresentacao-content {
+  flex: 1 1 auto !important;
+  background:
+    radial-gradient(900px 420px at 10% 0%, rgba(255, 255, 255, 0.08), transparent 55%),
+    linear-gradient(180deg, #12324a 0%, #0f2433 100%) !important;
+  padding: 1.25rem !important;
+  overflow: auto !important;
+}
+body.bm-plat-legacy .slide-content,
+body.bm-plat-legacy #slideContent {
+  max-width: 1180px !important;
+  margin: 0 auto !important;
+  min-height: 100% !important;
+}
+body.bm-plat-legacy .apresentacao-controls {
+  background: rgba(15, 36, 51, 0.96) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 0.85rem 1.25rem !important;
+  display: flex !important;
+  justify-content: center !important;
+  gap: 0.75rem !important;
+}
+body.bm-plat-legacy .btn-nav {
+  border-radius: 12px !important;
+  min-width: 120px;
+  border: 0 !important;
+  font-weight: 600 !important;
+}
+body.bm-plat-legacy .btn-nav.btn-prev {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+body.bm-plat-legacy .btn-nav.btn-next {
+  background: var(--bmx-teal) !important;
+  color: #fff !important;
+}
+body.bm-plat-legacy .btn-nav.btn-exit {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+body.bm-plat-legacy .btn-export,
+body.bm-plat-legacy .btn-fullscreen {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 10px !important;
+}
+/* KPI tiles inside presentation slides */
+body.bm-plat-legacy .apresentacao-content .kpi-card,
+body.bm-plat-legacy .slide-content .kpi-card {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+
+/* ============================================================
+   Hub / Analytics organizer — denser premium composition
+   ============================================================ */
+.bm-plat-hub-hero h1 {
+  font-size: clamp(1.8rem, 3vw, 2.35rem) !important;
+  letter-spacing: -0.03em;
+}
+.bm-plat-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: var(--bmx-gap) !important;
+}
+.bm-plat-kpi,
+.bm-plat-card,
+.bm-plat-activity {
+  border-radius: var(--bmx-radius) !important;
+  box-shadow: var(--bmx-shadow) !important;
+}
+.bm-plat-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: var(--bmx-gap) !important;
+}
+
+/* ============================================================
+   Responsive — Desktop / Notebook / Tablet / Mobile
+   ============================================================ */
+@media (max-width: 1280px) {
+  body.bm-plat-legacy .cards-grid,
+  body.bm-plat-legacy .clientes-snapshot {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .bm-plat-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 980px) {
+  body.bm-plat-legacy #graficosConverplast,
+  body.bm-plat-legacy #graficosComparativos,
+  body.bm-plat-legacy #graficosRodaOuro,
+  body.bm-plat-legacy .charts-grid,
+  body.bm-plat-legacy .bmx-chart-row,
+  body.bm-plat-legacy #graficosConverplast > div,
+  body.bm-plat-legacy #graficosComparativos > div {
+    grid-template-columns: 1fr !important;
+  }
+  body.bm-plat-legacy .chart-container {
+    min-height: 280px !important;
+  }
+  body.bm-plat-legacy .apresentacao-container {
+    height: auto !important;
+    min-height: 70vh !important;
+  }
+  body.bm-plat-legacy .header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  body.bm-plat-legacy .header-actions {
+    width: 100%;
+    flex-wrap: wrap !important;
+  }
+  body.bm-plat-legacy .btn,
+  body.bm-plat-legacy button.btn {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  body.bm-plat-legacy .cards-grid,
+  body.bm-plat-legacy .clientes-snapshot,
+  .bm-plat-kpis,
+  .bm-plat-cards {
+    grid-template-columns: 1fr !important;
+  }
+  body.bm-plat-legacy .filters,
+  body.bm-plat-legacy .toolbar {
+    padding: 1rem !important;
+  }
+  body.bm-plat-legacy .clientes-hero {
+    padding: 1.25rem !important;
+  }
+  body.bm-plat-legacy .apresentacao-controls {
+    flex-wrap: wrap !important;
+  }
+  body.bm-plat-legacy .btn-nav {
+    min-width: 0;
+    flex: 1 1 30%;
+  }
+  body.bm-plat-legacy table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Prevent overlapping sticky/fixed leftovers */
+body.bm-plat-legacy .header-actions,
+body.bm-plat-legacy .filter-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.6rem !important;
+  align-items: center !important;
+}
+body.bm-plat-legacy .alertas-dropdown {
+  z-index: 40 !important;
+}
+
+
+/* RC23a — presentation full-bleed (hard) */
+.bm-plat-main:has(.apresentacao-container),
+#bm-plat-legacy-slot:has(.apresentacao-container),
+.bm-plat-column:has(.apresentacao-container) .bm-plat-main {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.bm-plat-column:has(.apresentacao-container) .bm-plat-crumb {
+  display: none !important;
+}
+.bm-plat-column:has(.apresentacao-container) .bm-plat-foot {
+  display: none !important;
+}
+body.bm-plat-legacy .apresentacao-container {
+  border-radius: 0 !important;
+  width: 100% !important;
+  min-height: calc(100vh - 64px) !important;
+  height: calc(100vh - 64px) !important;
+}

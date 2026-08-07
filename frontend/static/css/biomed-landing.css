@@ -70,11 +70,12 @@
 
 .bm-lp-hero {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: clamp(1.5rem, 4vw, 3rem);
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
   align-items: center;
-  padding: clamp(2.5rem, 6vw, 5rem) clamp(1.2rem, 4vw, 3rem) clamp(3rem, 6vw, 5rem);
-  max-width: 1180px;
+  padding: clamp(2.5rem, 6vw, 5rem) clamp(1.4rem, 5vw, 3.5rem) clamp(3rem, 6vw, 5rem);
+  max-width: none;
+  width: min(1240px, 100%);
   margin: 0 auto;
 }
 .bm-lp-hero h1 {
