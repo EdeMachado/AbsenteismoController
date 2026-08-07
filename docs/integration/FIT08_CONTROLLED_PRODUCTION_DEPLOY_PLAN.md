@@ -4,15 +4,33 @@
 
 | Item | Valor |
 |------|-------|
-| Decisão deste documento | **PLANO PRONTO — EXECUÇÃO NÃO AUTORIZADA AQUI** |
-| Deploy automático | **PROIBIDO** |
-| Acesso VPS por agente | **NÃO EXECUTADO** |
-| Target `main` | `540cda0806326aa14ced57d42fd43e8a69817d08` |
-| PR integrado | [#11](https://github.com/EdeMachado/AbsenteismoController/pull/11) |
+| Decisão deste documento | **FIT-08 CONCLUÍDO** (deploy humano executado com sucesso) |
+| Deploy em produção | **CONCLUÍDO** em `540cda0806326aa14ced57d42fd43e8a69817d08` |
+| Smoke | **FIT08-B6-R3 = GO** · `FAIL_COUNT=0` |
+| Migration | **não executada** |
+| Rollback | **pronto, não executado** |
+| Acesso VPS por este agente documental | **NÃO** (fechamento só documental) |
+| Target `main` / produção | `540cda0806326aa14ced57d42fd43e8a69817d08` |
+| PR de código | [#11](https://github.com/EdeMachado/AbsenteismoController/pull/11) (merged) |
+| PR de plano/scripts | [#12](https://github.com/EdeMachado/AbsenteismoController/pull/12) |
 | Modo | `DEPLOY_DE_CODIGO_SEM_MIGRATION=true` |
 
-Este arquivo contém **somente** o plano humano (blocos SSH).  
-**Nada foi executado em produção por este pacote.**
+### Identidade do deploy executado
+
+| Campo | Valor |
+|-------|-------|
+| OLD_HEAD | `d0c012abaae9191531c3d2f30cb909407d31af01` |
+| DEPLOYED_HEAD | `540cda0806326aa14ced57d42fd43e8a69817d08` |
+| Backup DB | `/root/backups/absenteismo/absenteismo_pre_fit06_20260807_000226.db` |
+| Backup SHA-256 | `13c485ace101695b792ac1dd9f634cd9291ccc381b33dbaeb79f3f316acae1ff` |
+| Config backup | `/root/backups/absenteismo/config_pre_fit08_20260807_005949` |
+| Restart | **único** (`absenteismocontroller.service`) |
+| Serviço pós-deploy | **active** |
+
+Relatórios:  
+`FIT08_PRODUCTION_DEPLOY_REPORT.md` · `FIT08_POST_DEPLOY_VALIDATION.md` · `FIT08_ROLLBACK_READY.md` · `FIT08_FINAL_STATUS.md`
+
+Os blocos SSH abaixo permanecem como referência operacional histórica do plano.
 
 ---
 
