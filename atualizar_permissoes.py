@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
 Script para atualizar permissões de usuários
-Executa: python atualizar_permissoes.py
+DESATIVADO (S01-A): zerava client_id de usuários existentes.
+Não execute este script em produção.
 """
 import sys
 import os
+
+sys.stderr.write(
+    "ERRO (S01-A): atualizar_permissoes.py foi desativado. "
+    "Não é permitido zerar ou reatribuir client_id em massa.\n"
+)
+sys.exit(2)
 
 # Adiciona o diretório do projeto ao path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

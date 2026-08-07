@@ -6,8 +6,29 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import os
 
-# Database path
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database", "absenteismo.db")
+def _resolve_db_path() -> str:
+    """
+    Resolve SQLite path.
+
+    Optional staging override: ABSENTEISMO_SQLITE_PATH (explicit only).
+    Refuses known production live path. Default remains repo database/absenteismo.db
+    (local/dev — never auto-points to /var/www/...).
+    """
+    override = (os.environ.get("ABSENTEISMO_SQLITE_PATH") or "").strip()
+    if override:
+        norm = override.replace("\\", "/").lower()
+        if norm == "/var/www/absenteismo/database/absenteismo.db" or (
+            "/var/www/absenteismo/" in norm and norm.endswith("absenteismo.db")
+        ):
+            raise RuntimeError(
+                "ABSENTEISMO_SQLITE_PATH refuses production live database path"
+            )
+        return override
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), "database", "absenteismo.db")
+
+
+# Database path (overridable for isolated staging — never defaults to VPS live DB)
+DB_PATH = _resolve_db_path()
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # Create engine
