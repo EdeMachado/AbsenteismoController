@@ -1,6 +1,7 @@
 # RC-1.3 — Executive Language & Trust
 
-**Branch:** `cursor/rc13-executive-language-trust-f8f5`  
+**Branch:** `cursor/rc13-executive-language-trust-f8f5`
+**HEAD:** `bc7407ba31920bdd9813a6fa1321ac5855760f62`
 **Status:** Draft · sem merge · sem deploy · sem produção
 
 ## Pergunta da sprint
