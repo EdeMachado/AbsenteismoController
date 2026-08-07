@@ -76,7 +76,7 @@ rows = con.execute(
     "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ingestion_%' ORDER BY name"
 ).fetchall()
 con.close()
-print("\\n".join(r[0] for r in rows), end="")
+print("\n".join(r[0] for r in rows), end="")
 PY
 }
 
