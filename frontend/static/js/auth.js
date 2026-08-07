@@ -187,6 +187,15 @@ async function logout() {
     } finally {
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
+        // RC-23: clear company context so next login always returns to company list
+        try {
+            localStorage.removeItem('cliente_selecionado');
+            localStorage.removeItem('cliente_selecionado_nome');
+            localStorage.removeItem('cliente_nome');
+            localStorage.removeItem('cliente_cnpj');
+            localStorage.removeItem('cliente_tema');
+            localStorage.removeItem('cliente_logo_url');
+        } catch (e) { /* ignore */ }
         window.location.href = '/landing';
     }
 }

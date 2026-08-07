@@ -17,492 +17,107 @@
     <script src="/static/js/cores-cliente.js"></script>
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* RC-23: deck chrome rebuilt — experience layer owns the look under platform shell */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body[data-bm-shell="legacy"] {
+            font-family: "BM Sans", "Segoe UI", sans-serif;
+            background: transparent;
+            color: #132033;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #1a237e;
-            color: #333;
-            overflow: hidden;
-        }
-        
         .apresentacao-container {
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            min-height: calc(100vh - 112px);
+            height: calc(100vh - 112px);
             display: flex;
             flex-direction: column;
-            background: #F5F7FA;
+            background: #0f2a3d;
+            border-radius: 0;
+            overflow: hidden;
         }
-        
         .apresentacao-header {
-            background: linear-gradient(135deg, #1a237e, #3949ab);
+            background: linear-gradient(120deg, #12324a 0%, #1a4566 55%, #2a6b5a 100%);
             color: white;
-            padding: 16px 24px;
+            padding: 16px 22px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             z-index: 100;
         }
-        
         .apresentacao-header h1 {
-            font-size: 20px;
-            font-weight: 600;
+            font-family: "BM Display", Georgia, serif;
+            font-size: 1.2rem;
+            font-weight: 650;
+            letter-spacing: -0.02em;
         }
-        
-        .apresentacao-header-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        
-        .slide-indicator {
-            font-size: 14px;
-            opacity: 0.9;
-        }
-        
+        .apresentacao-header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: relative; }
+        .slide-indicator { font-size: 14px; opacity: 0.9; }
         .btn-export, .btn-fullscreen {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.22);
             color: white;
             padding: 8px 12px;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 14px;
-            transition: all 0.3s;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 6px;
         }
-        
-        .btn-export:hover, .btn-fullscreen:hover {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.5);
-        }
-        
-        .btn-export i, .btn-fullscreen i {
-            font-size: 16px;
-        }
-        
-        @media print {
-            /* Reset para impressão */
-            * {
-                margin: 0;
-                padding: 0;
-            }
-            
-            /* Esconde o header na impressão */
-            .apresentacao-header {
-                display: none !important;
-            }
-            
-            body {
-                overflow: visible !important;
-                background: white !important;
-                margin: 0;
-                padding: 0;
-            }
-            
-            .apresentacao-container {
-                background: white !important;
-                height: auto !important;
-                width: 100% !important;
-                display: block !important;
-            }
-            
-            /* Cada slide é uma página */
-            .slide-content {
-                page-break-after: always;
-                page-break-inside: avoid;
-                height: auto !important;
-                min-height: 100vh;
-                display: block !important;
-                margin: 0;
-                padding: 20px;
-                background: white !important;
-            }
-            
-            /* Evita páginas em branco */
-            .slide-content:empty {
-                display: none !important;
-            }
-            
-            /* Garante que gráficos sejam visíveis */
-            canvas {
-                max-width: 100% !important;
-                height: auto !important;
-            }
-            
-            /* Remove elementos desnecessários */
-            .btn-export, .btn-fullscreen, .slide-indicator {
-                display: none !important;
-            }
-            
-            /* Garante cores nos gráficos */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-        }
-        
-        /* Menu dropdown de exportação */
-        .export-menu {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            margin-top: 8px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-            min-width: 200px;
-            z-index: 1000;
-            display: none;
-            overflow: hidden;
-        }
-        
-        .export-menu.show {
-            display: block;
-        }
-        
-        .export-menu-item {
-            padding: 12px 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: background 0.2s;
-            color: #333;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .export-menu-item:last-child {
-            border-bottom: none;
-        }
-        
-        .export-menu-item:hover {
-            background: #f5f5f5;
-        }
-        
-        .export-menu-item i {
-            font-size: 18px;
-            width: 24px;
-            text-align: center;
-        }
-        
-        /* .export-menu-item.pdf REMOVIDO */
-        
-        .export-menu-item.pptx i {
-            color: #FF9800;
-        }
-        
-        .export-menu-item .label {
-            flex: 1;
-            font-weight: 500;
-        }
-        
-        .export-menu-item .desc {
-            font-size: 12px;
-            color: #666;
-            margin-top: 2px;
-        }
-        
-        /* Estilo quando está em fullscreen */
-        body.fullscreen-mode .apresentacao-header {
-            padding: 12px 20px;
-        }
-        
-        body.fullscreen-mode .apresentacao-header h1 {
-            font-size: 18px;
-        }
-        
-        body.fullscreen-mode .apresentacao-content {
-            padding: 16px;
-        }
-        
+        .btn-export:hover, .btn-fullscreen:hover { background: rgba(255, 255, 255, 0.2); }
         .apresentacao-content {
             flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            padding: 24px;
-            gap: 24px;
+            overflow: auto;
+            padding: 1.25rem;
+            background:
+              radial-gradient(900px 420px at 10% 0%, rgba(255,255,255,0.08), transparent 55%),
+              linear-gradient(180deg, #12324a 0%, #0f2433 100%);
         }
-        
-        .slide-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .slide-header {
-            padding: 20px 24px;
-            border-bottom: 2px solid #e0e0e0;
-            background: linear-gradient(135deg, #f8f9fa, #ffffff);
-        }
-        
-        .slide-header h2 {
-            font-size: 24px;
-            color: #1a237e;
-            margin-bottom: 4px;
-        }
-        
-        .slide-header p {
-            font-size: 14px;
-            color: #6c757d;
-        }
-        
-        .slide-body {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 1fr;
-            grid-template-rows: 1.8fr 1fr;
-            gap: 12px;
-            padding: 16px;
-            overflow: hidden;
-        }
-        
-        .chart-container-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 0;
-        }
-        
-        .chart-container {
-            width: 100%;
-            height: 100%;
-            max-height: 280px;
-            position: relative;
-        }
-        
-        .analise-container {
-            background: #f8f9fa;
-            border-left: 4px solid #556B2F;
-            padding: 12px;
-            border-radius: 8px;
-            overflow-y: auto;
-            max-height: 200px;
-            font-size: 12px;
-        }
-        
-        .analise-container h3 {
-            font-size: 18px;
-            color: #1a237e;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .analise-texto {
-            font-size: 12px;
-            line-height: 1.5;
-            color: #333;
-            white-space: pre-line;
-        }
-        
-        .analise-texto strong {
-            color: #1a237e;
-            font-weight: 600;
-        }
-        
+        .slide-content { max-width: 1180px; margin: 0 auto; color: #fff; }
         .apresentacao-controls {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex; justify-content: center; gap: 0.75rem;
+            padding: 0.85rem 1.25rem; flex-wrap: wrap;
+            background: rgba(15, 36, 51, 0.96);
+            border-top: 1px solid rgba(255,255,255,0.08);
         }
-        
         .btn-nav {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
+            border: 0; border-radius: 12px; padding: 0.7rem 1.1rem;
+            font-weight: 600; cursor: pointer; color: #fff; min-width: 120px;
         }
-        
-        .btn-nav:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        .btn-nav:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .btn-prev {
-            background: #556B2F;
-            color: white;
-        }
-        
-        .btn-next {
-            background: #1a237e;
-            color: white;
-        }
-        
-        .btn-exit {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #6c757d;
-        }
-        
-        .empty-state i {
-            font-size: 64px;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-        
-        .kpis-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            padding: 20px;
-        }
-        
+        .btn-nav.btn-prev { background: rgba(255,255,255,0.12); }
+        .btn-nav.btn-next { background: #2a6b5a; }
+        .btn-nav.btn-exit { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); }
+        .loading, .error-state { color: rgba(255,255,255,0.85); text-align: center; padding: 3rem 1rem; }
         .kpi-card {
-            background: linear-gradient(135deg, #1a237e, #3949ab);
-            color: white;
-            padding: 24px;
-            border-radius: 12px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: rgba(255,255,255,0.08) !important;
+            border: 1px solid rgba(255,255,255,0.14) !important;
+            border-radius: 16px !important;
+            color: #fff !important;
+            box-shadow: none !important;
         }
-        
-        .kpi-card h3 {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 12px;
-            font-weight: 500;
+        .export-menu {
+            display: none; position: absolute; top: calc(100% + 8px); right: 0;
+            background: #fff; color: #132033; border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(19,32,51,0.18); min-width: 240px; z-index: 200; overflow: hidden;
         }
-        
-        .kpi-card .valor {
-            font-size: 36px;
-            font-weight: 700;
-            margin-bottom: 8px;
+        .export-menu-item { display: flex; gap: 10px; padding: 12px 14px; cursor: pointer; }
+        .export-menu-item:hover { background: #f2f5f8; }
+        .export-menu-item .label { font-weight: 600; }
+        .export-menu-item .desc { font-size: 12px; color: #5a6474; }
+        @media (max-width: 900px) {
+            .apresentacao-container { height: auto; min-height: 70vh; }
+            .apresentacao-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
         }
-        
-        .kpi-card .label {
-            font-size: 12px;
-            opacity: 0.8;
-        }
-        
-        .acoes-content {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            padding: 40px;
-            overflow-y: auto;
-        }
-        
-        .acoes-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #6B8E23;
-        }
-        
-        .acoes-tab {
-            padding: 12px 24px;
-            border-radius: 8px 8px 0 0;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .acoes-tab.active {
-            background: #6B8E23;
-            color: white;
-        }
-        
-        .acoes-tab.inactive {
-            background: white;
-            color: #1a237e;
-            border: 2px dashed #dee2e6;
-            border-bottom: none;
-        }
-        
-        .acoes-texto {
-            font-size: 16px;
-            line-height: 1.8;
-            color: #333;
-            margin-bottom: 30px;
-            text-align: justify;
-        }
-        
-        .acoes-lista {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        
-        .acoes-lista li {
-            padding: 12px 0;
-            padding-left: 30px;
-            position: relative;
-            font-size: 16px;
-            line-height: 1.8;
-            color: #333;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .acoes-lista li::before {
-            content: '•';
-            position: absolute;
-            left: 0;
-            color: #6B8E23;
-            font-weight: bold;
-            font-size: 20px;
-        }
-        
-        .loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #6c757d;
-        }
-        
-        .loading i {
-            font-size: 48px;
-            margin-bottom: 16px;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        @media print {
+            .apresentacao-header, .apresentacao-controls { display: none !important; }
+            body { overflow: visible !important; background: white !important; }
+            .apresentacao-container { background: white !important; height: auto !important; width: 100% !important; display: block !important; }
+            .slide-content { page-break-after: always; color: #000 !important; }
         }
     </style>
-  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc22" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc23a" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-experience.css?v=rc23a" data-bm-exp="1" />
 </head>
 <body data-bm-shell="legacy">
     <div class="apresentacao-container">
@@ -585,6 +200,6 @@
             }, 1000);
         });
     </script>
-  <script src="/static/js/biomed-platform-shell.js?v=rc22"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc23a"></script>
 </body>
 </html>

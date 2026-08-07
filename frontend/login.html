@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Entrar — BioMed</title>
-  <link rel="stylesheet" href="/static/css/biomed-identity.css?v=rc22" />
-  <link rel="stylesheet" href="/static/css/biomed-login.css?v=rc22" />
+  <title>Entrar — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-identity.css?v=rc23a" />
+  <link rel="stylesheet" href="/static/css/biomed-login.css?v=rc23a" />
 </head>
 <body class="bm-login-body">
   <div class="bm-login-shell">
     <a class="bm-login-back" href="/landing">← BioMed</a>
     <div class="bm-login-card">
       <header class="bm-login-header">
-        <p class="bm-login-brand">BioMed</p>
+        <p class="bm-login-brand">BioMed Platform</p>
         <h1>Entrar na plataforma</h1>
         <p class="bm-login-sub">Inteligência em Saúde Corporativa</p>
       </header>
@@ -69,11 +69,23 @@
       return n;
     }
 
+    /** RC-23: after auth always open company list — never skip to a remembered empresa. */
+    function clearCompanySelection() {
+      try {
+        localStorage.removeItem("cliente_selecionado");
+        localStorage.removeItem("cliente_selecionado_nome");
+        localStorage.removeItem("cliente_nome");
+        localStorage.removeItem("cliente_cnpj");
+        localStorage.removeItem("cliente_tema");
+        localStorage.removeItem("cliente_logo_url");
+      } catch (e) {}
+    }
+
     function postLoginDestination() {
       const params = new URLSearchParams(window.location.search);
       const next = safeInternalNext(params.get("next"));
-      if (next) return next;
-      if (localStorage.getItem("cliente_selecionado")) return "/";
+      // Allow deep-link only to company picker; never resume a stored company session.
+      if (next === "/clientes" || (next && next.indexOf("/clientes?") === 0)) return next;
       return "/clientes";
     }
 
@@ -91,6 +103,7 @@
         const response = await fetch("/api/auth/login", { method: "POST", body: formData });
         const data = await response.json();
         if (response.ok) {
+          clearCompanySelection();
           localStorage.setItem("access_token", data.access_token);
           localStorage.setItem("user", JSON.stringify(data.user));
           showAlert("Login realizado com sucesso!", "success");
@@ -117,9 +130,7 @@
       this.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
     });
 
-    if (localStorage.getItem("access_token")) {
-      window.location.href = postLoginDestination();
-    }
+    // RC-23: Landing → Login must always show the form. Do not auto-resume sessions.
   </script>
 </body>
 </html>

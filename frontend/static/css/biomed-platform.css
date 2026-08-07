@@ -166,9 +166,11 @@
 }
 
 .bm-plat-main {
-  padding: clamp(1rem, 2.5vw, 1.5rem) clamp(1.25rem, 3.5vw, 2.5rem) 2rem;
-  max-width: 1280px;
+  padding: clamp(0.85rem, 2vw, 1.25rem) clamp(1rem, 2.5vw, 1.75rem) 1.5rem;
+  max-width: none;
+  width: 100%;
   flex: 1;
+  min-width: 0;
 }
 
 .bm-plat-foot {
