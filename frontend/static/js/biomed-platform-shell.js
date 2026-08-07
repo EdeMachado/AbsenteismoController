@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  var CACHE = "p0tenant1";
+  var CACHE = "rc24";
 
   function installTenantIsolationGuard() {
     if (window.__bmTenantIsolationInstalled) return;
