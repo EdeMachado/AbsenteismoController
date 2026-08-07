@@ -1,11 +1,11 @@
 /**
- * BioMed Platform shell — RC-23 Product Experience
+ * BioMed Platform shell — RC-24 Final Visual Polish
  * One shell for all post-login surfaces. No new business features.
  */
 (function () {
   "use strict";
 
-  var CACHE = "rc23a";
+  var CACHE = "rc24";
 
   var BREADCRUMB = {
     "/": "Início",
@@ -115,6 +115,13 @@
       e.href = "/static/css/biomed-experience.css?v=" + CACHE;
       e.setAttribute("data-bm-exp", "1");
       document.head.appendChild(e);
+    }
+    if (!document.querySelector('link[data-bm-polish]')) {
+      var p = document.createElement("link");
+      p.rel = "stylesheet";
+      p.href = "/static/css/biomed-polish.css?v=" + CACHE;
+      p.setAttribute("data-bm-polish", "1");
+      document.head.appendChild(p);
     }
   }
 

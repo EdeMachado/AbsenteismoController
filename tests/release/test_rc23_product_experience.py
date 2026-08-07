@@ -39,7 +39,11 @@ def test_experience_layer_wired():
     assert "apresentacao-container" in text
     assert "charts-grid" in text or "graficosConverplast" in text
     shell = (FRONTEND / "static/js/biomed-platform-shell.js").read_text(encoding="utf-8")
-    assert 'CACHE = "rc23"' in shell or 'CACHE = "rc23a"' in shell
+    assert (
+        'CACHE = "rc23"' in shell
+        or 'CACHE = "rc23a"' in shell
+        or 'CACHE = "rc24"' in shell
+    )
     assert "biomed-experience.css" in shell
 
 

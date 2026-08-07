@@ -8,14 +8,14 @@ function getCoresApresentacao() {
     if (typeof getCoresCliente === 'function') {
         return getCoresCliente();
     }
-    // Fallback para cores padrão
+    // Fallback BioMed Platform brand (RC24 visual polish — no business change)
     return {
-    primary: '#1a237e',
-    primaryDark: '#0d47a1',
-    primaryLight: '#3949ab',
-    secondary: '#556B2F',
-    secondaryDark: '#4a5d23',
-    secondaryLight: '#6B8E23',
+    primary: '#1a4566',
+    primaryDark: '#0f2f45',
+    primaryLight: '#2f6f8f',
+    secondary: '#2a6b5a',
+    secondaryDark: '#1f5244',
+    secondaryLight: '#3d8a74',
 };
 }
 
@@ -23,8 +23,8 @@ function getPaletaApresentacao() {
     if (typeof getPaletaCliente === 'function') {
         return getPaletaCliente();
     }
-    // Fallback para paleta padrão
-    return ['#1a237e', '#556B2F', '#3949ab', '#6B8E23', '#0d47a1', '#808000'];
+    // Fallback BioMed palette
+    return ['#1a4566', '#2a6b5a', '#2f6f8f', '#3d8a74', '#0f2f45', '#5a8aa8'];
 }
 
 // Mantém compatibilidade com código existente
@@ -181,7 +181,7 @@ async function carregarApresentacao(forceClientId = null) {
             // Restaura cores padrão para outras empresas
             const header = document.querySelector('.apresentacao-header');
             if (header) {
-                header.style.background = 'linear-gradient(135deg, #1a237e, #3949ab)';
+                header.style.background = 'linear-gradient(120deg, #12324a 0%, #1a4566 55%, #2a6b5a 100%)';
             }
         }
         
@@ -200,6 +200,12 @@ async function carregarApresentacao(forceClientId = null) {
             atualizarBotoes();
         } else {
             console.error('[APRESENTACAO] Nenhum slide retornado!');
+            const a = document.getElementById('slideAtual');
+            const t = document.getElementById('totalSlides');
+            if (a) a.textContent = '—';
+            if (t) t.textContent = '—';
+            const root = document.querySelector('.apresentacao-container');
+            if (root) root.classList.add('is-empty');
             mostrarErro('Nenhum dado disponível para apresentação. Verifique se há dados cadastrados para este cliente.');
         }
     } catch (error) {
@@ -452,7 +458,7 @@ async function renderizarCapa() {
     
     // Obtém cores do cliente
     const cores = getCoresApresentacao();
-    const corPrimaria = cores.primary || '#1a237e';
+    const corPrimaria = cores.primary || '#1a4566';
     const corSecundaria = cores.secondary || '#556B2F';
     
     // Gera nome da empresa para exibição
@@ -585,9 +591,9 @@ function renderizarKPIs(dados) {
     
     // Cores padrão (Converplast e outras)
     const coresPadrao = {
-        card1: '#1a237e',  // Azul escuro
-        card2: '#3949ab',  // Azul médio
-        card3: '#5c6bc0'   // Azul claro
+        card1: '#1a4566',  // BioMed brand
+        card2: '#2f6f8f',  // BioMed mid
+        card3: '#2a6b5a'   // BioMed teal
     };
     
     const cores = isRodaOuro ? coresRO : coresPadrao;
@@ -2438,7 +2444,7 @@ function renderizarAcoesIntro(tipo) {
     
     // Obtém cores do cliente
     const cores = getCoresApresentacao();
-    const corPrimaria = cores.primary || '#1a237e';
+    const corPrimaria = cores.primary || '#1a4566';
     const corSecundaria = cores.secondary || '#556B2F';
     
     return `
@@ -2483,7 +2489,7 @@ async function renderizarFooterAcoes() {
     
     // Obtém cores do cliente
     const cores = getCoresApresentacao();
-    const corPrimaria = cores.primary || '#1a237e';
+    const corPrimaria = cores.primary || '#1a4566';
     const corSecundaria = cores.secondary || '#556B2F';
     
     // Gera nome da empresa para exibição
@@ -2576,7 +2582,7 @@ function renderizarAcoesSaudeFisica(tipo) {
     
     // Obtém cores do cliente
     const cores = getCoresApresentacao();
-    const corPrimaria = cores.primary || '#1a237e';
+    const corPrimaria = cores.primary || '#1a4566';
     const corSecundaria = cores.secondary || '#556B2F';
     
     const acoesHTML = dados.acoes.map(acao => `
@@ -2636,7 +2642,7 @@ function renderizarAcoesSaudeEmocional(tipo) {
     
     // Obtém cores do cliente
     const cores = getCoresApresentacao();
-    const corPrimaria = cores.primary || '#1a237e';
+    const corPrimaria = cores.primary || '#1a4566';
     const corSecundaria = cores.secondary || '#556B2F';
     
     const acoesHTML = dados.acoes.map(acao => `
@@ -2696,7 +2702,7 @@ function renderizarAcoesSaudeSocial(tipo) {
     
     // Obtém cores do cliente
     const cores = getCoresApresentacao();
-    const corPrimaria = cores.primary || '#1a237e';
+    const corPrimaria = cores.primary || '#1a4566';
     const corSecundaria = cores.secondary || '#556B2F';
     
     const acoesHTML = dados.acoes.map(acao => `
@@ -3523,10 +3529,14 @@ function mostrarErro(mensagem) {
     container.innerHTML = `
         <div class="empty-state">
             <i class="fas fa-exclamation-triangle"></i>
-            <h3>Erro</h3>
+            <h3>Sem conteúdo</h3>
             <p>${mensagem}</p>
         </div>
     `;
+    const a = document.getElementById('slideAtual');
+    const t = document.getElementById('totalSlides');
+    if (a && (a.textContent === '1' || a.textContent === '')) a.textContent = '—';
+    if (t && t.textContent === '0') { /* keep 0 when empty */ }
 }
 
 // ==================== EXPORTAÇÃO ====================

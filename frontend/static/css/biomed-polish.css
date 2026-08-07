@@ -1,0 +1,479 @@
+/**
+ * BioMed Polish — RC-24 Final Visual Polish
+ * Layout / responsive / legacy residue only.
+ * No API, DB, business rules, or feature-flag changes.
+ */
+@import url("/static/css/biomed-identity.css");
+
+/* ============================================================
+   Token remap — kill indigo Material primary leak
+   ============================================================ */
+body.bm-plat-legacy,
+body.bm-plat-body,
+body[data-bm-shell] {
+  --primary: var(--bm-brand, #1a4566);
+  --primary-dark: var(--bm-brand-deep, #0f2f45);
+  --primary-light: #2f6f8f;
+  --primary-lighter: #5a8aa8;
+  --info: var(--bm-brand, #1a4566);
+  --bmx-brand: var(--bm-brand, #1a4566);
+  --bmx-teal: var(--bm-teal, #2a6b5a);
+}
+
+html,
+body.bm-plat-legacy,
+body.bm-plat-body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Soften Font Awesome density (keep glyphs, neutralize Material rainbow) */
+body.bm-plat-legacy .filter-label i,
+body.bm-plat-legacy .card-icon i,
+body.bm-plat-legacy .header-title i,
+body.bm-plat-legacy h2 i,
+body.bm-plat-legacy .stat-card i,
+body.bm-plat-legacy .kpi-card > i,
+body.bm-plat-legacy .btn i {
+  color: var(--bmx-brand, #1a4566) !important;
+  opacity: 0.9;
+}
+body.bm-plat-legacy .card-icon,
+body.bm-plat-legacy .stat-card .card-icon {
+  background: var(--bmx-surface-2, #f7f9fb) !important;
+  color: var(--bmx-brand, #1a4566) !important;
+  background-image: none !important;
+}
+
+/* ============================================================
+   Charts — un-nest wrappers, fix clipping / double cards
+   ============================================================ */
+body.bm-plat-legacy .chart-container {
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+body.bm-plat-legacy .chart-container .chart-wrapper,
+body.bm-plat-legacy .chart-wrapper {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0.35rem 0 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+  height: clamp(220px, 28vh, 340px) !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+body.bm-plat-legacy .chart-container canvas,
+body.bm-plat-legacy .chart-wrapper canvas {
+  max-width: 100% !important;
+}
+
+/* KPI row with only 2 cards — don't force empty 4-col holes */
+body.bm-plat-legacy .cards-grid.bmx-kpi-row {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 280px)) !important;
+  justify-content: start !important;
+}
+
+/* 3-up compact chart rows */
+body.bm-plat-legacy .bmx-chart-row:has(.chart-wrapper[style*="220"]) {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+/* Anonymous productivity pair grids inside dashboard */
+body.bm-plat-legacy #graficosConverplast > div[style*="grid-template-columns"],
+body.bm-plat-legacy #graficosComparativos > div[style*="grid-template-columns"],
+body.bm-plat-legacy #graficosRodaOuro > div[style*="grid-template-columns"] {
+  display: grid !important;
+  gap: 1.25rem !important;
+  width: 100% !important;
+  margin-bottom: 1.25rem !important;
+}
+
+/* Filters / multiselect indigo kill */
+body.bm-plat-legacy .multiselect-dropdown-content button,
+body.bm-plat-legacy button[onclick*="selecionarTodos"],
+body.bm-plat-legacy button[onclick*="limparSelecao"] {
+  border-color: var(--bmx-brand, #1a4566) !important;
+  color: var(--bmx-brand, #1a4566) !important;
+  background: #fff !important;
+  border-radius: 10px !important;
+}
+body.bm-plat-legacy .filters-header,
+body.bm-plat-legacy .filters-grid,
+body.bm-plat-legacy .periodo-selector,
+body.bm-plat-legacy .periodo-grid,
+body.bm-plat-legacy .toolbar,
+body.bm-plat-legacy .header-actions,
+body.bm-plat-legacy .filter-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.65rem !important;
+  align-items: center !important;
+  max-width: 100% !important;
+}
+body.bm-plat-legacy .filters-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+}
+body.bm-plat-legacy .alertas-dropdown {
+  width: min(400px, calc(100vw - 2rem)) !important;
+  max-width: calc(100vw - 1.5rem) !important;
+  right: 0 !important;
+  left: auto !important;
+  z-index: 50 !important;
+}
+
+/* Tables — never clip horizontally */
+body.bm-plat-legacy .table-container,
+body.bm-plat-legacy .table-responsive,
+body.bm-plat-legacy .data-table-wrap,
+body.bm-plat-legacy .consolidado-wrapper {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100% !important;
+}
+body.bm-plat-legacy table {
+  min-width: 0 !important;
+}
+
+/* Hub cards — even rows */
+.bm-plat-cards {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+}
+.bm-plat-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+}
+
+/* ============================================================
+   Apresentação — immersive deck polish
+   ============================================================ */
+body.bm-plat-legacy .apresentacao-container {
+  min-height: calc(100vh - 64px) !important;
+  height: calc(100vh - 64px) !important;
+  max-height: none !important;
+}
+body.bm-plat-legacy .apresentacao-header {
+  background: linear-gradient(120deg, #12324a 0%, #1a4566 55%, #2a6b5a 100%) !important;
+  background-image: linear-gradient(120deg, #12324a 0%, #1a4566 55%, #2a6b5a 100%) !important;
+}
+/* Full-bleed immersive: hide chrome that leaks white admin margins */
+.bm-plat-column:has(.apresentacao-container),
+body.bm-plat-legacy:has(.apresentacao-container) .bm-plat-column {
+  background: #0f2a3d !important;
+}
+.bm-plat-column:has(.apresentacao-container) .bm-plat-top,
+.bm-plat-column:has(.apresentacao-container) .bm-plat-crumb,
+.bm-plat-column:has(.apresentacao-container) .bm-plat-foot {
+  display: none !important;
+}
+body.bm-plat-legacy:has(.apresentacao-container) .apresentacao-container,
+.bm-plat-main:has(.apresentacao-container) .apresentacao-container {
+  min-height: 100dvh !important;
+  height: 100dvh !important;
+}
+@supports not (height: 100dvh) {
+  body.bm-plat-legacy:has(.apresentacao-container) .apresentacao-container {
+    min-height: 100vh !important;
+    height: 100vh !important;
+  }
+}
+body.bm-plat-legacy .slide-content,
+body.bm-plat-legacy #slideContent {
+  max-width: min(1280px, 100%) !important;
+  width: 100% !important;
+  padding: 0.25rem 0.5rem !important;
+}
+body.bm-plat-legacy .slide-indicator {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+body.bm-plat-legacy .apresentacao-container.is-empty .slide-indicator,
+body.bm-plat-legacy .apresentacao-container.is-loading .slide-indicator {
+  opacity: 0.4;
+}
+body.bm-plat-legacy .apresentacao-content .empty-state,
+body.bm-plat-legacy #slideContent .loading,
+body.bm-plat-legacy #slideContent > p {
+  color: rgba(255, 255, 255, 0.92) !important;
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+body.bm-plat-legacy .apresentacao-content .kpi-card,
+body.bm-plat-legacy .slide-content .kpi-card {
+  background: rgba(255, 255, 255, 0.08) !important;
+  background-image: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+}
+body.bm-plat-legacy .apresentacao-controls {
+  flex-wrap: wrap !important;
+  gap: 0.55rem !important;
+}
+body.bm-plat-legacy .btn-nav,
+body.bm-plat-legacy .btn-export,
+body.bm-plat-legacy .btn-fullscreen {
+  min-height: 40px;
+}
+
+/* ============================================================
+   Clientes / ops — indigo & admin residue
+   ============================================================ */
+body.bm-plat-legacy .filter-chip.active,
+body.bm-plat-legacy .btn-hero,
+body.bm-plat-legacy .modal-header,
+body.bm-plat-legacy .cliente-status-chip.status-active,
+body.bm-plat-legacy .status-chip.active {
+  background: var(--bmx-brand, #1a4566) !important;
+  background-image: none !important;
+  border-color: var(--bmx-brand, #1a4566) !important;
+  color: #fff !important;
+}
+body.bm-plat-legacy .cliente-banner {
+  background: linear-gradient(135deg, #1a4566, #2a6b5a) !important;
+  background-image: linear-gradient(135deg, #1a4566, #2a6b5a) !important;
+}
+body.bm-plat-legacy .cliente-card h3,
+body.bm-plat-legacy .clientes-snapshot .snapshot-value,
+body.bm-plat-legacy .snapshot-card .snapshot-value {
+  color: var(--bmx-brand, #1a4566) !important;
+}
+body.bm-plat-legacy .modal-footer,
+body.bm-plat-legacy .form-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.6rem !important;
+}
+
+/* Produtividade — kill purple hover / Skype cyan */
+body.bm-plat-legacy #tableRegistrosSalvos tbody tr:hover,
+body.bm-plat-legacy .produtividade-table tbody tr:hover,
+body.bm-plat-legacy table tbody tr:hover {
+  background: rgba(26, 69, 102, 0.04) !important;
+  background-image: none !important;
+}
+body.bm-plat-legacy .modal-header[style*="#00bcf2"],
+body.bm-plat-legacy .modal-header[style*="0, 188, 242"] {
+  background: var(--bmx-brand, #1a4566) !important;
+}
+
+/* Upload callouts — teal instead of cyan */
+body.bm-plat-legacy .info-box,
+body.bm-plat-legacy .alert-info,
+body.bm-plat-legacy .upload-info {
+  border-left-color: var(--bmx-teal, #2a6b5a) !important;
+  background: rgba(42, 107, 90, 0.08) !important;
+  color: var(--bmx-ink, #132033) !important;
+}
+
+/* Power BI dual sidebar — collapse on notebook */
+body.bm-plat-legacy .powerbi-container {
+  max-width: 100% !important;
+}
+body.bm-plat-legacy .search-box {
+  width: min(420px, 100%) !important;
+  max-width: 100% !important;
+}
+
+/* Perfil / comparativos grids */
+body.bm-plat-legacy .perfil-charts,
+body.bm-plat-legacy .charts-row {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 1.15rem !important;
+}
+body.bm-plat-legacy .periodo-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr auto !important;
+  gap: 0.75rem !important;
+  width: 100% !important;
+}
+
+/* Configurações tables / action buttons */
+body.bm-plat-legacy .config-actions,
+body.bm-plat-legacy .action-buttons {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.4rem !important;
+}
+
+/* ============================================================
+   Responsive ladder — 1440 → 390
+   ============================================================ */
+@media (max-width: 1440px) {
+  body.bm-plat-legacy .bmx-chart-row {
+    gap: 1rem !important;
+  }
+  body.bm-plat-legacy .chart-wrapper {
+    height: clamp(220px, 26vh, 320px) !important;
+  }
+}
+
+@media (max-width: 1280px) {
+  body.bm-plat-legacy .bmx-chart-row:has(.chart-wrapper[style*="220"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  body.bm-plat-legacy .cards-grid:not(.bmx-kpi-row),
+  body.bm-plat-legacy .clientes-snapshot {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1200px) {
+  body.bm-plat-legacy .powerbi-container {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body.bm-plat-legacy .sidebar-left,
+  body.bm-plat-legacy .sidebar-right,
+  body.bm-plat-legacy .powerbi-container .sidebar-left,
+  body.bm-plat-legacy .powerbi-container .sidebar-right {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 280px;
+    overflow: auto !important;
+  }
+  body.bm-plat-legacy .stats-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  body.bm-plat-legacy .filters-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  body.bm-plat-legacy .periodo-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 980px) {
+  body.bm-plat-legacy .bmx-chart-row,
+  body.bm-plat-legacy .bmx-chart-row:has(.chart-wrapper[style*="220"]),
+  body.bm-plat-legacy #graficosConverplast > div,
+  body.bm-plat-legacy #graficosComparativos > div,
+  body.bm-plat-legacy #graficosRodaOuro > div,
+  body.bm-plat-legacy .perfil-charts,
+  body.bm-plat-legacy .charts-row {
+    grid-template-columns: 1fr !important;
+  }
+  body.bm-plat-legacy .chart-wrapper {
+    height: 260px !important;
+  }
+  body.bm-plat-legacy .filters-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  body.bm-plat-legacy .apresentacao-container {
+    height: auto !important;
+    min-height: 72vh !important;
+  }
+  body.bm-plat-legacy .header,
+  body.bm-plat-legacy .clientes-header,
+  body.bm-plat-legacy .upload-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  body.bm-plat-legacy .header-actions,
+  body.bm-plat-legacy .btn,
+  body.bm-plat-legacy button.btn {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  body.bm-plat-legacy .cards-grid,
+  body.bm-plat-legacy .cards-grid.bmx-kpi-row,
+  body.bm-plat-legacy .clientes-snapshot,
+  .bm-plat-kpis,
+  .bm-plat-cards {
+    grid-template-columns: 1fr !important;
+  }
+  body.bm-plat-legacy .apresentacao-header-right .btn-export span,
+  body.bm-plat-legacy .apresentacao-header-right .btn-fullscreen span {
+    display: none;
+  }
+  body.bm-plat-legacy .slide-content,
+  body.bm-plat-legacy #slideContent {
+    max-width: 100% !important;
+    padding: 0 0.15rem !important;
+  }
+  body.bm-plat-legacy .apresentacao-controls {
+    flex-wrap: wrap !important;
+  }
+  body.bm-plat-legacy .btn-nav {
+    min-width: 0;
+    flex: 1 1 30%;
+  }
+}
+
+@media (max-width: 560px) {
+  body.bm-plat-legacy .filters-grid,
+  body.bm-plat-legacy .periodo-grid,
+  body.bm-plat-legacy .stats-container {
+    grid-template-columns: 1fr !important;
+  }
+  body.bm-plat-legacy .header-actions .btn-print-header span,
+  body.bm-plat-legacy .bm-plat-top-meta {
+    display: none !important;
+  }
+  body.bm-plat-legacy .chart-wrapper {
+    height: 220px !important;
+  }
+  body.bm-plat-legacy .cliente-card,
+  body.bm-plat-legacy .card,
+  body.bm-plat-legacy .stat-card {
+    padding: 1rem !important;
+  }
+}
+
+@media (max-width: 390px) {
+  body.bm-plat-legacy .chart-wrapper {
+    height: 200px !important;
+  }
+  body.bm-plat-legacy .btn-nav {
+    flex: 1 1 100%;
+  }
+  body.bm-plat-legacy .apresentacao-header h1 {
+    font-size: 1rem !important;
+  }
+  body.bm-plat-legacy .btn,
+  body.bm-plat-legacy button.btn {
+    width: 100%;
+    justify-content: center;
+  }
+  body.bm-plat-legacy .header-actions {
+    width: 100%;
+  }
+}
+
+/* Dashboard / analytics empty chart breathing room */
+body.bm-plat-legacy .chart-container h3,
+body.bm-plat-legacy .chart-container .chart-title,
+body.bm-plat-legacy .chart-card h3 {
+  color: var(--bmx-ink, #132033) !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.02em;
+}
+body.bm-plat-legacy .filters-header h2,
+body.bm-plat-legacy .filters h2,
+body.bm-plat-legacy .analysis-header h2 {
+  color: var(--bmx-brand, #1a4566) !important;
+}
+
+/* Snapshot / KPI decorative blobs — neutralize purple leftovers */
+body.bm-plat-legacy .snapshot-card::before,
+body.bm-plat-legacy .snapshot-card::after,
+body.bm-plat-legacy .stat-card::before {
+  background: rgba(26, 69, 102, 0.08) !important;
+  background-image: none !important;
+}
+body.bm-plat-legacy .header-actions > *,
+body.bm-plat-legacy .filter-actions > *,
+body.bm-plat-legacy .apresentacao-controls > * {
+  flex-shrink: 1;
+}
