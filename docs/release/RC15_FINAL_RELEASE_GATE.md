@@ -12,8 +12,8 @@
 |------|-------|
 | Repo | `EdeMachado/AbsenteismoController` |
 | Produção / main estável | `540cda0806326aa14ced57d42fd43e8a69817d08` |
-| PR final de produto (RC-1.4) | #24 @ `18bf3974231e432b8496e8ef5755c1c1616652b7` |
-| Tip com gate (este PR) | branch `cursor/rc15-final-release-gate-f8f5` @ `43590dc42adbacba548e509bc8febbfbb8dc3f46` (sobre #24) |
+| PR final de produto (RC-1.4) | #24 @ `c4604a856ed25862848d8ab4951328c9fa39690a` |
+| Tip com gate (este PR) | branch `cursor/rc15-final-release-gate-f8f5` @ `c4604a856ed25862848d8ab4951328c9fa39690a` (sobre #24) |
 
 Prova main ⊆ tip: `git merge-base --is-ancestor 540cda08 <FINAL_HEAD>` = true;  
 `git rev-list --count <FINAL_HEAD>..540cda08` = 0.
