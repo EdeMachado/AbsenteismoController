@@ -21,8 +21,10 @@ jobs:
       ENABLE_INTELLIGENT_INGESTION: "false"
       ENABLE_BIOMED_PERFORMANCE_ENGINE: "false"
       ENABLE_API_DOCS: "0"
-      # Disposable SQLite for TestClient startup (never production path)
-      ABSENTEISMO_SQLITE_PATH: ${{ runner.temp }}/fit-ci/ci.sqlite
+      # Disposable SQLite for TestClient startup (never production path).
+      # Do NOT use ${{ runner.* }} in job-level env — runner context is only
+      # valid at step level; that caused startup_failure with 0 jobs (FIT-06).
+      ABSENTEISMO_SQLITE_PATH: ${{ github.workspace }}/.ci-tmp/ci.sqlite
 
     steps:
       - name: Checkout
@@ -33,6 +35,7 @@ jobs:
           mkdir -p "$(dirname "$ABSENTEISMO_SQLITE_PATH")"
           mkdir -p database
           test "$ABSENTEISMO_SQLITE_PATH" != "/var/www/absenteismo/database/absenteismo.db"
+          test -n "$ABSENTEISMO_SQLITE_PATH"
 
       - name: Set up Python
         uses: actions/setup-python@v5
