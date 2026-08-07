@@ -54,7 +54,15 @@ ENABLE_API_DOCS=false
 
 ## Tests
 
-`tests/release/test_rc24_final_visual_polish.py`
+`tests/release/test_rc24_final_visual_polish.py`  
+Full suite (`pytest tests/`): **629 passed**
+
+## Screenshots
+
+`/opt/cursor/artifacts/rc24-screenshots/` — 52 PNGs  
+(landing, login, clientes, home, executive, analytics, dashboard, comparativos, produtividade, funcionarios, upload, apresentacao, configuracoes × desktop / notebook / mobile).
+
+Overflow-X probe on captured pages: **PASS**.
 
 ## Human acceptance
 
