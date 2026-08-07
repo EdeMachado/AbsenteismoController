@@ -1,6 +1,7 @@
 # EXEC-11A — Product Audit Preview
 
 **Branch:** `cursor/exec11a-product-audit-preview-f8f5`  
+**HEAD:** `370f06256fde09c6d5e273427a8c6c35458a53d9`
 **Status:** Draft · sem merge · sem deploy · sem produção
 
 ## Objetivo
