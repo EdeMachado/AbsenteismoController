@@ -605,6 +605,14 @@ async def product_audit_preview():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/preview/product-excellence", response_class=HTMLResponse)
+async def product_excellence_audit_preview():
+    """EXEC-11B — product excellence audit instrumentation. Synthetic. No login. Measure-only."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "product-excellence.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():
     """Página de análises"""
