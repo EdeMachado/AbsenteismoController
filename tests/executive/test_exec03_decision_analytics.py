@@ -430,11 +430,11 @@ def test_legacy_apresentacao_preserved():
     assert path.exists()
     html = path.read_text(encoding="utf-8")
     assert len(html) > 100
-    # executive presentation is separate
+    # executive presentation page asset remains; landing is EXEC-08 first experience
     assert (FRONTEND / "executive_presentation.html").exists()
     exec_html = (FRONTEND / "executive.html").read_text(encoding="utf-8")
-    assert "Executive Analytics" in exec_html
-    assert "bm-analyze-modal" in exec_html
+    assert "bm-first-experience" in exec_html
+    assert (FRONTEND / "static" / "js" / "executive" / "analytics.js").exists()
 
 
 @pytest.fixture()

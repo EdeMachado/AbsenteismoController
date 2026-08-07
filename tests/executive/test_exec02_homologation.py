@@ -81,14 +81,12 @@ def db_session():
 
 def test_html_has_hero_and_reading_order():
     html = (FRONTEND / "executive.html").read_text(encoding="utf-8")
-    assert 'id="bm-hero"' in html
-    assert "Indicadores primários" in html
-    assert "Tendência e causas" in html
-    assert "Trabalho BioMed e resultado" in html
-    assert "Como calculamos?" in html
-    assert 'id="bm-method-modal"' in html
-    assert "aria-label" in html
+    # EXEC-08 first experience reading order
+    assert 'id="bm-first-experience"' in html
+    assert "Abertura" in html or "abertura" in html.lower()
     assert "bm-nav-toggle" in html
+    assert "aria-label" in html
+    assert "chart-temporal" not in html
 
 
 def test_css_has_responsive_and_a11y_tokens():

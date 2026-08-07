@@ -22,6 +22,7 @@ from backend.executive.exec03_enrichment import (
     cost_kpi,
     weekday_distribution,
 )
+from backend.executive.first_experience import compose_first_experience
 from backend.executive.intelligence import ExecutiveIntelligenceEngine
 from backend.executive.presentation import compose_presentation
 from backend.executive.questions import QUESTIONS, answer_question
@@ -647,6 +648,8 @@ class ExecutiveAggregateService:
             "analytics": True,
             "presentation": True,
         }
+        # EXEC-08 — first CEO experience (premium opening screen)
+        payload["first_experience"] = compose_first_experience(payload)
 
         assert_no_pii_in_payload(payload)
         return payload

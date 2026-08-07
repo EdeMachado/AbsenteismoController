@@ -142,29 +142,29 @@ def test_legacy_dashboard_still_present():
 def test_executive_static_assets_exist():
     assert (FRONTEND / "executive.html").exists()
     assert (FRONTEND / "static" / "css" / "biomed-executive.css").exists()
-    for name in ("api.js", "charts.js", "command-center.js", "app.js", "analytics.js"):
+    # EXEC-08 landing uses first-experience; prior modules remain on disk for later epics
+    for name in (
+        "api.js",
+        "charts.js",
+        "command-center.js",
+        "app.js",
+        "analytics.js",
+        "first-experience.js",
+        "app-first.js",
+    ):
         assert (FRONTEND / "static" / "js" / "executive" / name).exists()
 
 
 def test_executive_html_responsive_and_modules():
     html = (FRONTEND / "executive.html").read_text(encoding="utf-8")
-    assert "name=\"viewport\"" in html
-    for mid in (
-        "command",
-        "absenteeism",
-        "epidemiology",
-        "sectors",
-        "performance",
-        "actions",
-        "intelligence",
-        "productivity",
-        "quality",
-        "admin",
-    ):
-        assert ('id="%s"' % mid) in html
+    assert 'name="viewport"' in html
+    # EXEC-08 — first CEO experience landing only
+    assert 'id="first"' in html
+    assert "bm-first-experience" in html
+    assert "first-experience.js" in html
     assert "ENABLE_EXECUTIVE_UI" in html
     assert "biomed-executive.css" in html
-    assert "data-theme=\"dark\"" not in html
+    assert 'data-theme="dark"' not in html
 
 
 def test_design_system_has_tokens():
@@ -320,7 +320,7 @@ def test_executive_page_served_when_flag_on(exec_app):
     r = client.get("/executive")
     assert r.status_code == 200
     assert "BioMed" in r.text
-    assert "Command Center" in r.text
+    assert "bm-first-experience" in r.text or "Abertura" in r.text
 
 
 def test_visual_regression_artifact_viewports():
