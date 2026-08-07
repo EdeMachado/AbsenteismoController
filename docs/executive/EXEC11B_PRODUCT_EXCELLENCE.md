@@ -1,6 +1,7 @@
 # EXEC-11B — Product Excellence Audit
 
 **Branch:** `cursor/exec11b-product-excellence-audit-f8f5`  
+**HEAD:** 
 **Status:** Draft · sem merge · sem deploy · sem produção
 
 ## Missão
