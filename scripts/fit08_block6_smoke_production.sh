@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# FIT08-B6-R2 — SMOKE TEST DE PRODUÇÃO (somente leitura)
+# FIT08-B6-R3 — SMOKE TEST DE PRODUÇÃO (somente leitura)
 # Contrato de páginas alinhado às rotas reais em backend/main.py.
+# Inventário: eventos via uploads.client_id JOIN atestados.upload_id (sem atestados.client_id).
 # Não usa set -e: acumula falhas e executa todas as verificações.
 set +e
 set -u
@@ -15,7 +16,7 @@ RANDOM_ORIGIN=https://evil-example-$(date +%s).invalid
 DB="$APP/database/absenteismo.db"
 SERVICE=absenteismocontroller.service
 PY=/var/www/absenteismo/venv/bin/python3
-SMOKE_ID=FIT08-B6-R2
+SMOKE_ID=FIT08-B6-R3
 
 HEAD=""
 SERVICE_STATUS=""
@@ -211,7 +212,13 @@ lcode=$(curl -sS -o /dev/null -w '%{http_code}' -m 12 -X POST "$BASE/api/auth/lo
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data 'username=smoke-invalid&password=smoke-invalid' 2>/dev/null || echo ERR)
 echo "LOGIN_PROBE=$lcode"
-case "$lcode" in 401|422|400) ;; *) fail_item "login probe inesperado ($lcode)" ;; esac
+# 401/422/400 = rota pública acessível com credenciais inválidas (esperado)
+# 404/405/500 = falha de acessibilidade pública
+case "$lcode" in
+  401|422|400) ;;
+  404|405|500|ERR) fail_item "login público inacessível ($lcode)" ;;
+  *) fail_item "login probe inesperado ($lcode)" ;;
+esac
 
 # --- APIs protegidas sem token (rotas API reais) ---
 echo "--- APIs protegidas sem token ---"
@@ -234,13 +241,33 @@ if [ "$prot_fail" -eq 0 ]; then PROTECTED_ROUTES_OK=yes; else PROTECTED_ROUTES_O
 echo "--- experimentais + docs ---"
 exp_fail=0
 docs_fail=0
-for path in /api/ingestion /api/ingestion/preview /api/ingestion/import /experimental/ingestion /api/performance /api/performance/shadow; do
+# API experimental: 401/403 sem token = não acessível anonimamente (middleware);
+# não concluir "não registrada" só por 401. UI experimental deve ser 404.
+for path in /api/ingestion /api/ingestion/preview /api/ingestion/import /api/performance /api/performance/shadow; do
   code=$(http_code GET "$BASE$path")
-  echo "EXP $path -> $code"
+  echo "EXP_API $path -> $code"
   case "$code" in
-    404|401|403|405) ;;
-    200|500) echo "FAIL_ITEM: experimental exposta $path=$code"; exp_fail=$((exp_fail + 1)) ;;
-    *) ;;
+    401|403|404|405) ;;
+    200|500) echo "FAIL_ITEM: experimental API acessível/errada $path=$code"; exp_fail=$((exp_fail + 1)) ;;
+    *) note "EXP_API $path code=$code (revisar)" ;;
+  esac
+done
+for path in /experimental/ingestion /upload_inteligente; do
+  code=$(http_code GET "$BASE$path")
+  echo "EXP_UI $path -> $code"
+  # upload_inteligente pode existir como página HTML legado; experimental UI nova deve 404
+  case "$path" in
+    /experimental/ingestion)
+      case "$code" in
+        404) ;;
+        401|403) note "EXP_UI $path protegida ($code) — não anônima" ;;
+        200) echo "FAIL_ITEM: UI experimental exposta $path"; exp_fail=$((exp_fail + 1)) ;;
+        *) note "EXP_UI $path code=$code" ;;
+      esac
+      ;;
+    *)
+      note "EXP_UI legado $path -> $code (não usado como gate de flag)"
+      ;;
   esac
 done
 for path in /docs /redoc /openapi.json; do
@@ -297,76 +324,127 @@ if [ "$cors_fail" -eq 0 ]; then CORS_OK=yes; else CORS_OK=no; fi
 
 # --- banco via Python sqlite3 (readonly URI) ---
 echo "--- inventário agregado (Python sqlite3, mode=ro) ---"
-INV=$("$PY" - <<PY
+echo "EVENT_SQL: COUNT atestados JOIN uploads ON atestados.upload_id=uploads.id WHERE uploads.client_id=?"
+INV=$("$PY" - "$DB" <<'PY'
 import sqlite3
-db = "$DB"
+import sys
+
+db = sys.argv[1]
+out = {}
+
+def emit(k, v):
+    out[k] = v
+    print(f"{k}={v}")
+
 con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 cur = con.cursor()
-qc = cur.execute("PRAGMA quick_check").fetchone()[0]
-ic = cur.execute("PRAGMA integrity_check").fetchone()[0]
-c2 = cur.execute("SELECT COUNT(*) FROM clients WHERE id=2").fetchone()[0]
-c4 = cur.execute("SELECT COUNT(*) FROM clients WHERE id=4").fetchone()[0]
-u2 = cur.execute("SELECT COUNT(*) FROM uploads WHERE client_id=2").fetchone()[0]
-u4 = cur.execute("SELECT COUNT(*) FROM uploads WHERE client_id=4").fetchone()[0]
-e2 = cur.execute("SELECT COUNT(*) FROM atestados WHERE client_id=2").fetchone()[0]
-e4 = cur.execute("SELECT COUNT(*) FROM atestados WHERE client_id=4").fetchone()[0]
-users = cur.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-admins = cur.execute(
-    "SELECT COUNT(*) FROM users WHERE IFNULL(is_admin,0)=1 AND IFNULL(is_active,0)=1"
-).fetchone()[0]
-orphan = cur.execute(
-    "SELECT COUNT(*) FROM users WHERE IFNULL(is_admin,0)=0 AND client_id IS NULL"
-).fetchone()[0]
+
+# Schema audit (column names only — no data/PII)
+for table in ("clients", "users", "uploads", "atestados"):
+    try:
+        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        print(f"SCHEMA_{table.upper()}=" + ",".join(cols))
+        if table == "atestados" and "client_id" in cols:
+            print("NOTE=atestados.has_client_id_unexpected")
+        if table == "atestados" and "upload_id" not in cols:
+            print("NOTE=atestados.missing_upload_id")
+    except Exception as exc:
+        print(f"SCHEMA_{table.upper()}=ERROR:{type(exc).__name__}")
+
+# Integrity first — always print even if later queries fail
+try:
+    qc = cur.execute("PRAGMA quick_check").fetchone()[0]
+except Exception as exc:
+    qc = f"ERROR:{type(exc).__name__}"
+emit("QC", qc)
+
+try:
+    ic = cur.execute("PRAGMA integrity_check").fetchone()[0]
+except Exception as exc:
+    ic = f"ERROR:{type(exc).__name__}"
+emit("IC", ic)
+
+def q(label, sql, params=()):
+    try:
+        val = cur.execute(sql, params).fetchone()[0]
+        emit(label, val)
+    except Exception as exc:
+        emit(label, f"ERROR:{type(exc).__name__}")
+
+# Clients present by id
+q("C2", "SELECT COUNT(*) FROM clients WHERE id=?", (2,))
+q("C4", "SELECT COUNT(*) FROM clients WHERE id=?", (4,))
+
+# Uploads per client (uploads.client_id)
+q("U2", "SELECT COUNT(*) FROM uploads WHERE client_id=?", (2,))
+q("U4", "SELECT COUNT(*) FROM uploads WHERE client_id=?", (4,))
+
+# Events per client: atestados via upload_id → uploads.client_id (NÃO usar atestados.client_id)
+EVENT_SQL = (
+    "SELECT COUNT(*) FROM atestados a "
+    "INNER JOIN uploads u ON a.upload_id = u.id "
+    "WHERE u.client_id = ?"
+)
+q("E2", EVENT_SQL, (2,))
+q("E4", EVENT_SQL, (4,))
+
+# Users aggregates (real columns: client_id, is_admin, is_active)
+q("USERS", "SELECT COUNT(*) FROM users")
+q(
+    "ADMINS",
+    "SELECT COUNT(*) FROM users WHERE IFNULL(is_admin,0)=1 AND IFNULL(is_active,0)=1",
+)
+q(
+    "ORPHAN",
+    "SELECT COUNT(*) FROM users WHERE IFNULL(is_admin,0)=0 AND client_id IS NULL",
+)
+
 con.close()
-print(f"QC={qc}")
-print(f"IC={ic}")
-print(f"C2={c2}")
-print(f"C4={c4}")
-print(f"U2={u2}")
-print(f"U4={u4}")
-print(f"E2={e2}")
-print(f"E4={e4}")
-print(f"USERS={users}")
-print(f"ADMINS={admins}")
-print(f"ORPHAN={orphan}")
 PY
 )
 echo "$INV"
-QC=$(echo "$INV" | awk -F= '/^QC=/{print $2}')
-IC=$(echo "$INV" | awk -F= '/^IC=/{print $2}')
-C2=$(echo "$INV" | awk -F= '/^C2=/{print $2}')
-C4=$(echo "$INV" | awk -F= '/^C4=/{print $2}')
-U2=$(echo "$INV" | awk -F= '/^U2=/{print $2}')
-U4=$(echo "$INV" | awk -F= '/^U4=/{print $2}')
-E2=$(echo "$INV" | awk -F= '/^E2=/{print $2}')
-E4=$(echo "$INV" | awk -F= '/^E4=/{print $2}')
-USERS_TOTAL=$(echo "$INV" | awk -F= '/^USERS=/{print $2}')
-ADMINS_ACTIVE=$(echo "$INV" | awk -F= '/^ADMINS=/{print $2}')
-ORPHAN_NON_ADMIN=$(echo "$INV" | awk -F= '/^ORPHAN=/{print $2}')
+QC=$(echo "$INV" | awk -F= '/^QC=/{print $2; exit}')
+IC=$(echo "$INV" | awk -F= '/^IC=/{print $2; exit}')
+C2=$(echo "$INV" | awk -F= '/^C2=/{print $2; exit}')
+C4=$(echo "$INV" | awk -F= '/^C4=/{print $2; exit}')
+U2=$(echo "$INV" | awk -F= '/^U2=/{print $2; exit}')
+U4=$(echo "$INV" | awk -F= '/^U4=/{print $2; exit}')
+E2=$(echo "$INV" | awk -F= '/^E2=/{print $2; exit}')
+E4=$(echo "$INV" | awk -F= '/^E4=/{print $2; exit}')
+USERS_TOTAL=$(echo "$INV" | awk -F= '/^USERS=/{print $2; exit}')
+ADMINS_ACTIVE=$(echo "$INV" | awk -F= '/^ADMINS=/{print $2; exit}')
+ORPHAN_NON_ADMIN=$(echo "$INV" | awk -F= '/^ORPHAN=/{print $2; exit}')
 
-[ "$QC" = "ok" ] || fail_item "quick_check != ok"
-[ "$IC" = "ok" ] || fail_item "integrity_check != ok"
+echo "PRAGMA_QUICK_CHECK=$QC"
+echo "PRAGMA_INTEGRITY_CHECK=$IC"
+[ "$QC" = "ok" ] || fail_item "quick_check != ok ($QC)"
+[ "$IC" = "ok" ] || fail_item "integrity_check != ok ($IC)"
 
 echo "CLIENT_2_PRESENT=$C2 UPLOADS=$U2 EVENTS=$E2"
 echo "CLIENT_4_PRESENT=$C4 UPLOADS=$U4 EVENTS=$E4"
 echo "USERS_TOTAL=$USERS_TOTAL ADMINS_ACTIVE=$ADMINS_ACTIVE ORPHAN_NON_ADMIN=$ORPHAN_NON_ADMIN"
 
-if [ "$C2" = "1" ] && [ "$U2" = "18" ] && [ "$E2" = "4520" ]; then CLIENT_2_OK=yes; else fail_item "contagens client 2 divergem"; CLIENT_2_OK=no; fi
-if [ "$C4" = "1" ] && [ "$U4" = "14" ] && [ "$E4" = "333" ]; then CLIENT_4_OK=yes; else fail_item "contagens client 4 divergem"; CLIENT_4_OK=no; fi
+if [ "$C2" = "1" ] && [ "$U2" = "18" ] && [ "$E2" = "4520" ]; then CLIENT_2_OK=yes; else fail_item "contagens client 2 divergem (C2=$C2 U2=$U2 E2=$E2)"; CLIENT_2_OK=no; fi
+if [ "$C4" = "1" ] && [ "$U4" = "14" ] && [ "$E4" = "333" ]; then CLIENT_4_OK=yes; else fail_item "contagens client 4 divergem (C4=$C4 U4=$U4 E4=$E4)"; CLIENT_4_OK=no; fi
 if [ "$USERS_TOTAL" = "3" ] && [ "$ADMINS_ACTIVE" = "2" ] && [ "$ORPHAN_NON_ADMIN" = "0" ]; then USERS_OK=yes; else fail_item "contagens de usuários divergem"; USERS_OK=no; fi
 
 echo "--- common password count (sem usernames/hashes) ---"
-COMMON_COUNT=$("$PY" - <<PY
+COMMON_COUNT=$("$PY" - "$DB" <<'PY'
 import sqlite3
 import bcrypt
-db = "$DB"
+import sys
+db = sys.argv[1]
 commons = [
     b"admin123", b"admin", b"123456", b"password", b"senha", b"senha123",
     b"12345678", b"admin@123", b"Admin123", b"changeme", b"qwerty",
 ]
-con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-rows = con.execute("SELECT password_hash FROM users").fetchall()
-con.close()
+try:
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    rows = con.execute("SELECT password_hash FROM users").fetchall()
+    con.close()
+except Exception as exc:
+    print(f"ERROR:{type(exc).__name__}")
+    raise SystemExit(0)
 hits = 0
 for (h,) in rows:
     if not h:
@@ -383,11 +461,15 @@ print(hits)
 PY
 )
 echo "COMMON_PASSWORD_HITS=$COMMON_COUNT"
-if [ "$COMMON_COUNT" = "0" ]; then COMMON_PASSWORDS_ZERO=yes; else fail_item "contas com senha comum > 0"; COMMON_PASSWORDS_ZERO=no; fi
+case "$COMMON_COUNT" in
+  0) COMMON_PASSWORDS_ZERO=yes ;;
+  ERROR:*) fail_item "falha ao contar senhas comuns ($COMMON_COUNT)"; COMMON_PASSWORDS_ZERO=no ;;
+  *) fail_item "contas com senha comum > 0 ($COMMON_COUNT)"; COMMON_PASSWORDS_ZERO=no ;;
+esac
 
-DB_META_AFTER=$("$PY" - <<PY
-import os, hashlib
-p = "$DB"
+DB_META_AFTER=$("$PY" - "$DB" <<'PY'
+import os, hashlib, sys
+p = sys.argv[1]
 h = hashlib.sha256()
 with open(p, "rb") as f:
     for chunk in iter(lambda: f.read(1024 * 1024), b""):
