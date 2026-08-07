@@ -22,7 +22,7 @@ def test_landing_serves_premium_production_safe():
     assert r.status_code == 200
     body = r.text
     assert "biomed-landing.css" in body
-    assert "rc20p1" in body or "rc21" in body
+    assert "rc20p1" in body or "rc21" in body or "rc22" in body
     assert "bm-lp-body" in body
     assert "BioMed" in body
     assert "Entrar" in body
@@ -74,7 +74,7 @@ def test_home_is_biomed_hub_with_unified_shell():
     assert "Visão Executiva" in body or "Executive" in body
     assert 'href="/executive"' in body
     assert 'href="/dashboard"' in body or 'href="/analytics"' in body
-    assert "rc21" in body or "rc20p1" in body
+    assert "rc21" in body or "rc20p1" in body or "rc22" in body
     assert "AbsenteismoController - GrupoBiomed" not in body
     assert 'href="/analises"' not in body
 
@@ -161,7 +161,7 @@ def test_executive_integrated_in_one_platform_journey():
     assert "Voltar ao sistema" not in html
     assert "Voltar ao operacional" not in html
     assert "bm-fx-steps" in html
-    assert "rc21" in html
+    assert "rc21" in html or "rc22" in html
     assert "biomed-platform.css" in html
 
 
