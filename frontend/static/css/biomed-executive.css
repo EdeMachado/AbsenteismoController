@@ -119,6 +119,17 @@ button, input, select { font: inherit; }
   color: var(--bm-ink-faint);
   line-height: 1.4;
 }
+.bm-nav-ops {
+  display: inline-block;
+  color: var(--bm-ink-faint);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  font-weight: 500;
+}
+.bm-nav-ops:hover {
+  color: var(--bm-ink-muted);
+  border-bottom-color: var(--bm-ink-faint);
+}
 
 .bm-main { padding: var(--bm-space-5) var(--bm-space-6) 3rem; max-width: 1280px; }
 .bm-topbar {
