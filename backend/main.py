@@ -34,6 +34,7 @@ from .authz import (
     require_admin,
     assert_tenant_access,
 )
+from .preview_gate import is_preview_homologation_path, preview_surfaces_enabled
 # Sistema de logging (opcional - se falhar, ignora)
 try:
     from .logger import get_logger, audit_logger, log_operation, security_logger
@@ -191,6 +192,19 @@ async def api_auth_middleware(request: Request, call_next):
             elif db is not None:
                 db.close()
 
+    return await call_next(request)
+
+
+# RC-1.5: fail-closed preview/homologation surfaces in production
+@app.middleware("http")
+async def preview_surfaces_middleware(request: Request, call_next):
+    """Block /preview/*, /staging/*, /f/*, /api/preview/ficha* when preview surfaces disabled."""
+    path = request.url.path
+    if is_preview_homologation_path(path) and not preview_surfaces_enabled():
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": "Não encontrado"},
+        )
     return await call_next(request)
 
 # Rate Limiting - Proteção contra DDoS
@@ -355,6 +369,15 @@ try:
     register_ingestion_routes(app, FRONTEND_DIR)
 except Exception:
     # Never break legacy app if experimental package import fails
+    pass
+
+# EXEC-01 BioMed Executive Intelligence — registered ONLY when ENABLE_EXECUTIVE_UI=true.
+# Default off: legacy dashboard unchanged.
+try:
+    from backend.executive.api import register_executive_routes
+
+    register_executive_routes(app, FRONTEND_DIR)
+except Exception:
     pass
 
 # ==================== HELPER FUNCTIONS ====================
@@ -571,6 +594,112 @@ async def preview_page():
     file_path = os.path.join(FRONTEND_DIR, "preview.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/executive", response_class=HTMLResponse)
+async def executive_identity_preview():
+    """EXEC-11 — identidade visual isolada. Sem login. Dataset sintético. Sem dados reais."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "executive-identity.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/staging/executive-preview", response_class=HTMLResponse)
+async def executive_identity_preview_alias():
+    """Alias de staging para o preview de identidade EXEC-11."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "executive-identity.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/product-audit", response_class=HTMLResponse)
+async def product_audit_preview():
+    """EXEC-11A — consolidated product audit (EXEC-08→11). Synthetic. No login."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "product-audit.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/product-excellence", response_class=HTMLResponse)
+async def product_excellence_audit_preview():
+    """EXEC-11B — product excellence audit instrumentation. Synthetic. No login. Measure-only."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "product-excellence.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/release-candidate", response_class=HTMLResponse)
+async def release_candidate_consolidation_preview():
+    """RC-1.1 — product consolidation homologation. Synthetic. No login. No new features."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "release-candidate.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/release-candidate-functional", response_class=HTMLResponse)
+async def release_candidate_functional_preview():
+    """RC-1.2 — functional consolidation & micro-UX. Synthetic. No login. No new features."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "release-candidate-functional.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/landing", response_class=HTMLResponse)
+async def preview_landing_premium():
+    """RC-1.2A — institutional landing premium. Synthetic preview. No login."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "landing-premium.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/ficha-digital", response_class=HTMLResponse)
+async def preview_ficha_digital():
+    """RC-1.2A — Digital Employee Form journey (staff + employee). In-memory. No login."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "ficha-digital.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/preview/executive-presentation-rc", response_class=HTMLResponse)
+async def preview_executive_presentation_rc():
+    """RC-1.4 — Executive Presentation Premium. Synthetic. No login. No production data."""
+    import json
+    from backend.executive.presentation_preview import build_synthetic_premium_deck
+
+    file_path = os.path.join(FRONTEND_DIR, "preview", "executive-presentation-rc.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        html = f.read()
+    deck = build_synthetic_premium_deck()
+    inject = (
+        "<script>window.__RC14_DECK__ = "
+        + json.dumps(deck, ensure_ascii=False)
+        + ";</script>\n"
+    )
+    html = html.replace(
+        '<script src="/static/js/executive/presentation-premium.js"></script>',
+        inject + '<script src="/static/js/executive/presentation-premium.js"></script>',
+        1,
+    )
+    return HTMLResponse(content=html)
+
+
+@app.get("/f/{token}", response_class=HTMLResponse)
+async def employee_digital_form(token: str):
+    """RC-1.2A — secure employee form entry. Opaque token only in path (no CPF/matrícula/CID)."""
+    # Reject obvious PII-looking path segments in preview guard (length/charset soft check)
+    if len(token) < 16 or any(ch in token for ch in "@/\\?&= "):
+        raise HTTPException(status_code=404, detail="Link inválido")
+    file_path = os.path.join(FRONTEND_DIR, "preview", "ficha-employee.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        html = f.read().replace("__TOKEN__", token)
+    return HTMLResponse(content=html)
+
+
+# RC-1.2A digital form preview APIs (in-memory store)
+from backend.digital_form.routes import router as digital_form_router  # noqa: E402
+
+app.include_router(digital_form_router)
+
 
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BioMed Executive Presentation</title>
+  <link rel="stylesheet" href="/static/css/biomed-executive.css" />
+  <link rel="stylesheet" href="/static/css/biomed-presentation-premium.css" />
+</head>
+<body class="bm-presentation-body bm-rc14-body">
+  <div class="bm-pres-shell">
+    <header class="bm-pres-top bm-rc14-chrome">
+      <div>
+        <strong>BioMed</strong>
+        <div class="bm-rc14-muted">Apresentação executiva · sem identificação nominal</div>
+      </div>
+      <div class="bm-pres-controls bm-rc14-actions">
+        <a class="bm-rc14-btn" href="/executive">Voltar</a>
+        <button type="button" class="bm-rc14-btn" id="bm-pres-prev">Voltar</button>
+        <span id="bm-pres-counter" class="bm-rc14-muted">—</span>
+        <button type="button" class="bm-rc14-btn is-primary" id="bm-pres-next">Continuar</button>
+      </div>
+    </header>
+    <div id="bm-pres-status" class="bm-loading" role="status">Preparando leitura executiva…</div>
+    <main id="bm-pres-stage" class="bm-pres-stage" aria-live="polite"></main>
+    <nav id="bm-pres-thumbs" class="bm-pres-thumbs" hidden aria-hidden="true"></nav>
+  </div>
+  <script src="/static/js/executive/presentation-premium.js"></script>
+  <script src="/static/js/executive/presentation.js"></script>
+</body>
+</html>

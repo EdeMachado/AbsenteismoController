@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ficha Digital — BioMed</title>
+  <link rel="stylesheet" href="/static/css/biomed-ficha-digital.css" />
+  <style>
+    .bm-fd-body { background: linear-gradient(180deg, #eef2f6 0%, #f7f6f3 40%); }
+    .bm-fd-shell { max-width: 420px; padding-top: 1.5rem; }
+    .bm-fd-chrome { display: none; }
+  </style>
+</head>
+<body class="bm-fd-body">
+  <main class="bm-fd-shell">
+    <div id="fd-employee"><p class="bm-fd-muted">Carregando…</p></div>
+  </main>
+  <script>
+    window.__FICHA_TOKEN__ = "__TOKEN__";
+  </script>
+  <script src="/static/js/ficha/employee-form.js"></script>
+</body>
+</html>

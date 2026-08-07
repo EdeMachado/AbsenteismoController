@@ -1,0 +1,291 @@
+/**
+ * RC-1.4 — Executive Presentation Premium styles
+ */
+@import url("/static/css/biomed-identity.css");
+
+.bm-rc14-body {
+  margin: 0;
+  font-family: var(--bm-font, "DM Sans", sans-serif);
+  color: var(--bm-ink, #1a2332);
+  background: #0e2433;
+  min-height: 100vh;
+}
+.bm-rc14-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.bm-rc14-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 1.25rem;
+  background: rgba(8, 22, 34, 0.92);
+  color: #d7e2ec;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.bm-rc14-chrome strong {
+  font-family: var(--bm-display, Fraunces, serif);
+  font-weight: 650;
+  color: #fff;
+}
+.bm-rc14-chrome .bm-rc14-muted { color: rgba(215,226,236,0.65); font-size: 0.78rem; }
+.bm-rc14-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center; }
+.bm-rc14-btn {
+  border: 1px solid rgba(255,255,255,0.18);
+  background: transparent;
+  color: #e8eef4;
+  border-radius: 10px;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+.bm-rc14-btn.is-primary { background: #1f6f8b; border-color: #1f6f8b; color: #fff; }
+.bm-rc14-progress {
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+}
+.bm-rc14-progress > i {
+  display: block;
+  height: 100%;
+  background: #5eb3c9;
+  width: 0;
+  transition: width 0.25s ease;
+}
+.bm-rc14-stage {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+.bm-rc14-slide {
+  width: min(1100px, 100%);
+  background: #f7f6f3;
+  border-radius: 18px;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.28);
+  min-height: min(72vh, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.bm-rc14-head h1 {
+  margin: 0.25rem 0 0;
+  font-family: var(--bm-display, Fraunces, serif);
+  font-weight: 650;
+  font-size: clamp(1.6rem, 3.2vw, 2.35rem);
+  color: #0f3a52;
+  letter-spacing: -0.02em;
+}
+.bm-rc14-q {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5a6b7a;
+  font-weight: 600;
+}
+.bm-rc14-conf {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  background: #e6ebf0;
+  color: #3d4d5c;
+}
+.bm-rc14-conf.is-high { background: #d9efe6; color: #1b5c45; }
+.bm-rc14-conf.is-mid { background: #efe6d4; color: #6a4b12; }
+.bm-rc14-conf.is-low { background: #ecdfe0; color: #6b2c32; }
+.bm-rc14-insight {
+  margin: auto 0 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid #d9e0e7;
+  color: #3d4d5c;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+.bm-rc14-muted { color: #5a6b7a; font-size: 0.88rem; line-height: 1.4; }
+
+/* Cover */
+.bm-rc14-cover {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(120deg, rgba(10,35,52,0.82), rgba(10,35,52,0.35)),
+    url("/static/img/executive/bg-institutional.svg") center/cover;
+  color: #f4f7fb;
+  justify-content: flex-end;
+  min-height: min(78vh, 760px);
+}
+.bm-rc14-cover__inner { position: relative; z-index: 1; max-width: 18ch; }
+.bm-rc14-cover h1 {
+  font-family: var(--bm-display, Fraunces, serif);
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  margin: 0.35rem 0;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.bm-rc14-eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.bm-rc14-cover__period { margin: 0; opacity: 0.8; font-size: 1.05rem; }
+
+/* State */
+.bm-rc14-state { justify-content: center; }
+.bm-rc14-state__phrase {
+  font-family: var(--bm-display, Fraunces, serif);
+  font-size: clamp(1.7rem, 3.8vw, 2.7rem);
+  line-height: 1.2;
+  color: #0f3a52;
+  margin: 1rem 0 0;
+  max-width: 22ch;
+  font-weight: 650;
+}
+
+/* Financial */
+.bm-rc14-fin__hero {
+  background: #0f3a52;
+  color: #f4f7fb;
+  border-radius: 16px;
+  padding: 1.35rem 1.4rem;
+}
+.bm-rc14-fin__hero.is-na { background: #3d4d5c; }
+.bm-rc14-fin__hero span { display: block; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.8; }
+.bm-rc14-fin__hero strong {
+  display: block;
+  font-family: var(--bm-display, Fraunces, serif);
+  font-size: clamp(2rem, 4.5vw, 3.2rem);
+  margin: 0.25rem 0;
+  font-weight: 650;
+}
+.bm-rc14-premissa {
+  display: inline-block;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.35);
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+}
+.bm-rc14-fin__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+.bm-rc14-fin__grid > div,
+.bm-rc14-closing__grid > div {
+  background: #fff;
+  border: 1px solid #d9e0e7;
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
+}
+.bm-rc14-fin__grid span,
+.bm-rc14-closing__grid span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5a6b7a;
+}
+.bm-rc14-fin__grid strong,
+.bm-rc14-closing__grid strong {
+  font-family: var(--bm-display, Fraunces, serif);
+  font-size: 1.45rem;
+  color: #0f3a52;
+  font-weight: 650;
+}
+
+.bm-rc14-bars { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 0.5rem; }
+.bm-rc14-bar { display: grid; grid-template-columns: 9rem 1fr 3.5rem; gap: 0.55rem; align-items: center; }
+.bm-rc14-bar__l { font-size: 0.85rem; color: #3d4d5c; }
+.bm-rc14-bar__t { background: #e6ebf0; border-radius: 999px; height: 10px; overflow: hidden; }
+.bm-rc14-bar__t i { display: block; height: 100%; background: #1f6f8b; border-radius: inherit; }
+.bm-rc14-bar__v { text-align: right; font-weight: 650; color: #0f3a52; font-size: 0.9rem; }
+
+.bm-rc14-list { margin: 0; padding-left: 1.1rem; line-height: 1.6; }
+.bm-rc14-prio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+.bm-rc14-prio article {
+  background: #fff;
+  border-top: 2px solid #0f3a52;
+  padding: 0.9rem 0.85rem;
+}
+.bm-rc14-prio em { font-style: normal; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: #5a6b7a; font-weight: 700; }
+.bm-rc14-prio h3 { margin: 0.35rem 0; font-family: var(--bm-display, Fraunces, serif); color: #0f3a52; font-size: 1.1rem; }
+.bm-rc14-prio p { margin: 0 0 0.55rem; color: #3d4d5c; font-size: 0.88rem; }
+.bm-rc14-prio dl { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; margin: 0; }
+.bm-rc14-prio dt { font-size: 0.68rem; text-transform: uppercase; color: #5a6b7a; }
+.bm-rc14-prio dd { margin: 0; font-weight: 650; color: #0f3a52; font-size: 0.88rem; }
+
+.bm-rc14-road {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+.bm-rc14-road > div {
+  background: #fff;
+  border: 1px solid #d9e0e7;
+  border-radius: 12px;
+  padding: 1rem;
+}
+.bm-rc14-road strong { display: block; font-family: var(--bm-display, Fraunces, serif); color: #0f3a52; font-size: 1.2rem; margin-bottom: 0.35rem; }
+.bm-rc14-road span { color: #3d4d5c; font-size: 0.92rem; line-height: 1.4; }
+
+.bm-rc14-decisions { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.bm-rc14-decisions li { margin-bottom: 0.85rem; }
+.bm-rc14-decisions strong { display: block; font-family: var(--bm-display, Fraunces, serif); color: #0f3a52; font-size: 1.2rem; }
+.bm-rc14-decisions span { color: #3d4d5c; }
+
+.bm-rc14-closing { justify-content: space-between; }
+.bm-rc14-closing__grid { grid-template-columns: repeat(2, 1fr); }
+.bm-rc14-sign {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d9e0e7;
+}
+.bm-rc14-sign strong {
+  font-family: var(--bm-display, Fraunces, serif);
+  color: #0f3a52;
+  font-size: 1.25rem;
+}
+.bm-rc14-sign p { margin: 0.25rem 0 0; color: #5a6b7a; }
+
+.bm-rc14-body.is-fs .bm-rc14-chrome { opacity: 0.35; }
+.bm-rc14-body.is-fs .bm-rc14-chrome:hover { opacity: 1; }
+.bm-rc14-body.is-fs .bm-rc14-slide {
+  min-height: calc(100vh - 4.5rem);
+  border-radius: 0;
+  width: 100%;
+  max-width: none;
+}
+
+@media (max-width: 900px) {
+  .bm-rc14-fin__grid,
+  .bm-rc14-prio,
+  .bm-rc14-road,
+  .bm-rc14-closing__grid { grid-template-columns: 1fr; }
+  .bm-rc14-bar { grid-template-columns: 1fr; }
+}

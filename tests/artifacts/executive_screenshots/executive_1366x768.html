@@ -1,0 +1,224 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=1366"><title>exec-1366x768</title></head><body data-viewport="1366x768" style="width:1366px;min-height:768px"><div id="fixture-root"><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BioMed Executive Intelligence</title>
+  <link rel="stylesheet" href="/static/css/biomed-executive.css" />
+  <script>window.Chart=function(){return {destroy:function(){}}};</script>
+</head>
+<body>
+  <div class="bm-shell">
+    <aside class="bm-nav" id="bm-nav" aria-label="Navegação executiva">
+      <button type="button" class="bm-nav-toggle" id="bm-nav-toggle" aria-expanded="false" aria-controls="bm-nav-links">Menu</button>
+      <div class="bm-brand">BioMed</div>
+      <div class="bm-brand-sub">Executive Intelligence<br />experiência experimental</div>
+      <nav id="bm-nav-links" class="bm-nav-links"></nav>
+      <p class="bm-nav-foot">
+        Flag <code>ENABLE_EXECUTIVE_UI</code>. Não substitui o dashboard operacional.
+        <br /><a href="/">← Voltar ao operacional</a>
+      </p>
+    </aside>
+
+    <main class="bm-main" id="bm-main">
+      <header class="bm-topbar">
+        <div>
+          <h1 class="bm-title" id="bm-page-title">Command Center</h1>
+          <p class="bm-lede">Leitura executiva em saúde corporativa — métricas canônicas, qualidade e recomendações auditáveis.</p>
+        </div>
+        <form class="bm-filters" id="bm-filters" aria-label="Filtros do período">
+          <div class="bm-field">
+            <label for="periodo_inicio">Início</label>
+            <input id="periodo_inicio" name="periodo_inicio" type="month" />
+          </div>
+          <div class="bm-field">
+            <label for="periodo_fim">Fim</label>
+            <input id="periodo_fim" name="periodo_fim" type="month" />
+          </div>
+          <div class="bm-field">
+            <label for="efetivo">Efetivo (opcional)</label>
+            <input id="efetivo" name="efetivo" type="number" min="1" placeholder="não inventado" />
+          </div>
+          <button type="submit" class="bm-btn">Atualizar</button>
+          <button type="button" class="bm-btn bm-btn-ghost" id="bm-how" aria-haspopup="dialog">Como calculamos?</button>
+        </form>
+      </header>
+
+      <div id="bm-status" class="bm-loading" role="status" aria-live="polite">Carregando painel executivo…</div>
+
+      <!-- 1. COMMAND CENTER — reading order -->
+      <section id="command" class="bm-module is-visible" data-module="command" aria-label="Command Center">
+        <div class="bm-hero" id="bm-hero" aria-label="Estado executivo"></div>
+
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Indicadores primários</h2>
+            <p class="bm-section-sub">Estado atual · sem zeros artificiais</p>
+          </div>
+          <div class="bm-kpi-primary" id="bm-kpis-primary"></div>
+          <div class="bm-kpi-secondary" id="bm-kpis-secondary" aria-label="Indicadores secundários"></div>
+        </div>
+
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Tendência e causas</h2>
+            <p class="bm-section-sub">Evolução · Pareto CID (grupo alfabético)</p>
+          </div>
+          <div class="bm-grid-2">
+            <article class="bm-card">
+              <h3 class="bm-section-title">Evolução temporal</h3>
+              <p class="bm-sr-only" id="chart-temporal-summary"></p>
+              <div class="bm-chart" id="wrap-temporal"><canvas id="chart-temporal" aria-describedby="chart-temporal-summary"></canvas></div>
+            </article>
+            <article class="bm-card">
+              <h3 class="bm-section-title">Pareto — grupos alfabéticos CID</h3>
+              <p class="bm-muted" style="margin:0 0 0.5rem;font-size:0.8rem">Não é capítulo CID oficial.</p>
+              <p class="bm-sr-only" id="chart-pareto-summary"></p>
+              <div class="bm-chart" id="wrap-pareto"><canvas id="chart-pareto" aria-describedby="chart-pareto-summary"></canvas></div>
+            </article>
+          </div>
+        </div>
+
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Áreas de risco e confiabilidade</h2>
+          </div>
+          <div class="bm-grid-2">
+            <article class="bm-card">
+              <h3 class="bm-section-title">Setores — ranking de impacto</h3>
+              <p class="bm-sr-only" id="chart-setores-summary"></p>
+              <div class="bm-chart" id="wrap-setores"><canvas id="chart-setores" aria-describedby="chart-setores-summary"></canvas></div>
+            </article>
+            <article class="bm-card">
+              <h3 class="bm-section-title">Qualidade dos dados</h3>
+              <div id="bm-quality"></div>
+            </article>
+          </div>
+        </div>
+
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Trabalho BioMed e resultado</h2>
+          </div>
+          <div id="bm-conditionants-banner" class="bm-callout" hidden></div>
+          <div id="bm-performance-brief"></div>
+          <div id="bm-narrative" class="bm-muted" style="margin-top:1rem"></div>
+        </div>
+
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Recomendações prioritárias</h2>
+          </div>
+          <div id="bm-recommendations"></div>
+        </div>
+
+        <div class="bm-section">
+          <div class="bm-section-head">
+            <h2 class="bm-section-title">Plano de ação (prévia)</h2>
+            <button type="button" class="bm-linkish" data-goto="actions">Ver módulo completo →</button>
+          </div>
+          <div id="bm-actions-preview"></div>
+        </div>
+      </section>
+
+      <section id="absenteeism" class="bm-module" data-module="absenteeism" aria-label="Absenteísmo">
+        <div class="bm-section">
+          <h2 class="bm-section-title">Absenteísmo</h2>
+          <p class="bm-muted">KPIs primários e evolução do período selecionado.</p>
+          <div class="bm-kpi-primary" id="bm-abs-kpis"></div>
+          <article class="bm-card" style="margin-top:1rem">
+            <h3 class="bm-section-title">Evolução</h3>
+            <div class="bm-chart" id="wrap-abs-temporal"><canvas id="chart-abs-temporal"></canvas></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="epidemiology" class="bm-module" data-module="epidemiology" aria-label="Epidemiologia">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Epidemiologia</h2>
+          <p class="bm-muted">Pareto por grupo alfabético CID — volume e participação acumulada.</p>
+          <div class="bm-chart" id="wrap-epi"><canvas id="chart-epi"></canvas></div>
+        </article>
+      </section>
+
+      <section id="sectors" class="bm-module" data-module="sectors" aria-label="Setores e risco">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Setores e risco</h2>
+          <p class="bm-muted">Ranking de impacto (eventos). Centro de custo permanece separado — não duplicado aqui. Taxa relativa somente com denominador explícito.</p>
+          <div class="bm-chart" id="wrap-sectors-mod"><canvas id="chart-sectors-mod"></canvas></div>
+        </article>
+      </section>
+
+      <section id="performance" class="bm-module" data-module="performance" aria-label="Performance BioMed">
+        <h2 class="bm-section-title">Performance BioMed</h2>
+        <p class="bm-muted">O que a BioMed fez e qual foi o resultado observado — sem misturar produção com desfecho.</p>
+        <div id="bm-conditionants-banner-2" class="bm-callout" hidden></div>
+        <div class="bm-perf-grid" id="bm-performance"></div>
+        <article class="bm-card" style="margin-top:1rem">
+          <h3 class="bm-section-title">Condicionantes empresariais</h3>
+          <div id="bm-conditionants"></div>
+        </article>
+        <article class="bm-card" style="margin-top:1rem">
+          <h3 class="bm-section-title">ROI</h3>
+          <div id="bm-roi"></div>
+        </article>
+      </section>
+
+      <section id="actions" class="bm-module" data-module="actions" aria-label="Plano de Ação">
+        <h2 class="bm-section-title">Plano de Ação</h2>
+        <p class="bm-muted">IA propõe → médico valida → empresa aprova → execução → monitoramento → avaliação. Sem autoexecução.</p>
+        <div id="bm-actions"></div>
+      </section>
+
+      <section id="intelligence" class="bm-module" data-module="intelligence" aria-label="BioMed Intelligence">
+        <h2 class="bm-section-title">BioMed Intelligence</h2>
+        <p class="bm-muted">Motor de regras determinístico. Sem LLM. Somente agregados — sem PII.</p>
+        <div class="bm-intel-grid" id="bm-intel"></div>
+      </section>
+
+      <section id="productivity" class="bm-module" data-module="productivity" aria-label="Produtividade">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Produtividade</h2>
+          <div class="bm-chart-empty">
+            Módulo preparado. Dados operacionais permanecem em <code>/produtividade</code> até binding canônico.
+            Sem zero artificial neste painel.
+          </div>
+        </article>
+      </section>
+
+      <section id="quality" class="bm-module" data-module="quality" aria-label="Qualidade dos Dados">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Dados / Qualidade</h2>
+          <div id="bm-quality-full"></div>
+        </article>
+      </section>
+
+      <section id="admin" class="bm-module" data-module="admin" aria-label="Administração">
+        <article class="bm-card">
+          <h2 class="bm-section-title">Administração</h2>
+          <p class="bm-muted">Ficha clínica / entrevista estruturada: navegação futura apenas — não implementada.</p>
+          <ul class="bm-list">
+            <li>Sem upload de exames, anexos ou prontuário</li>
+            <li>Sem ranking nominal de trabalhadores</li>
+            <li>Tenant via autenticação / seletor legado</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div class="bm-modal" id="bm-method-modal" role="dialog" aria-modal="true" aria-labelledby="bm-method-title">
+    <div class="bm-modal__panel">
+      <h2 class="bm-section-title" id="bm-method-title">Como calculamos?</h2>
+      <div id="bm-method-body" class="bm-muted"></div>
+      <p style="margin-top:1rem"><button type="button" class="bm-btn" id="bm-method-close">Fechar</button></p>
+    </div>
+  </div>
+
+  <script src="/static/js/executive/api.js"></script>
+  <script src="/static/js/executive/charts.js"></script>
+  <script src="/static/js/executive/command-center.js"></script>
+  <script src="/static/js/executive/app.js"></script>
+</body>
+</html>
+</div><script>document.documentElement.style.width="1366px";</script></body></html>
