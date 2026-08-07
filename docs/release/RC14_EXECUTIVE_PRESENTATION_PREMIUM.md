@@ -1,7 +1,7 @@
 # RC-1.4 — Executive Presentation Premium
 
 **Branch:** `cursor/rc14-executive-presentation-premium-f8f5`  
-**HEAD:** `83d08df26b0b71edb93b64b4ca4e6f158bbffc2e`
+**HEAD:** `514a25a1caf0bfd2b12d1de87292f4f330bdcc78`
 **Status:** Draft · sem merge · sem deploy · sem produção
 
 ## Preview
