@@ -581,6 +581,22 @@ async def preview_page():
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/preview/executive", response_class=HTMLResponse)
+async def executive_identity_preview():
+    """EXEC-11 — identidade visual isolada. Sem login. Dataset sintético. Sem dados reais."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "executive-identity.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/staging/executive-preview", response_class=HTMLResponse)
+async def executive_identity_preview_alias():
+    """Alias de staging para o preview de identidade EXEC-11."""
+    file_path = os.path.join(FRONTEND_DIR, "preview", "executive-identity.html")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 @app.get("/analises", response_class=HTMLResponse)
 async def analises_page():
     """Página de análises"""

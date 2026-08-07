@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+<symbol id="bm-i-shield" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm0 2.2L6 6.1v4.9c0 3.9 2.5 7.4 6 8.8 3.5-1.4 6-4.9 6-8.8V6.1l-6-1.9z"/></symbol>
+<symbol id="bm-i-pulse" viewBox="0 0 24 24"><path fill="currentColor" d="M3 13h3.2l2.1-6.2L12 18l2.6-7H21v-2h-7.2L12 14.2 8.7 4.8 5.8 13H3v2z"/></symbol>
+<symbol id="bm-i-chart" viewBox="0 0 24 24"><path fill="currentColor" d="M4 19h16v2H4v-2zm2-2V9h2v8H6zm5 0V5h2v12h-2zm5 0v-5h2v5h-2z"/></symbol>
+<symbol id="bm-i-decision" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a5 5 0 015 5v1h2a3 3 0 013 3v8a3 3 0 01-3 3H5a3 3 0 01-3-3v-8a3 3 0 013-3h2V7a5 5 0 015-5zm0 2a3 3 0 00-3 3v1h6V7a3 3 0 00-3-3zm-1 8v5h2v-5h-2z"/></symbol>
+<symbol id="bm-i-evidence" viewBox="0 0 24 24"><path fill="currentColor" d="M7 2h10a2 2 0 012 2v16l-7-3-7 3V4a2 2 0 012-2zm0 2v13.1l5-2.1 5 2.1V4H7zm2 3h6v2H9V7zm0 4h6v2H9v-2z"/></symbol>
+<symbol id="bm-i-close" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 110 20 10 10 0 010-20zm0 2a8 8 0 100 16 8 8 0 000-16zm-1 3h2v6h-2V7zm0 8h2v2h-2v-2z"/></symbol>
+</svg>
