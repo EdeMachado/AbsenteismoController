@@ -523,6 +523,8 @@ body.bm-plat-legacy .btn-hero {
 body.bm-plat-legacy .filter-chip {
   border-radius: 999px !important;
   border-color: var(--bm-border, #d8dee8) !important;
+  background: #fff !important;
+  color: var(--bm-ink, #132033) !important;
 }
 body.bm-plat-legacy .filter-chip.active {
   background: var(--bm-brand, #1a4566) !important;
