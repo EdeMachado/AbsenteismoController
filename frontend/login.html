@@ -1,386 +1,125 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AbsenteismoController</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #5c6bc0 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .login-container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            padding: 50px;
-            width: 100%;
-            max-width: 450px;
-        }
-        
-        .login-header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        
-        .login-logo {
-            font-size: 48px;
-            color: #1a237e;
-            margin-bottom: 16px;
-        }
-        
-        .login-header h1 {
-            font-size: 32px;
-            color: #1a237e;
-            margin-bottom: 8px;
-        }
-        
-        .login-header p {
-            color: #666;
-            font-size: 16px;
-        }
-        
-        .form-group {
-            margin-bottom: 24px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #1a237e;
-        }
-        
-        .form-group input::placeholder {
-            color: #999;
-        }
-        
-        .input-icon {
-            position: relative;
-        }
-        
-        .input-icon i {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #999;
-        }
-        
-        .input-icon input {
-            padding-left: 45px;
-        }
-        
-        .input-icon.password-input {
-            position: relative;
-        }
-        
-        .input-icon.password-input input {
-            padding-right: 45px;
-        }
-        
-        .password-toggle {
-            position: absolute;
-            right: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: transparent;
-            border: none;
-            color: #999;
-            cursor: pointer;
-            padding: 8px;
-            font-size: 18px;
-            transition: color 0.3s;
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 4px;
-        }
-        
-        .password-toggle:hover {
-            color: #1a237e;
-            background: rgba(26, 35, 126, 0.05);
-        }
-        
-        .password-toggle:focus {
-            outline: 2px solid #1a237e;
-            outline-offset: 2px;
-        }
-        
-        .password-toggle i {
-            pointer-events: none;
-        }
-        
-        .btn-login {
-            width: 100%;
-            padding: 16px;
-            background: #1a237e;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 8px;
-        }
-        
-        .btn-login:hover {
-            background: #283593;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
-        }
-        
-        .btn-login:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .alert {
-            padding: 14px 16px;
-            border-radius: 8px;
-            margin-bottom: 24px;
-            display: none;
-        }
-        
-        .alert-error {
-            background: #fee;
-            border: 1px solid #fcc;
-            color: #c33;
-        }
-        
-        .alert-success {
-            background: #efe;
-            border: 1px solid #cfc;
-            color: #3c3;
-        }
-        
-        .alert.show {
-            display: block;
-        }
-        
-        .login-footer {
-            text-align: center;
-            margin-top: 32px;
-            padding-top: 32px;
-            border-top: 1px solid #e0e0e0;
-        }
-        
-        .login-footer a {
-            color: #1a237e;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        
-        .login-footer a:hover {
-            text-decoration: underline;
-        }
-        
-        .loading {
-            display: none;
-        }
-        
-        .loading.show {
-            display: inline-block;
-            margin-right: 8px;
-        }
-        
-        @media (max-width: 500px) {
-            .login-container {
-                padding: 30px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Entrar — BioMed</title>
+  <link rel="stylesheet" href="/static/css/biomed-identity.css?v=rc21b" />
+  <link rel="stylesheet" href="/static/css/biomed-login.css?v=rc21b" />
 </head>
-<body>
-    <div class="login-container">
-        <div class="login-header">
-            <div class="login-logo">
-                <i class="fas fa-chart-line"></i>
-            </div>
-            <h1>AbsenteismoController</h1>
-            <p>Faça login para continuar</p>
-        </div>
-        
-        <div id="alert" class="alert"></div>
-        
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="username">Usuário</label>
-                <div class="input-icon">
-                    <i class="fas fa-user"></i>
-                    <input type="text" id="username" name="username" placeholder="Digite seu usuário" required autocomplete="username">
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="password">Senha</label>
-                <div class="input-icon password-input">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="password" name="password" placeholder="Digite sua senha" required autocomplete="current-password">
-                    <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar senha">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <button type="submit" class="btn-login" id="loginBtn">
-                <span class="loading" id="loading">
-                    <i class="fas fa-spinner fa-spin"></i>
-                </span>
-                <span id="loginText">Entrar</span>
-            </button>
-        </form>
-        
-        <div class="login-footer">
-            <p>Não tem conta? <a href="/landing">Voltar à página inicial</a></p>
-        </div>
+<body class="bm-login-body">
+  <div class="bm-login-shell">
+    <a class="bm-login-back" href="/landing">← BioMed</a>
+    <div class="bm-login-card">
+      <header class="bm-login-header">
+        <p class="bm-login-brand">BioMed</p>
+        <h1>Entrar na plataforma</h1>
+        <p class="bm-login-sub">Inteligência em Saúde Corporativa</p>
+      </header>
+
+      <div id="alert" class="bm-login-alert" role="alert" hidden></div>
+
+      <form id="loginForm" class="bm-login-form">
+        <label class="bm-login-field">
+          <span>Usuário</span>
+          <input type="text" id="username" name="username" placeholder="Seu usuário" required autocomplete="username" />
+        </label>
+        <label class="bm-login-field">
+          <span>Senha</span>
+          <div class="bm-login-pass">
+            <input type="password" id="password" name="password" placeholder="Sua senha" required autocomplete="current-password" />
+            <button type="button" class="bm-login-toggle" id="togglePassword" aria-label="Mostrar senha">Mostrar</button>
+          </div>
+        </label>
+        <button type="submit" class="bm-login-submit" id="loginBtn">
+          <span class="bm-login-loading" id="loading" hidden>…</span>
+          <span id="loginText">Entrar</span>
+        </button>
+      </form>
+
+      <p class="bm-login-foot"><a href="/landing">Voltar à página inicial</a></p>
     </div>
-    
-    <script>
-        const form = document.getElementById('loginForm');
-        const alertDiv = document.getElementById('alert');
-        const loginBtn = document.getElementById('loginBtn');
-        const loading = document.getElementById('loading');
-        const loginText = document.getElementById('loginText');
-        
-        function showAlert(message, type = 'error') {
-            alertDiv.textContent = message;
-            alertDiv.className = `alert alert-${type} show`;
-            setTimeout(() => {
-                alertDiv.classList.remove('show');
-            }, 5000);
-        }
+  </div>
 
-        /** Internal path only — blocks open redirects (https:, //host, javascript:, etc.). */
-        function safeInternalNext(raw) {
-            if (!raw || typeof raw !== 'string') return null;
-            const n = raw.trim();
-            if (!n.startsWith('/')) return null;
-            if (n.startsWith('//')) return null;
-            if (n.includes('\\')) return null;
-            if (n.includes('://')) return null;
-            if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(n)) return null;
-            return n;
-        }
+  <script>
+    const form = document.getElementById("loginForm");
+    const alertDiv = document.getElementById("alert");
+    const loginBtn = document.getElementById("loginBtn");
+    const loading = document.getElementById("loading");
+    const loginText = document.getElementById("loginText");
 
-        function postLoginDestination() {
-            const params = new URLSearchParams(window.location.search);
-            const next = safeInternalNext(params.get('next'));
-            if (next) return next;
-            // Legacy without next: selected client → home; else → client picker
-            if (localStorage.getItem('cliente_selecionado')) return '/';
-            return '/clientes';
-        }
-        
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            // Desabilita botão
-            loginBtn.disabled = true;
-            loading.classList.add('show');
-            loginText.textContent = 'Entrando...';
-            
-            try {
-                // Cria FormData para OAuth2
-                const formData = new FormData();
-                formData.append('username', username);
-                formData.append('password', password);
-                
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // Salva token no localStorage
-                    localStorage.setItem('access_token', data.access_token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    
-                    showAlert('Login realizado com sucesso!', 'success');
-                    
-                    // Honra ?next= interno seguro; sem next preserva legado (/ ou /clientes)
-                    setTimeout(() => {
-                        window.location.href = postLoginDestination();
-                    }, 1000);
-                } else {
-                    showAlert(data.detail || 'Erro ao fazer login');
-                }
-            } catch (error) {
-                showAlert('Erro ao conectar com o servidor');
-                console.error('Erro:', error);
-            } finally {
-                // Reabilita botão
-                loginBtn.disabled = false;
-                loading.classList.remove('show');
-                loginText.textContent = 'Entrar';
-            }
-        });
-        
-        // Toggle mostrar/ocultar senha
-        const togglePassword = document.getElementById('togglePassword');
-        const passwordInput = document.getElementById('password');
-        const passwordIcon = togglePassword.querySelector('i');
-        
-        togglePassword.addEventListener('click', () => {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            
-            // Alterna ícone
-            if (type === 'text') {
-                passwordIcon.classList.remove('fa-eye');
-                passwordIcon.classList.add('fa-eye-slash');
-                togglePassword.setAttribute('aria-label', 'Ocultar senha');
-            } else {
-                passwordIcon.classList.remove('fa-eye-slash');
-                passwordIcon.classList.add('fa-eye');
-                togglePassword.setAttribute('aria-label', 'Mostrar senha');
-            }
-        });
-        
-        // Já autenticado: honra ?next= interno; sem next preserva legado
-        if (localStorage.getItem('access_token')) {
+    function showAlert(message, type) {
+      alertDiv.hidden = false;
+      alertDiv.textContent = message;
+      alertDiv.className = "bm-login-alert is-" + (type || "error");
+      setTimeout(function () {
+        alertDiv.hidden = true;
+      }, 5000);
+    }
+
+    /** Internal path only — blocks open redirects (https:, //host, javascript:, etc.). */
+    function safeInternalNext(raw) {
+      if (!raw || typeof raw !== "string") return null;
+      const n = raw.trim();
+      if (!n.startsWith("/")) return null;
+      if (n.startsWith("//")) return null;
+      if (n.includes("\\")) return null;
+      if (n.includes("://")) return null;
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(n)) return null;
+      return n;
+    }
+
+    function postLoginDestination() {
+      const params = new URLSearchParams(window.location.search);
+      const next = safeInternalNext(params.get("next"));
+      if (next) return next;
+      if (localStorage.getItem("cliente_selecionado")) return "/";
+      return "/clientes";
+    }
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      loginBtn.disabled = true;
+      loading.hidden = false;
+      loginText.textContent = "Entrando…";
+      try {
+        const formData = new FormData();
+        formData.append("username", username);
+        formData.append("password", password);
+        const response = await fetch("/api/auth/login", { method: "POST", body: formData });
+        const data = await response.json();
+        if (response.ok) {
+          localStorage.setItem("access_token", data.access_token);
+          localStorage.setItem("user", JSON.stringify(data.user));
+          showAlert("Login realizado com sucesso!", "success");
+          setTimeout(function () {
             window.location.href = postLoginDestination();
+          }, 800);
+        } else {
+          showAlert(data.detail || "Erro ao fazer login");
         }
-    </script>
+      } catch (err) {
+        showAlert("Erro ao conectar com o servidor");
+      } finally {
+        loginBtn.disabled = false;
+        loading.hidden = true;
+        loginText.textContent = "Entrar";
+      }
+    });
+
+    document.getElementById("togglePassword").addEventListener("click", function () {
+      const input = document.getElementById("password");
+      const show = input.getAttribute("type") === "password";
+      input.setAttribute("type", show ? "text" : "password");
+      this.textContent = show ? "Ocultar" : "Mostrar";
+      this.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
+    });
+
+    if (localStorage.getItem("access_token")) {
+      window.location.href = postLoginDestination();
+    }
+  </script>
 </body>
 </html>
-

@@ -84,7 +84,9 @@ def test_html_has_hero_and_reading_order():
     # EXEC-08 first experience reading order
     assert 'id="bm-first-experience"' in html
     assert "Abertura" in html or "abertura" in html.lower()
-    assert "bm-nav-toggle" in html
+    # RC-21B: mobile menu is platform shell toggle (not parallel executive nav)
+    assert "biomed-platform-shell.js" in html
+    assert 'data-bm-shell="hub"' in html
     assert "aria-label" in html
     assert "chart-temporal" not in html
 

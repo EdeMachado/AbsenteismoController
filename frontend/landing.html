@@ -1,768 +1,127 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AbsenteismoController - Gestão de Absenteísmo</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #5c6bc0 100%);
-            color: #333;
-            min-height: 100vh;
-        }
-        
-        .landing-container {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* Header */
-        .landing-header {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px 40px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 24px;
-            font-weight: 700;
-            color: #1a237e;
-        }
-        
-        .logo i {
-            font-size: 32px;
-        }
-        
-        .header-actions {
-            display: flex;
-            gap: 16px;
-        }
-        
-        .btn-landing {
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        
-        .btn-primary-landing {
-            background: #1a237e;
-            color: white;
-        }
-        
-        .btn-primary-landing:hover {
-            background: #283593;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
-        }
-        
-        .btn-secondary-landing {
-            background: white;
-            color: #1a237e;
-            border: 2px solid #1a237e;
-        }
-        
-        .btn-secondary-landing:hover {
-            background: #f5f5f5;
-        }
-        
-        /* Hero Section */
-        .hero {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 60px 40px;
-            text-align: center;
-            color: white;
-        }
-        
-        .hero-content {
-            max-width: 900px;
-        }
-        
-        .hero h1 {
-            font-size: 56px;
-            font-weight: 800;
-            margin-bottom: 24px;
-            line-height: 1.2;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        .hero p {
-            font-size: 22px;
-            margin-bottom: 40px;
-            line-height: 1.6;
-            opacity: 0.95;
-        }
-        
-        .hero-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        
-        /* Features */
-        .features {
-            background: white;
-            padding: 80px 40px;
-        }
-        
-        .features-container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .features h2 {
-            text-align: center;
-            font-size: 42px;
-            color: #1a237e;
-            margin-bottom: 60px;
-        }
-        
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 40px;
-        }
-        
-        .feature-card {
-            background: #f8f9fa;
-            padding: 40px;
-            border-radius: 12px;
-            text-align: center;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-        }
-        
-        .feature-icon {
-            font-size: 48px;
-            color: #1a237e;
-            margin-bottom: 20px;
-        }
-        
-        .feature-card h3 {
-            font-size: 24px;
-            color: #1a237e;
-            margin-bottom: 16px;
-        }
-        
-        .feature-card p {
-            color: #666;
-            line-height: 1.6;
-        }
-        
-        /* Footer */
-        .landing-footer {
-            background: #1a237e;
-            color: white;
-            padding: 40px;
-            text-align: center;
-        }
-        
-        .landing-footer p {
-            opacity: 0.9;
-        }
-        
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 36px;
-            }
-            
-            .hero p {
-                font-size: 18px;
-            }
-            
-            .features-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* Modal de Cadastro */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .modal-overlay.show {
-            display: flex;
-        }
-        
-        .modal-cadastro {
-            background: white;
-            border-radius: 16px;
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            position: relative;
-        }
-        
-        .modal-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .modal-header h2 {
-            color: #1a237e;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .modal-header p {
-            color: #666;
-            font-size: 16px;
-        }
-        
-        .modal-close {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: transparent;
-            border: none;
-            font-size: 24px;
-            color: #999;
-            cursor: pointer;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.3s;
-        }
-        
-        .modal-close:hover {
-            background: #f5f5f5;
-            color: #333;
-        }
-        
-        .form-group-modal {
-            margin-bottom: 20px;
-        }
-        
-        .form-group-modal label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        .form-group-modal input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group-modal input:focus {
-            outline: none;
-            border-color: #1a237e;
-        }
-        
-        .form-group-modal input::placeholder {
-            color: #999;
-        }
-        
-        .btn-submit-cadastro {
-            width: 100%;
-            padding: 16px;
-            background: #1a237e;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 10px;
-        }
-        
-        .btn-submit-cadastro:hover {
-            background: #283593;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.4);
-        }
-        
-        .btn-submit-cadastro:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .alert-modal {
-            padding: 14px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .alert-modal.show {
-            display: block;
-        }
-        
-        .alert-success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-        
-        .alert-error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-        }
-        
-        .loading-spinner {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
-        }
-        
-        .loading-spinner.show {
-            display: block;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BioMed Absenteísmo Controller</title>
+  <link rel="stylesheet" href="/static/css/biomed-landing.css?v=rc21b" />
 </head>
-<body>
-    <div class="landing-container">
-        <!-- Header -->
-        <header class="landing-header">
-            <div class="logo">
-                <i class="fas fa-chart-line"></i>
-                <span>AbsenteismoController</span>
-            </div>
-            <div class="header-actions">
-                <a href="/login" class="btn-landing btn-secondary-landing">
-                    <i class="fas fa-sign-in-alt"></i> Entrar
-                </a>
-                <button onclick="abrirModalContato()" class="btn-landing btn-primary-landing">
-                    <i class="fas fa-envelope"></i> Fale conosco
-                </button>
-            </div>
-        </header>
-        
-        <!-- Hero Section -->
-        <section class="hero">
-            <div class="hero-content">
-                <h1>Reduza os Prejuízos do Absenteísmo na Sua Empresa</h1>
-                <p style="font-size: 24px; font-weight: 600; margin-bottom: 20px;">
-                    O absenteísmo custa bilhões às empresas brasileiras todos os anos. 
-                    <strong style="color: #ffd700;">Transforme perdas em ganhos</strong> com gestão inteligente e dados acionáveis.
-                </p>
-                <p style="font-size: 18px; opacity: 0.9; margin-bottom: 40px;">
-                    Sistema completo de análise e controle que identifica padrões, previne problemas e reduz custos operacionais.
-                </p>
-                <div class="hero-buttons">
-                    <button onclick="abrirModalContato()" class="btn-landing btn-primary-landing" style="font-size: 18px; padding: 16px 32px;">
-                        <i class="fas fa-envelope"></i> Solicitar contato comercial
-                    </button>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Problem Section -->
-        <section class="problem-section" style="background: #fff; padding: 80px 40px;">
-            <div style="max-width: 1200px; margin: 0 auto;">
-                <h2 style="text-align: center; font-size: 42px; color: #d32f2f; margin-bottom: 20px;">
-                    <i class="fas fa-exclamation-triangle"></i> O Problema do Absenteísmo
-                </h2>
-                <p style="text-align: center; font-size: 20px; color: #666; margin-bottom: 60px; max-width: 800px; margin-left: auto; margin-right: auto;">
-                    Empresas brasileiras perdem milhões de reais anualmente com absenteísmo. Sem gestão adequada, você está perdendo dinheiro todos os dias.
-                </p>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; margin-bottom: 60px;">
-                    <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); padding: 40px; border-radius: 12px; color: white; text-align: center;">
-                        <div style="font-size: 56px; font-weight: 800; margin-bottom: 10px;">3-5%</div>
-                        <div style="font-size: 18px; opacity: 0.95;">do faturamento anual perdido com absenteísmo</div>
-                    </div>
-                    
-                    <div style="background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%); padding: 40px; border-radius: 12px; color: white; text-align: center;">
-                        <div style="font-size: 56px; font-weight: 800; margin-bottom: 10px;">R$ 50 bi</div>
-                        <div style="font-size: 18px; opacity: 0.95;">perdidos anualmente pelas empresas no Brasil</div>
-                    </div>
-                    
-                    <div style="background: linear-gradient(135deg, #ef5350 0%, #c62828 100%); padding: 40px; border-radius: 12px; color: white; text-align: center;">
-                        <div style="font-size: 56px; font-weight: 800; margin-bottom: 10px;">40%</div>
-                        <div style="font-size: 18px; opacity: 0.95;">de redução de produtividade com absenteísmo alto</div>
-                    </div>
-                </div>
-                
-                <div style="background: #f5f5f5; padding: 40px; border-radius: 12px; border-left: 5px solid #d32f2f;">
-                    <h3 style="color: #d32f2f; font-size: 24px; margin-bottom: 20px;">
-                        <i class="fas fa-calculator"></i> Calcule o Custo do Absenteísmo na Sua Empresa
-                    </h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; color: #333;">
-                        <div>
-                            <strong>Salário médio:</strong> R$ 3.000/mês<br>
-                            <strong>Dias perdidos:</strong> 5 dias/mês por funcionário<br>
-                            <strong>Custo direto:</strong> R$ 500/mês por funcionário
-                        </div>
-                        <div>
-                            <strong>Com 100 funcionários:</strong><br>
-                            <strong style="color: #d32f2f; font-size: 20px;">R$ 50.000/mês</strong><br>
-                            <strong style="color: #d32f2f; font-size: 20px;">R$ 600.000/ano</strong>
-                        </div>
-                    </div>
-                    <p style="margin-top: 20px; color: #666; font-style: italic;">
-                        * Este cálculo não inclui custos indiretos como perda de produtividade, horas extras, treinamento de substitutos e impacto na qualidade.
-                    </p>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Solution Section -->
-        <section class="solution-section" style="background: linear-gradient(135deg, #1a237e 0%, #283593 100%); padding: 80px 40px; color: white;">
-            <div style="max-width: 1200px; margin: 0 auto;">
-                <h2 style="text-align: center; font-size: 42px; margin-bottom: 20px;">
-                    <i class="fas fa-lightbulb"></i> A Solução: Gestão Inteligente
-                </h2>
-                <p style="text-align: center; font-size: 20px; opacity: 0.95; margin-bottom: 60px; max-width: 800px; margin-left: auto; margin-right: auto;">
-                    Transforme dados em decisões estratégicas. Identifique padrões, previna problemas e reduza custos com análises inteligentes.
-                </p>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
-                    <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 12px; backdrop-filter: blur(10px);">
-                        <div style="font-size: 48px; margin-bottom: 20px;"><i class="fas fa-chart-line"></i></div>
-                        <h3 style="font-size: 24px; margin-bottom: 15px;">Redução de Custos</h3>
-                        <p style="opacity: 0.9; line-height: 1.6;">
-                            Empresas que implementam gestão de absenteísmo reduzem custos em até <strong>30-40%</strong> no primeiro ano, identificando e corrigindo problemas antes que se tornem críticos.
-                        </p>
-                    </div>
-                    
-                    <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 12px; backdrop-filter: blur(10px);">
-                        <div style="font-size: 48px; margin-bottom: 20px;"><i class="fas fa-shield-alt"></i></div>
-                        <h3 style="font-size: 24px; margin-bottom: 15px;">Prevenção Proativa</h3>
-                        <p style="opacity: 0.9; line-height: 1.6;">
-                            Identifique padrões e tendências antes que se tornem problemas. Ações preventivas reduzem absenteísmo em até <strong>25%</strong> em 6 meses.
-                        </p>
-                    </div>
-                    
-                    <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 12px; backdrop-filter: blur(10px);">
-                        <div style="font-size: 48px; margin-bottom: 20px;"><i class="fas fa-trophy"></i></div>
-                        <h3 style="font-size: 24px; margin-bottom: 15px;">Aumento de Produtividade</h3>
-                        <p style="opacity: 0.9; line-height: 1.6;">
-                            Com menos ausências, sua equipe trabalha de forma mais consistente, aumentando a produtividade e a qualidade dos resultados.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Why Manage Section -->
-        <section style="background: #f8f9fa; padding: 80px 40px;">
-            <div style="max-width: 1200px; margin: 0 auto;">
-                <h2 style="text-align: center; font-size: 42px; color: #1a237e; margin-bottom: 20px;">
-                    Por Que Gerenciar Absenteísmo é Essencial?
-                </h2>
-                <p style="text-align: center; font-size: 20px; color: #666; margin-bottom: 60px; max-width: 800px; margin-left: auto; margin-right: auto;">
-                    A gestão de absenteísmo não é mais opcional. É uma necessidade estratégica para empresas competitivas.
-                </p>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px;">
-                    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <div style="font-size: 40px; color: #1a237e; margin-bottom: 15px;"><i class="fas fa-balance-scale"></i></div>
-                        <h3 style="color: #1a237e; font-size: 22px; margin-bottom: 15px;">Compliance e Legislação</h3>
-                        <p style="color: #666; line-height: 1.6;">
-                            Atenda às exigências legais do eSocial, INSS e normas trabalhistas. Evite multas e processos trabalhistas com documentação adequada e análises precisas.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <div style="font-size: 40px; color: #1a237e; margin-bottom: 15px;"><i class="fas fa-dollar-sign"></i></div>
-                        <h3 style="color: #1a237e; font-size: 22px; margin-bottom: 15px;">ROI Comprovado</h3>
-                        <p style="color: #666; line-height: 1.6;">
-                            Para cada R$ 1 investido em gestão de absenteísmo, empresas economizam R$ 3-5 em custos evitados. O retorno é rápido e mensurável.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <div style="font-size: 40px; color: #1a237e; margin-bottom: 15px;"><i class="fas fa-user-md"></i></div>
-                        <h3 style="color: #1a237e; font-size: 22px; margin-bottom: 15px;">Saúde Ocupacional</h3>
-                        <p style="color: #666; line-height: 1.6;">
-                            Identifique problemas de saúde ocupacional precocemente. Reduza afastamentos por doenças relacionadas ao trabalho com ações preventivas.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <div style="font-size: 40px; color: #1a237e; margin-bottom: 15px;"><i class="fas fa-bullseye"></i></div>
-                        <h3 style="color: #1a237e; font-size: 22px; margin-bottom: 15px;">Tomada de Decisão</h3>
-                        <p style="color: #666; line-height: 1.6;">
-                            Dados precisos permitem decisões estratégicas baseadas em evidências, não em suposições. Otimize recursos e priorize ações.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <div style="font-size: 40px; color: #1a237e; margin-bottom: 15px;"><i class="fas fa-chart-pie"></i></div>
-                        <h3 style="color: #1a237e; font-size: 22px; margin-bottom: 15px;">Benchmarking</h3>
-                        <p style="color: #666; line-height: 1.6;">
-                            Compare seus indicadores com padrões do mercado. Identifique oportunidades de melhoria e áreas que precisam de atenção.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                        <div style="font-size: 40px; color: #1a237e; margin-bottom: 15px;"><i class="fas fa-clock"></i></div>
-                        <h3 style="color: #1a237e; font-size: 22px; margin-bottom: 15px;">Economia de Tempo</h3>
-                        <p style="color: #666; line-height: 1.6;">
-                            Automatize análises que antes levavam dias. Tenha relatórios prontos em minutos, liberando sua equipe para ações estratégicas.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Features -->
-        <section class="features">
-            <div class="features-container">
-                <h2>Funcionalidades que Fazem a Diferença</h2>
-                <p style="text-align: center; font-size: 18px; color: #666; margin-bottom: 50px; max-width: 700px; margin-left: auto; margin-right: auto;">
-                    Tudo que você precisa para gerenciar absenteísmo de forma profissional e eficiente.
-                </p>
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-chart-bar"></i>
-                        </div>
-                        <h3>Dashboard Inteligente</h3>
-                        <p>Visualize métricas críticas em tempo real: dias perdidos, custos, tendências e alertas. Tudo em uma única tela.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-brain"></i>
-                        </div>
-                        <h3>Análises com IA</h3>
-                        <p>Insights automáticos identificam padrões, preveem problemas e sugerem ações corretivas baseadas em dados históricos.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-file-upload"></i>
-                        </div>
-                        <h3>Importação Automática</h3>
-                        <p>Processe planilhas Excel automaticamente. Reconhecimento inteligente de colunas e validação de dados.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-presentation"></i>
-                        </div>
-                        <h3>Apresentações Profissionais</h3>
-                        <p>Gere apresentações executivas automaticamente com gráficos, análises e insights prontos para reuniões.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-map-marked-alt"></i>
-                        </div>
-                        <h3>Mapa de Calor</h3>
-                        <p>Visualize padrões de absenteísmo por setor e mês. Identifique períodos críticos e áreas problemáticas rapidamente.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-filter"></i>
-                        </div>
-                        <h3>Análises Personalizadas</h3>
-                        <p>Filtre por período, funcionário, setor, tipo de atestado. Compare períodos e identifique tendências.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-user-injured"></i>
-                        </div>
-                        <h3>Perfil de Funcionários</h3>
-                        <p>Análise individual detalhada: histórico de atestados, padrões de ausência e recomendações personalizadas.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-building"></i>
-                        </div>
-                        <h3>Análise por Setor</h3>
-                        <p>Identifique setores com maior absenteísmo. Compare performance e implemente ações específicas por área.</p>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-calendar-alt"></i>
-                        </div>
-                        <h3>Comparativos Temporais</h3>
-                        <p>Compare meses, trimestres e anos. Avalie impacto de ações corretivas e acompanhe evolução dos indicadores.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <!-- ROI Section -->
-        <section style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); padding: 80px 40px; color: white;">
-            <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
-                <h2 style="font-size: 42px; margin-bottom: 30px;">
-                    <i class="fas fa-chart-line"></i> Retorno Sobre Investimento
-                </h2>
-                <p style="font-size: 20px; opacity: 0.95; margin-bottom: 50px; max-width: 800px; margin-left: auto; margin-right: auto;">
-                    Veja como empresas reduziram custos e melhoraram resultados com gestão inteligente de absenteísmo
-                </p>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-bottom: 50px;">
-                    <div style="background: rgba(255,255,255,0.15); padding: 30px; border-radius: 12px; backdrop-filter: blur(10px);">
-                        <div style="font-size: 48px; font-weight: 800; margin-bottom: 10px;">30-40%</div>
-                        <div style="font-size: 18px; opacity: 0.95;">Redução de custos no primeiro ano</div>
-                    </div>
-                    
-                    <div style="background: rgba(255,255,255,0.15); padding: 30px; border-radius: 12px; backdrop-filter: blur(10px);">
-                        <div style="font-size: 48px; font-weight: 800; margin-bottom: 10px;">3-6 meses</div>
-                        <div style="font-size: 18px; opacity: 0.95;">Tempo médio para ver resultados</div>
-                    </div>
-                    
-                    <div style="background: rgba(255,255,255,0.15); padding: 30px; border-radius: 12px; backdrop-filter: blur(10px);">
-                        <div style="font-size: 48px; font-weight: 800; margin-bottom: 10px;">R$ 3-5</div>
-                        <div style="font-size: 18px; opacity: 0.95;">Economizados para cada R$ 1 investido</div>
-                    </div>
-                </div>
-                
-                <div style="background: rgba(255,255,255,0.1); padding: 40px; border-radius: 12px; max-width: 800px; margin: 0 auto;">
-                    <h3 style="font-size: 28px; margin-bottom: 20px;">Exemplo Real de Economia</h3>
-                    <div style="text-align: left; display: grid; gap: 15px;">
-                        <div style="display: flex; justify-content: space-between; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                            <span><strong>Empresa com 200 funcionários:</strong></span>
-                            <span><strong>Antes:</strong> R$ 1.200.000/ano em custos</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                            <span><strong>Após implementação:</strong></span>
-                            <span><strong>R$ 720.000/ano</strong> (redução de 40%)</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; padding: 15px; background: rgba(76, 175, 80, 0.3); border-radius: 8px; font-size: 20px;">
-                            <span><strong>ECONOMIA ANUAL:</strong></span>
-                            <span style="color: #ffd700; font-weight: 800;">R$ 480.000</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <!-- CTA Section -->
-        <section style="background: #1a237e; padding: 80px 40px; text-align: center; color: white;">
-            <div style="max-width: 800px; margin: 0 auto;">
-                <h2 style="font-size: 42px; margin-bottom: 30px;">
-                    Não Deixe o Absenteísmo Drenar Seus Lucros
-                </h2>
-                <p style="font-size: 20px; opacity: 0.95; margin-bottom: 40px; line-height: 1.6;">
-                    Cada dia sem gestão adequada é dinheiro perdido. Comece hoje a transformar dados em economia e resultados.
-                </p>
-                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-                    <button onclick="abrirModalContato()" class="btn-landing btn-primary-landing" style="font-size: 20px; padding: 18px 40px; background: #ffd700; color: #1a237e; font-weight: 700;">
-                        <i class="fas fa-envelope"></i> Fale com o comercial
-                    </button>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Footer -->
-        <footer class="landing-footer">
-            <p>&copy; 2025 AbsenteismoController - GrupoBiomed. Todos os direitos reservados.</p>
-        </footer>
+<body class="bm-lp-body">
+  <header class="bm-lp-header">
+    <div class="bm-lp-brand">
+      <strong>BioMed</strong>
+      <span>Absenteísmo Controller</span>
     </div>
-    
-    <!-- Modal institucional de contato (FIT-04 Alt. A) — sem chamada a API -->
-    <div id="modalContato" class="modal-overlay">
-        <div class="modal-cadastro">
-            <button class="modal-close" onclick="fecharModalContato()">&times;</button>
-            <div class="modal-header">
-                <h2><i class="fas fa-envelope"></i> Contato comercial</h2>
-                <p>A landing pública não realiza cadastro automático de empresa.</p>
-            </div>
-            <div class="alert-modal alert-success show" style="display:block;margin-bottom:16px;">
-                <i class="fas fa-info-circle"></i>
-                <strong>Fale com o GrupoBioMed</strong><br>
-                Solicite demonstração ou contratação pelo canal comercial.
-                Empresas são provisionadas exclusivamente por administrador autenticado.
-            </div>
-            <p style="color:#555;line-height:1.5;margin-bottom:20px;">
-                Já é cliente? Use o botão <strong>Entrar</strong> para acessar o painel com suas credenciais.
-            </p>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                <a href="/login" class="btn-submit-cadastro" style="text-decoration:none;display:inline-block;text-align:center;">
-                    <i class="fas fa-sign-in-alt"></i> Ir para login
-                </a>
-                <button type="button" class="btn-landing btn-secondary-landing" onclick="fecharModalContato()">
-                    Fechar
-                </button>
-            </div>
-        </div>
+    <nav aria-label="Ações">
+      <a class="bm-lp-btn bm-lp-btn-ghost" href="#como">Conhecer a solução</a>
+      <button type="button" class="bm-lp-btn bm-lp-btn-ghost" onclick="abrirModalContato()">Contato comercial</button>
+      <a class="bm-lp-btn bm-lp-btn-primary" href="/login">Entrar</a>
+    </nav>
+  </header>
+
+  <section class="bm-lp-hero" aria-label="Abertura">
+    <div>
+      <p class="bm-lp-product">BioMed Absenteísmo Controller</p>
+      <h1>Inteligência para reduzir o impacto do absenteísmo.</h1>
+      <p>Indicadores, análise, impacto financeiro e apoio à decisão em uma única plataforma.</p>
+      <div class="bm-lp-cta">
+        <a class="bm-lp-btn bm-lp-btn-primary" href="/login">Entrar</a>
+        <a class="bm-lp-btn bm-lp-btn-ghost" href="#como">Conhecer a solução</a>
+        <button type="button" class="bm-lp-btn bm-lp-btn-ghost" onclick="abrirModalContato()">Contato comercial</button>
+      </div>
     </div>
-    
-    <script>
-        // FIT-04: landing institucional — sem cadastro automático via API
-        window.abrirModalContato = function() {
-            const modal = document.getElementById('modalContato');
-            if (modal) {
-                modal.classList.add('show');
-                document.body.style.overflow = 'hidden';
-            }
-        };
-        // Compatibilidade com referências antigas do markup
-        window.abrirModalCadastro = window.abrirModalContato;
+    <div class="bm-lp-hero-visual">
+      <img src="/static/img/executive/landing-hero.svg" alt="Executivo analisando indicadores" />
+    </div>
+  </section>
 
-        window.fecharModalContato = function() {
-            const modal = document.getElementById('modalContato');
-            if (modal) {
-                modal.classList.remove('show');
-                document.body.style.overflow = 'auto';
-            }
-        };
-        window.fecharModalCadastro = window.fecharModalContato;
+  <section class="bm-lp-section" id="como">
+    <h2>Como funciona</h2>
+    <div class="bm-lp-flow" aria-label="Fluxo">
+      <span>Dados</span><i aria-hidden="true">↓</i>
+      <span>Análise</span><i aria-hidden="true">↓</i>
+      <span>Evidências</span><i aria-hidden="true">↓</i>
+      <span>Decisão</span><i aria-hidden="true">↓</i>
+      <span>Plano de ação</span><i aria-hidden="true">↓</i>
+      <span>Resultados</span>
+    </div>
+  </section>
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const modal = document.getElementById('modalContato');
-            if (modal) {
-                modal.addEventListener('click', function(e) {
-                    if (e.target === this) {
-                        window.fecharModalContato();
-                    }
-                });
-            }
+  <section class="bm-lp-section" id="pilares">
+    <h2>Três pilares</h2>
+    <div class="bm-lp-pillars">
+      <article class="bm-lp-pillar">
+        <strong>ENTENDER</strong>
+        <p>Descubra onde o absenteísmo acontece.</p>
+      </article>
+      <article class="bm-lp-pillar">
+        <strong>DECIDIR</strong>
+        <p>Transforme dados em ações.</p>
+      </article>
+      <article class="bm-lp-pillar">
+        <strong>MEDIR</strong>
+        <p>Acompanhe o impacto financeiro.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="bm-lp-section" id="peek">
+    <h2>Centro executivo</h2>
+    <div class="bm-lp-peek">
+      <img src="/static/img/executive/bg-institutional.svg" alt="" />
+      <p class="bm-lp-peek-caption">Uma leitura executiva — sem expor o operacional completo.</p>
+    </div>
+  </section>
+
+  <section class="bm-lp-section bm-lp-close">
+    <p>Dados de saúde corporativa só geram valor quando ajudam alguém a decidir.</p>
+    <a class="bm-lp-btn bm-lp-btn-primary" href="/login">Entrar</a>
+  </section>
+
+  <footer class="bm-lp-foot">
+    BioMed · Absenteísmo Controller
+  </footer>
+
+  <!-- Modal institucional de contato (FIT-04) — sem chamada a API -->
+  <div id="modalContato" class="bm-lp-modal" hidden>
+    <div class="bm-lp-modal-card" role="dialog" aria-labelledby="bm-lp-contact-title">
+      <button type="button" class="bm-lp-modal-close" onclick="fecharModalContato()" aria-label="Fechar">&times;</button>
+      <h2 id="bm-lp-contact-title">Contato comercial</h2>
+      <p>A landing pública não realiza cadastro automático de empresa.</p>
+      <p><strong>Fale com o GrupoBioMed</strong> — solicite demonstração ou contratação pelo canal comercial. Empresas são provisionadas exclusivamente por administrador autenticado.</p>
+      <p>Já é cliente? Use <strong>Entrar</strong> para acessar a plataforma com suas credenciais.</p>
+      <div class="bm-lp-modal-actions">
+        <a class="bm-lp-btn bm-lp-btn-primary" href="/login">Ir para login</a>
+        <button type="button" class="bm-lp-btn bm-lp-btn-ghost" onclick="fecharModalContato()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.abrirModalContato = function () {
+      var modal = document.getElementById("modalContato");
+      if (!modal) return;
+      modal.hidden = false;
+      modal.classList.add("is-open");
+      document.body.style.overflow = "hidden";
+    };
+    window.abrirModalCadastro = window.abrirModalContato;
+    window.fecharModalContato = function () {
+      var modal = document.getElementById("modalContato");
+      if (!modal) return;
+      modal.hidden = true;
+      modal.classList.remove("is-open");
+      document.body.style.overflow = "";
+    };
+    window.fecharModalCadastro = window.fecharModalContato;
+    document.addEventListener("DOMContentLoaded", function () {
+      var modal = document.getElementById("modalContato");
+      if (modal) {
+        modal.addEventListener("click", function (e) {
+          if (e.target === modal) window.fecharModalContato();
         });
-    </script>
+      }
+    });
+  </script>
 </body>
 </html>
-

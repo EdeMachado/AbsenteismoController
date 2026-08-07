@@ -70,11 +70,12 @@ def test_api_pages_include_auth_js_before_app_js():
 
 
 def test_index_loads_auth_js_before_dashboard_js():
-    scripts = _script_srcs("index.html")
+    # RC-20: / is BioMed Hub; legacy dashboard lives at index-legacy.html (/dashboard).
+    scripts = _script_srcs("index-legacy.html")
     auth = _auth_index(scripts)
     dash = next(i for i, s in enumerate(scripts) if "dashboard.js" in s)
     assert auth < dash, (
-        f"index.html: auth.js must precede dashboard.js (scripts={scripts})"
+        f"index-legacy.html: auth.js must precede dashboard.js (scripts={scripts})"
     )
 
 

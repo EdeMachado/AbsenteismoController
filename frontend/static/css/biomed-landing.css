@@ -1,5 +1,5 @@
 /**
- * BioMed Landing Premium — RC-1.2A
+ * BioMed Landing Premium — production /landing (RC-20 Phase 1)
  */
 @import url("/static/css/biomed-identity.css");
 
@@ -233,6 +233,56 @@
   color: var(--bm-ink-faint);
   padding: 1rem;
   border-top: 1px solid var(--bm-border);
+}
+
+.bm-lp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(15, 32, 51, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+.bm-lp-modal[hidden] { display: none !important; }
+.bm-lp-modal-card {
+  position: relative;
+  background: #fff;
+  border-radius: 18px;
+  border: 1px solid var(--bm-border);
+  max-width: 440px;
+  width: 100%;
+  padding: 1.75rem 1.5rem 1.35rem;
+  box-shadow: 0 20px 48px rgba(19, 32, 51, 0.16);
+}
+.bm-lp-modal-card h2 {
+  margin: 0 0 0.65rem;
+  font-family: var(--bm-display);
+  color: var(--bm-brand);
+  font-size: 1.35rem;
+}
+.bm-lp-modal-card p {
+  margin: 0 0 0.75rem;
+  color: var(--bm-ink-muted);
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+.bm-lp-modal-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.75rem;
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: var(--bm-ink-muted);
+}
+.bm-lp-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
 }
 
 @media (max-width: 900px) {

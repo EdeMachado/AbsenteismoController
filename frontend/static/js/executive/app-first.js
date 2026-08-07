@@ -92,7 +92,21 @@
     }
   }
 
-  function showView(id) {
+  function viewHash(id) {
+    if (id === "evidence") return "#evidence";
+    if (id === "decision") return "#decision";
+    return "#first";
+  }
+
+  function currentViewId() {
+    const hash = (location.hash || "").replace("#", "");
+    if (hash === "evidence" || hash === "decision") return hash;
+    return "first";
+  }
+
+  /** Apply shell UI for a view. historyMode: push | replace | none */
+  function showView(id, historyMode) {
+    historyMode = historyMode || "replace";
     document.querySelectorAll(".bm-module").forEach(function (el) {
       el.classList.toggle("is-visible", el.id === id || el.dataset.module === id);
     });
@@ -109,38 +123,44 @@
       if (lede) lede.textContent = "Por que podemos confiar nesta recomendação.";
       if (navDec) navDec.hidden = false;
       if (navEv) navEv.hidden = false;
-      history.replaceState(null, "", "#evidence");
     } else if (id === "decision") {
       if (title) title.textContent = "Decisão";
       if (lede) lede.textContent = "O que fazer — impacto, caminho e próximo passo.";
       if (navDec) navDec.hidden = false;
       if (navEv) navEv.hidden = false;
-      history.replaceState(null, "", "#decision");
     } else {
       if (title) title.textContent = "Abertura executiva";
       if (lede) lede.textContent = "Estado, indicadores e uma decisão.";
       if (navDec) navDec.hidden = true;
       if (navEv) navEv.hidden = true;
-      history.replaceState(null, "", "#first");
+      id = "first";
+    }
+
+    const target = viewHash(id);
+    if (historyMode === "push" && location.hash !== target) {
+      history.pushState({ view: id }, "", target);
+    } else if (historyMode === "replace") {
+      history.replaceState({ view: id }, "", target);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
     focusMain();
   }
 
-  function openEvidenceIntelligence() {
+  function openEvidenceIntelligence(historyMode) {
     if (!lastPayload || !lastPayload.evidence_intelligence || !EI) {
       setStatus("Não há evidência suficiente para esta leitura.", true, true);
       return;
     }
     EI.render(document.getElementById("bm-evidence-intelligence"), lastPayload.evidence_intelligence, {
       onBack: function () {
-        openDecisionExperience();
+        // Evidence → Decision (never "/")
+        openDecisionExperience("replace");
       },
     });
-    showView("evidence");
+    showView("evidence", historyMode || "push");
   }
 
-  function openDecisionExperience() {
+  function openDecisionExperience(historyMode) {
     if (!lastPayload || !lastPayload.decision_experience || !DX) {
       setStatus("Não foi possível abrir esta decisão.", true, true);
       return;
@@ -149,11 +169,21 @@
       document.getElementById("bm-decision-experience"),
       lastPayload.decision_experience,
       function () {
-        showView("first");
+        // Decision → Abertura (never "/")
+        showView("first", "replace");
       },
-      openEvidenceIntelligence
+      function () {
+        openEvidenceIntelligence("push");
+      }
     );
-    showView("decision");
+    showView("decision", historyMode || "push");
+  }
+
+  function syncFromLocationHash(historyMode) {
+    const hash = (location.hash || "").replace("#", "");
+    if (hash === "evidence") openEvidenceIntelligence(historyMode || "none");
+    else if (hash === "decision") openDecisionExperience(historyMode || "none");
+    else showView("first", historyMode || "none");
   }
 
   function renderAll(payload) {
@@ -163,15 +193,10 @@
       setStatus("Dados insuficientes para esta análise.", true, true);
       return;
     }
-    FX.render(document.getElementById("bm-first-experience"), fx, openDecisionExperience);
-    const hash = (location.hash || "").replace("#", "");
-    if (hash === "evidence") {
-      openEvidenceIntelligence();
-    } else if (hash === "decision") {
-      openDecisionExperience();
-    } else {
-      showView("first");
-    }
+    FX.render(document.getElementById("bm-first-experience"), fx, function () {
+      openDecisionExperience("push");
+    });
+    syncFromLocationHash("replace");
   }
 
   async function load() {
@@ -203,46 +228,54 @@
     load();
   });
 
-  document.getElementById("bm-nav-toggle").addEventListener("click", function () {
-    const nav = document.getElementById("bm-nav");
-    const open = nav.classList.toggle("is-open");
-    this.setAttribute("aria-expanded", open ? "true" : "false");
-  });
+  var navToggle = document.getElementById("bm-nav-toggle");
+  if (navToggle) {
+    navToggle.addEventListener("click", function () {
+      const nav = document.getElementById("bm-nav");
+      if (!nav) return;
+      const open = nav.classList.toggle("is-open");
+      this.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
 
-  document.getElementById("bm-nav-first").addEventListener("click", function (e) {
-    e.preventDefault();
-    showView("first");
-  });
+  var navFirst = document.getElementById("bm-nav-first");
+  if (navFirst) {
+    navFirst.addEventListener("click", function (e) {
+      e.preventDefault();
+      showView("first", "push");
+    });
+  }
   const navDec = document.getElementById("bm-nav-decision");
   if (navDec) {
     navDec.addEventListener("click", function (e) {
       e.preventDefault();
-      openDecisionExperience();
+      openDecisionExperience("push");
     });
   }
   const navEv = document.getElementById("bm-nav-evidence");
   if (navEv) {
     navEv.addEventListener("click", function (e) {
       e.preventDefault();
-      openEvidenceIntelligence();
+      openEvidenceIntelligence("push");
     });
   }
 
   document.addEventListener("keydown", function (e) {
     if (e.key !== "Escape") return;
-    const hash = (location.hash || "").replace("#", "");
-    if (hash === "evidence") openDecisionExperience();
-    else if (hash === "decision") showView("first");
-    else showView("first");
+    const view = currentViewId();
+    // Escape never leaves Executive for "/"
+    if (view === "evidence") openDecisionExperience("replace");
+    else if (view === "decision") showView("first", "replace");
+  });
+
+  window.addEventListener("popstate", function () {
+    // Browser back: Evidence → Decision → Abertura; then leave only if history exits Executive
+    syncFromLocationHash("none");
   });
 
   window.addEventListener("hashchange", function () {
-    const hash = (location.hash || "").replace("#", "");
-    if (hash === "evidence") openEvidenceIntelligence();
-    else if (hash === "decision") openDecisionExperience();
-    else showView("first");
+    syncFromLocationHash("none");
   });
-
   (function initDates() {
     document.getElementById("periodo_inicio").value = "2026-01";
     document.getElementById("periodo_fim").value = "2026-03";

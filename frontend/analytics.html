@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analytics — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc21b" />
+</head>
+<body class="bm-plat-body" data-bm-shell="hub" data-bm-page="analytics">
+  <div id="bm-plat-content">
+    <section class="bm-plat-hub-hero">
+      <h1>Analytics</h1>
+      <p>Toda a inteligência operacional existente — organizada. Os gráficos e cálculos permanecem nas superfícies já validadas (sem recriação).</p>
+    </section>
+
+    <div class="bm-plat-cards" aria-label="Áreas de Analytics">
+      <a class="bm-plat-card" href="/dashboard">
+        <strong>Visão Geral</strong>
+        <span>Dashboard completo: KPIs, filtros, alertas e todos os gráficos legados.</span>
+      </a>
+      <a class="bm-plat-card" href="/comparativos">
+        <strong>Comparativos</strong>
+        <span>Período versus período com variações reais.</span>
+      </a>
+      <a class="bm-plat-card" href="/dados_powerbi">
+        <strong>Power BI / Dados</strong>
+        <span>Registros editáveis e leituras detalhadas.</span>
+      </a>
+      <a class="bm-plat-card" href="/dashboard_powerbi">
+        <strong>Dashboard Power BI</strong>
+        <span>Visão alternativa com filtros e indicadores.</span>
+      </a>
+      <a class="bm-plat-card" href="/produtividade">
+        <strong>Produtividade</strong>
+        <span>Consolidado mensal por categoria (fonte REAL).</span>
+      </a>
+      <a class="bm-plat-card" href="/dashboard#graficosConverplast">
+        <strong>Setores</strong>
+        <span>Gráficos de setores no dashboard (reutilizado).</span>
+      </a>
+      <a class="bm-plat-card" href="/dashboard#chartCids">
+        <strong>CID</strong>
+        <span>Pareto e médias de CID no dashboard (quando permitido pelos dados).</span>
+      </a>
+      <a class="bm-plat-card" href="/dashboard#chartEvolucao">
+        <strong>Tendências</strong>
+        <span>Evolução temporal no dashboard (reutilizado).</span>
+      </a>
+    </div>
+
+    <p class="bm-plat-hub-note">
+      SOURCE=REAL nas superfícies acima via APIs existentes. Nenhuma série ilustrativa é injetada aqui.
+    </p>
+  </div>
+  <script src="/static/js/biomed-platform-shell.js?v=rc21b"></script>
+  <script>
+    if (!localStorage.getItem("access_token")) {
+      location.href = "/login?next=" + encodeURIComponent("/analytics");
+    }
+  </script>
+</body>
+</html>

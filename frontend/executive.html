@@ -3,66 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BioMed Executive Intelligence</title>
-  <link rel="stylesheet" href="/static/css/biomed-executive.css?v=rc19fix02" />
+  <title>Executive — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-executive.css?v=rc21b" />
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc21b" />
 </head>
-<body class="bm-fx-body">
-  <div class="bm-shell bm-shell--first">
-    <aside class="bm-nav bm-nav--minimal" id="bm-nav" aria-label="Navegação executiva">
-      <button type="button" class="bm-nav-toggle" id="bm-nav-toggle" aria-expanded="false" aria-controls="bm-nav-links">Menu</button>
-      <div class="bm-brand">BioMed</div>
-      <div class="bm-brand-sub">Executive Intelligence<br />experiência experimental</div>
-      <nav id="bm-nav-links" class="bm-nav-links">
-        <a href="#first" class="is-active" data-module="first" id="bm-nav-first">Abertura</a>
-        <a href="#decision" data-module="decision" id="bm-nav-decision" hidden>Decisão</a>
-        <a href="#evidence" data-module="evidence" id="bm-nav-evidence" hidden>Evidência</a>
-      </nav>
-      <p class="bm-nav-foot">
-        Flag <code>ENABLE_EXECUTIVE_UI</code>. Experiência experimental.
-        <br /><a href="/">← Voltar ao operacional</a>
-      </p>
-    </aside>
-
-    <main class="bm-main bm-main--first" id="bm-main">
-      <header class="bm-topbar bm-topbar--first" id="bm-topbar">
-        <div>
-          <h1 class="bm-title" id="bm-page-title">Abertura executiva</h1>
-          <p class="bm-lede" id="bm-page-lede">Primeiros 30 segundos — estado, indicadores e uma decisão.</p>
+<body class="bm-fx-body" data-bm-shell="hub" data-bm-page="executive">
+  <div id="bm-plat-content">
+    <div class="bm-shell bm-shell--platform">
+      <!-- In-module steps only — platform nav lives in BioMed shell -->
+      <nav class="bm-fx-steps" id="bm-nav" aria-label="Etapas da Visão Executiva">
+        <div id="bm-nav-links" class="bm-fx-steps-links">
+          <a href="#first" class="is-active" data-module="first" id="bm-nav-first">Abertura</a>
+          <a href="#decision" data-module="decision" id="bm-nav-decision" hidden>Decisão</a>
+          <a href="#evidence" data-module="evidence" id="bm-nav-evidence" hidden>Evidências</a>
         </div>
-        <form class="bm-filters" id="bm-filters" aria-label="Filtros do período">
-          <div class="bm-field">
-            <label for="periodo_inicio">Início</label>
-            <input id="periodo_inicio" name="periodo_inicio" type="month" />
+      </nav>
+
+      <main class="bm-main bm-main--first" id="bm-main">
+        <header class="bm-topbar bm-topbar--first" id="bm-topbar">
+          <div>
+            <h1 class="bm-title" id="bm-page-title">Abertura executiva</h1>
+            <p class="bm-lede" id="bm-page-lede">Estado, indicadores e uma decisão.</p>
           </div>
-          <div class="bm-field">
-            <label for="periodo_fim">Fim</label>
-            <input id="periodo_fim" name="periodo_fim" type="month" />
-          </div>
-          <button type="submit" class="bm-btn">Atualizar</button>
-        </form>
-      </header>
+          <form class="bm-filters" id="bm-filters" aria-label="Filtros do período">
+            <div class="bm-field">
+              <label for="periodo_inicio">Início</label>
+              <input id="periodo_inicio" name="periodo_inicio" type="month" />
+            </div>
+            <div class="bm-field">
+              <label for="periodo_fim">Fim</label>
+              <input id="periodo_fim" name="periodo_fim" type="month" />
+            </div>
+            <button type="submit" class="bm-btn">Atualizar</button>
+          </form>
+        </header>
 
-      <div id="bm-status" class="bm-loading" role="status" aria-live="polite">Preparando leitura executiva…</div>
+        <div id="bm-status" class="bm-loading" role="status" aria-live="polite">Preparando leitura executiva…</div>
 
-      <section id="first" class="bm-module is-visible" data-module="first" aria-label="Primeira experiência executiva">
-        <div id="bm-first-experience"></div>
-      </section>
+        <section id="first" class="bm-module is-visible" data-module="first" aria-label="Primeira experiência executiva">
+          <div id="bm-first-experience"></div>
+        </section>
 
-      <!-- EXEC-09 — full Decision Experience (not a modal) -->
-      <section id="decision" class="bm-module" data-module="decision" aria-label="Executive Decision Experience">
-        <div id="bm-decision-experience"></div>
-      </section>
+        <section id="decision" class="bm-module" data-module="decision" aria-label="Executive Decision Experience">
+          <div id="bm-decision-experience"></div>
+        </section>
 
-      <!-- EXEC-10 — Evidence Intelligence (why trust the recommendation) -->
-      <section id="evidence" class="bm-module" data-module="evidence" aria-label="Evidence Intelligence">
-        <div id="bm-evidence-intelligence"></div>
-      </section>
-    </main>
+        <section id="evidence" class="bm-module" data-module="evidence" aria-label="Evidence Intelligence">
+          <div id="bm-evidence-intelligence"></div>
+        </section>
+      </main>
+    </div>
   </div>
 
-  <script src="/static/js/executive/first-experience.js?v=rc19fix02"></script>
-  <script src="/static/js/executive/decision-experience.js?v=rc19fix02"></script>
-  <script src="/static/js/executive/evidence-intelligence.js?v=rc19fix02"></script>
-  <script src="/static/js/executive/app-first.js?v=rc19fix02"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc21b"></script>
+  <script src="/static/js/executive/first-experience.js?v=rc21b"></script>
+  <script src="/static/js/executive/decision-experience.js?v=rc21b"></script>
+  <script src="/static/js/executive/evidence-intelligence.js?v=rc21b"></script>
+  <script src="/static/js/executive/app-first.js?v=rc21b"></script>
 </body>
 </html>

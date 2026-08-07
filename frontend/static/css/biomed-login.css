@@ -1,0 +1,122 @@
+/**
+ * BioMed Login — RC-20 Phase 1
+ */
+@import url("/static/css/biomed-identity.css");
+
+.bm-login-body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--bm-font, "BM Sans", system-ui, sans-serif);
+  color: var(--bm-ink, #132033);
+  background:
+    radial-gradient(900px 420px at 15% -10%, rgba(15, 74, 110, 0.08), transparent 55%),
+    radial-gradient(700px 360px at 95% 10%, rgba(42, 107, 90, 0.06), transparent 50%),
+    linear-gradient(180deg, #f4f6f8 0%, #f7f6f3 50%, #eef1f4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.bm-login-shell { width: 100%; max-width: 420px; position: relative; }
+.bm-login-back {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--bm-brand, #1a4566);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.bm-login-card {
+  background: #fff;
+  border: 1px solid var(--bm-border, #d8dee8);
+  border-radius: 20px;
+  padding: 2rem 1.75rem 1.5rem;
+  box-shadow: 0 1px 2px rgba(19, 32, 51, 0.04), 0 18px 40px rgba(19, 32, 51, 0.08);
+}
+.bm-login-brand {
+  margin: 0 0 0.35rem;
+  font-family: var(--bm-display, "BM Display", Georgia, serif);
+  font-size: 1.45rem;
+  font-weight: 650;
+  color: var(--bm-brand, #1a4566);
+  letter-spacing: -0.02em;
+}
+.bm-login-header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.bm-login-sub {
+  margin: 0 0 1.5rem;
+  color: var(--bm-ink-muted, #5a6474);
+  font-size: 0.92rem;
+}
+.bm-login-field {
+  display: block;
+  margin-bottom: 1rem;
+}
+.bm-login-field span {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--bm-ink, #132033);
+}
+.bm-login-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--bm-border, #d8dee8);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #fff;
+}
+.bm-login-field input:focus {
+  outline: none;
+  border-color: var(--bm-brand, #1a4566);
+  box-shadow: 0 0 0 3px rgba(26, 69, 102, 0.12);
+}
+.bm-login-pass { position: relative; }
+.bm-login-pass input { padding-right: 5rem; }
+.bm-login-toggle {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--bm-ink-muted, #5a6474);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bm-login-submit {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.9rem 1rem;
+  border: none;
+  border-radius: 12px;
+  background: var(--bm-brand, #1a4566);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 650;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bm-login-submit:disabled { opacity: 0.7; cursor: wait; }
+.bm-login-foot {
+  margin: 1.25rem 0 0;
+  text-align: center;
+  font-size: 0.88rem;
+}
+.bm-login-foot a { color: var(--bm-brand, #1a4566); text-decoration: none; font-weight: 600; }
+.bm-login-alert {
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+.bm-login-alert.is-error { background: #fef2f2; color: #991b1b; }
+.bm-login-alert.is-success { background: #ecfdf5; color: #065f46; }

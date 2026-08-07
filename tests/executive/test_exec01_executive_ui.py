@@ -164,7 +164,11 @@ def test_executive_html_responsive_and_modules():
     assert 'id="first"' in html
     assert "bm-first-experience" in html
     assert "first-experience.js" in html
-    assert "ENABLE_EXECUTIVE_UI" in html
+    # RC-21B: platform shell owns Início; Executive keeps in-module steps only
+    assert "bm-fx-steps" in html or 'data-bm-shell="hub"' in html
+    assert "Voltar ao sistema" not in html
+    assert "ENABLE_EXECUTIVE_UI" not in html
+    assert "experiência experimental" not in html.lower()
     assert "biomed-executive.css" in html
     assert 'data-theme="dark"' not in html
 
