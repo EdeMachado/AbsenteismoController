@@ -4,155 +4,78 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BioMed Platform</title>
-  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc24" />
-  <link rel="stylesheet" href="/static/css/biomed-experience.css?v=rc24" data-bm-exp="1" />
-  <link rel="stylesheet" href="/static/css/biomed-polish.css?v=rc24" data-bm-polish="1" />
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
 </head>
-<body class="bm-plat-body" data-bm-shell="hub" data-bm-page="home">
-  <div id="bm-plat-content">
-    <section class="bm-plat-hub-hero" aria-label="Início">
-      <h1>BioMed Platform</h1>
-      <p>Uma experiência única: visão executiva, analytics e operação — com a empresa ativa no contexto.</p>
-      <p class="bm-plat-hub-company" id="bm-hub-company">Empresa ativa: —</p>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="home" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core">
+    <section class="bc-hello">
+      <h1 id="bc-hello">Olá</h1>
+      <p id="bc-hello-sub">Bem-vindo à BioMed Platform.</p>
     </section>
 
-    <p class="bm-plat-section-title">Indicadores rápidos</p>
-    <div class="bm-plat-kpis" id="bm-hub-kpis" aria-live="polite">
-      <div class="bm-plat-kpi"><small>Dias perdidos</small><strong id="kpi-dias" class="bm-plat-kpi-empty">—</strong></div>
-      <div class="bm-plat-kpi"><small>Horas perdidas</small><strong id="kpi-horas" class="bm-plat-kpi-empty">—</strong></div>
-      <div class="bm-plat-kpi"><small>Alertas</small><strong id="kpi-alertas" class="bm-plat-kpi-empty">—</strong></div>
-      <div class="bm-plat-kpi"><small>Fonte</small><strong id="kpi-source" class="bm-plat-kpi-empty">—</strong></div>
+    <div class="bc-header-meta" style="margin-bottom:1.5rem">
+      <span class="bc-chip is-brand" id="bc-company">Empresa</span>
+      <span class="bc-chip" id="bc-period">Período: dados disponíveis</span>
     </div>
 
-    <p class="bm-plat-section-title">Resumo executivo</p>
-    <div class="bm-plat-activity" id="bm-hub-summary">
-      <p class="bm-plat-empty" id="bm-hub-summary-text">Carregando resumo da empresa ativa…</p>
-      <p style="margin:0.75rem 0 0"><a href="/executive">Abrir Executive</a></p>
-    </div>
+    <section class="bc-section" data-source="/api/dashboard#metricas">
+      <div class="bc-section-head">
+        <h2>Resumo do período</h2>
+        <p>Indicadores da empresa ativa — sem repetir o dashboard completo</p>
+      </div>
+      <div class="bc-metrics" id="bc-home-metrics">
+        <div class="bc-metric"><small>Dias perdidos</small><strong id="h-dias">—</strong></div>
+        <div class="bc-metric"><small>Horas perdidas</small><strong id="h-horas">—</strong></div>
+        <div class="bc-metric"><small>Atestados</small><strong id="h-atest">—</strong></div>
+        <div class="bc-metric"><small>Colaboradores</small><strong id="h-colab">—</strong></div>
+      </div>
+    </section>
 
-    <p class="bm-plat-section-title">Acesso aos módulos</p>
-    <div class="bm-plat-cards" aria-label="Módulos">
-      <a class="bm-plat-card" href="/executive"><strong>Executive</strong><span>Narrativa, KPIs e decisão.</span></a>
-      <a class="bm-plat-card" href="/analytics"><strong>Analytics</strong><span>Visão geral, comparativos, Power BI, produtividade.</span></a>
-      <a class="bm-plat-card" href="/dashboard"><strong>Visão Geral</strong><span>Dashboard operacional completo (gráficos reais).</span></a>
-      <a class="bm-plat-card" href="/clientes"><strong>Operação</strong><span>Clientes, uploads e funcionários.</span></a>
-      <a class="bm-plat-card" href="/apresentacao"><strong>Apresentações</strong><span>Deck operacional existente.</span></a>
-      <a class="bm-plat-card" href="/configuracoes"><strong>Configurações</strong><span>Preferências e administração.</span></a>
-    </div>
+    <section class="bc-section">
+      <div class="bc-section-head">
+        <h2>Entrar nos módulos</h2>
+        <p>Atalhos — Home não repete o dashboard completo</p>
+      </div>
+      <div class="bc-entry-grid">
+        <a class="bc-entry" href="/executive"><strong>Executive</strong><span>Narrativa e decisão para liderança.</span></a>
+        <a class="bc-entry" href="/analytics"><strong>Analytics</strong><span>Evolução, causas, setores e impacto.</span></a>
+        <a class="bc-entry" href="/clientes"><strong>Operação</strong><span>Empresas, uploads e colaboradores.</span></a>
+        <a class="bc-entry" href="/apresentacao"><strong>Apresentação</strong><span>Deck para reunião com dados reais.</span></a>
+      </div>
+    </section>
 
-    <p class="bm-plat-section-title">Atividades recentes</p>
-    <div class="bm-plat-activity">
-      <ul id="bm-hub-activity" style="list-style:none;padding:0;margin:0"></ul>
-      <p class="bm-plat-empty" id="bm-hub-activity-empty">Nenhuma atividade recente carregada.</p>
-    </div>
+    <section class="bc-section" data-source="/api/alertas">
+      <div class="bc-section-head">
+        <h2>Alertas relevantes</h2>
+        <p>Sinais que merecem atenção agora</p>
+      </div>
+      <div class="bc-card" id="bc-alerts">
+        <div class="bc-loading"><strong>Carregando</strong>Buscando alertas…</div>
+      </div>
+    </section>
 
-    <p class="bm-plat-hub-note">
-      Fichas digitais e Presentation Premium permanecem desabilitadas. Indicadores usam APIs reais existentes (SOURCE=REAL quando disponíveis).
-    </p>
+    <section class="bc-section" data-source="/api/uploads">
+      <div class="bc-section-head">
+        <h2>Atividades recentes</h2>
+        <p>Últimos processamentos da empresa</p>
+      </div>
+      <div class="bc-table-wrap">
+        <table class="bc-table">
+          <thead>
+            <tr><th>Arquivo</th><th>Referência</th><th>Registros</th><th>Quando</th></tr>
+          </thead>
+          <tbody id="bc-activity-body">
+            <tr><td colspan="4">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
-  <script src="/static/js/biomed-platform-shell.js?v=rc24"></script>
-  <script>
-    (function () {
-      if (!localStorage.getItem("access_token")) {
-        location.href = "/login?next=" + encodeURIComponent("/");
-        return;
-      }
 
-      function company() {
-        try {
-          var nome = localStorage.getItem("cliente_selecionado_nome") || localStorage.getItem("cliente_nome");
-          var id = localStorage.getItem("cliente_selecionado");
-          return nome ? nome : id ? "#" + id : null;
-        } catch (e) {
-          return null;
-        }
-      }
-
-      var el = document.getElementById("bm-hub-company");
-      var c = company();
-      el.textContent = c
-        ? "Empresa ativa: " + c
-        : "Empresa ativa: nenhuma selecionada — escolha em Operação.";
-
-      var token = localStorage.getItem("access_token");
-      var headers = { Accept: "application/json", Authorization: "Bearer " + token };
-      var clientId = localStorage.getItem("cliente_selecionado");
-
-      function setKpi(id, value, empty) {
-        var node = document.getElementById(id);
-        if (!node) return;
-        if (value == null || value === "") {
-          node.textContent = empty || "Indisponível";
-          node.classList.add("bm-plat-kpi-empty");
-        } else {
-          node.textContent = value;
-          node.classList.remove("bm-plat-kpi-empty");
-        }
-      }
-
-      // REAL sources only — never invent numbers. /api/dashboard requires client_id.
-      var dashUrl = clientId ? ("/api/dashboard?client_id=" + encodeURIComponent(clientId)) : null;
-      var alertUrl = clientId ? ("/api/alertas?client_id=" + encodeURIComponent(clientId)) : "/api/alertas";
-
-      Promise.all([
-        dashUrl
-          ? fetch(dashUrl, { headers: headers }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-          : Promise.resolve(null),
-        fetch(alertUrl, { headers: headers }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-        fetch("/api/uploads", { headers: headers }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      ]).then(function (parts) {
-        var dash = parts[0];
-        var alerts = parts[1];
-        var uploads = parts[2];
-        var used = false;
-
-        if (dash) {
-          var dias = dash.total_dias_perdidos != null ? dash.total_dias_perdidos
-            : (dash.dias_perdidos != null ? dash.dias_perdidos : (dash.metricas && dash.metricas.total_dias_perdidos));
-          var horas = dash.total_horas_perdidas != null ? dash.total_horas_perdidas
-            : (dash.horas_perdidas != null ? dash.horas_perdidas : (dash.metricas && dash.metricas.total_horas_perdidas));
-          if (dias != null) { setKpi("kpi-dias", String(dias)); used = true; }
-          else setKpi("kpi-dias", null);
-          if (horas != null) { setKpi("kpi-horas", String(horas)); used = true; }
-          else setKpi("kpi-horas", null);
-          var summary = document.getElementById("bm-hub-summary-text");
-          if (summary) {
-            summary.textContent = used
-              ? "Resumo da empresa ativa a partir do dashboard operacional (SOURCE=REAL). Abra Executive para narrativa e decisão."
-              : "Dashboard respondeu sem KPIs agregados para o período atual. Abra Analytics → Visão Geral ou selecione empresa.";
-            summary.className = "";
-          }
-        } else {
-          setKpi("kpi-dias", null);
-          setKpi("kpi-horas", null);
-          var s = document.getElementById("bm-hub-summary-text");
-          if (s) {
-            s.textContent = "Não foi possível carregar o resumo (sessão, permissão ou empresa). SOURCE=NOT_AVAILABLE neste momento.";
-          }
-        }
-
-        var alertItems = Array.isArray(alerts) ? alerts : (alerts && alerts.items) || [];
-        setKpi("kpi-alertas", alertItems.length != null ? String(alertItems.length) : null);
-        setKpi("kpi-source", used ? "REAL" : "NOT_AVAILABLE");
-
-        var list = document.getElementById("bm-hub-activity");
-        var empty = document.getElementById("bm-hub-activity-empty");
-        var rows = [];
-        alertItems.slice(0, 5).forEach(function (a) {
-          rows.push("<li>" + (a.titulo || a.title || a.mensagem || a.message || "Alerta") + "</li>");
-        });
-        var ups = Array.isArray(uploads) ? uploads : (uploads && uploads.items) || [];
-        ups.slice(0, 3).forEach(function (u) {
-          rows.push("<li>Upload: " + (u.nome_arquivo || u.arquivo || u.filename || "arquivo") + "</li>");
-        });
-        if (rows.length) {
-          list.innerHTML = rows.join("");
-          if (empty) empty.hidden = true;
-        } else if (empty) {
-          empty.textContent = "Sem alertas ou uploads recentes para exibir.";
-        }
-      });
-    })();
-  </script>
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/home-core.js?v=rc25"></script>
 </body>
 </html>

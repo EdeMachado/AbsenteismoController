@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Comparativos — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="comparativos-core" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core">
+    <header class="bc-header">
+      <div>
+        <h1>Comparativos</h1>
+        <p class="bc-sub">Período versus período com a API de relatórios existente.</p>
+      </div>
+      <span class="bc-chip is-brand" id="bc-company">Empresa</span>
+    </header>
+
+    <div class="bc-filters">
+      <div class="bc-field"><label>P1 início</label><input type="month" id="p1i" /></div>
+      <div class="bc-field"><label>P1 fim</label><input type="month" id="p1f" /></div>
+      <div class="bc-field"><label>P2 início</label><input type="month" id="p2i" /></div>
+      <div class="bc-field"><label>P2 fim</label><input type="month" id="p2f" /></div>
+      <button type="button" class="bc-btn" id="bc-run">Comparar</button>
+    </div>
+
+    <div class="bc-metrics" id="bc-metrics">
+      <div class="bc-metric"><small>Dias P1</small><strong id="c-d1">—</strong></div>
+      <div class="bc-metric"><small>Dias P2</small><strong id="c-d2">—</strong></div>
+      <div class="bc-metric"><small>Variação dias</small><strong id="c-dv">—</strong></div>
+      <div class="bc-metric"><small>Atestados P1</small><strong id="c-a1">—</strong></div>
+      <div class="bc-metric"><small>Atestados P2</small><strong id="c-a2">—</strong></div>
+      <div class="bc-metric"><small>Variação atestados</small><strong id="c-av">—</strong></div>
+    </div>
+
+    <div class="bc-card">
+      <h3>Comparativo visual</h3>
+      <p class="bc-card-sub">Dias e atestados entre os períodos escolhidos</p>
+      <div class="bc-chart is-tall"><canvas id="chartComp"></canvas></div>
+    </div>
+  </div>
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/comparativos-core.js?v=rc25"></script>
+</body>
+</html>

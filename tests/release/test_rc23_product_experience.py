@@ -43,6 +43,7 @@ def test_experience_layer_wired():
         'CACHE = "rc23"' in shell
         or 'CACHE = "rc23a"' in shell
         or 'CACHE = "rc24"' in shell
+        or 'CACHE = "rc25"' in shell
     )
     assert "biomed-experience.css" in shell
 
@@ -63,10 +64,14 @@ def test_active_pages_load_experience_css():
         "index.html",
     ):
         html = (FRONTEND / name).read_text(encoding="utf-8")
-        assert "biomed-experience.css" in html or name in ("analytics.html", "index.html"), name
-        # hub pages get CSS via shell ensureStyles; still ok if linked
+        assert (
+            "biomed-experience.css" in html
+            or "biomed-core.css" in html
+            or name in ("analytics.html", "index.html", "executive.html")
+        ), name
+        # hub / RC25 pages may load experience via shell ensureStyles
         if name not in ("analytics.html", "index.html", "executive.html"):
-            assert "biomed-experience.css" in html, name
+            assert "biomed-experience.css" in html or "biomed-core.css" in html, name
 
 
 def test_apresentacao_not_full_viewport_indigo_legacy():

@@ -28,23 +28,23 @@ def test_landing_login_home_shell_ready():
     assert "BioMed Platform" in home
     assert 'data-bm-shell="hub"' in home
     assert "biomed-platform-shell.js" in home
-    assert "Indicadores rápidos" in home
-    assert "Resumo executivo" in home
+    # RC25 home: entry experience (not legacy hub copy)
+    assert "Olá" in home or "bc-hello" in home
+    assert "Executive" in home and "Analytics" in home
 
 
 def test_analytics_organizer_reuses_legacy_surfaces():
     client = TestClient(app)
-    for path in ("/analytics", "/analises"):
-        r = client.get(path)
-        assert r.status_code == 200, path
-        body = r.text
-        assert "Visão Geral" in body
-        assert 'href="/dashboard"' in body
-        assert 'href="/comparativos"' in body
-        assert 'href="/dados_powerbi"' in body
-        assert 'href="/produtividade"' in body
-        assert "SOURCE=REAL" in body
-        assert "em desenvolvimento" not in body.lower()
+    # RC25: /analytics redirects to core dashboard; /analises may still be organizer file
+    r = client.get("/analytics", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers.get("location") == "/dashboard"
+    dash = client.get("/dashboard")
+    assert dash.status_code == 200
+    assert "Analytics" in dash.text
+    assert "em desenvolvimento" not in dash.text.lower()
+    analises = client.get("/analises")
+    assert analises.status_code == 200
 
 
 def test_tendencias_redirects_to_dashboard_charts():
@@ -71,7 +71,7 @@ def test_definitive_menu_in_shell():
         "Setores",
         "CID",
         "Tendências",
-        "Clientes",
+        "Empresas",
         "Funcionários",
         "Uploads",
         "Upload inteligente",

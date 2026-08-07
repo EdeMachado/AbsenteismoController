@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apresentação — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body.bm-core-body:has(.bc-deck) .bm-plat-crumb,
+    body.bm-core-body:has(.bc-deck) .bm-plat-foot { display: none !important; }
+    body.bm-core-body:has(.bc-deck) .bm-plat-main { padding: 0 !important; }
+  </style>
+</head>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="apresentacao-core" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core" style="padding:0">
+    <div class="bc-deck" id="bc-deck">
+      <div class="bc-deck-stage" id="bc-stage">
+        <div class="bc-loading" style="color:#fff"><strong>Carregando deck</strong>Montando slides com dados reais…</div>
+      </div>
+      <div class="bc-deck-controls">
+        <button type="button" class="bc-btn bc-btn-secondary" id="bc-prev">Anterior</button>
+        <span class="bc-chip" id="bc-indicator" style="background:rgba(255,255,255,0.08);color:#fff;border-color:rgba(255,255,255,0.2)">— / —</span>
+        <button type="button" class="bc-btn" id="bc-next" style="background:#2a6b5a;border-color:#2a6b5a">Próximo</button>
+        <button type="button" class="bc-btn bc-btn-secondary" id="bc-fs">Tela cheia</button>
+        <a class="bc-btn bc-btn-ghost" href="/" style="color:#fff">Sair</a>
+      </div>
+    </div>
+  </div>
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/apresentacao-core.js?v=rc25"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Funcionários — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
+</head>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="funcionarios-core" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core">
+    <header class="bc-header">
+      <div>
+        <h1>Funcionários</h1>
+        <p class="bc-sub">Listagem limpa a partir dos registros reais de absenteísmo.</p>
+      </div>
+      <span class="bc-chip is-brand" id="bc-company">Empresa</span>
+    </header>
+
+    <div class="bc-filters">
+      <div class="bc-field bc-search" style="flex:2">
+        <label for="bc-q">Busca</label>
+        <input id="bc-q" type="search" placeholder="Nome do colaborador" />
+      </div>
+      <div class="bc-field">
+        <label for="bc-setor">Setor</label>
+        <select id="bc-setor"><option value="">Todos</option></select>
+      </div>
+    </div>
+
+    <div class="bc-metrics" data-source="/api/dados/todos">
+      <div class="bc-metric"><small>Colaboradores</small><strong id="f-total">—</strong></div>
+      <div class="bc-metric"><small>Atestados (soma)</small><strong id="f-atest">—</strong></div>
+      <div class="bc-metric"><small>Dias (soma)</small><strong id="f-dias">—</strong></div>
+    </div>
+
+    <div class="bc-table-wrap">
+      <table class="bc-table">
+        <thead>
+          <tr>
+            <th>Colaborador</th>
+            <th>Setor</th>
+            <th>Atestados</th>
+            <th>Dias</th>
+            <th>Horas</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="bc-body"><tr><td colspan="6">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/funcionarios-core.js?v=rc25"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analytics — BioMed Platform</title>
+  <link rel="stylesheet" href="/static/css/biomed-platform.css?v=rc25" data-bm-plat="1" />
+  <link rel="stylesheet" href="/static/css/biomed-core.css?v=rc25" data-bm-core="1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="bm-plat-body bm-core-body" data-bm-shell="hub" data-bm-page="analytics-core" data-bm-rc25="1">
+  <div id="bm-plat-content" class="bm-core">
+    <header class="bc-header">
+      <div>
+        <h1>Analytics</h1>
+        <p class="bc-sub">Leitura operacional do absenteísmo — composição nova sobre a mesma base de dados.</p>
+      </div>
+      <div class="bc-header-meta">
+        <span class="bc-chip is-brand" id="bc-company">Empresa</span>
+        <button type="button" class="bc-btn bc-btn-secondary" id="bc-reload">Atualizar</button>
+      </div>
+    </header>
+
+    <div class="bc-filters" id="bc-filters">
+      <div class="bc-field">
+        <label for="mesInicio">Período início</label>
+        <input type="month" id="mesInicio" />
+      </div>
+      <div class="bc-field">
+        <label for="mesFim">Período fim</label>
+        <input type="month" id="mesFim" />
+      </div>
+      <button type="button" class="bc-btn" id="bc-apply">Aplicar filtros</button>
+    </div>
+
+    <div class="bc-metrics" id="bc-metrics" aria-live="polite" data-source="/api/dashboard#metricas">
+      <div class="bc-metric" data-field="funcionarios_afetados"><small>Colaboradores afetados</small><strong id="m-colab">—</strong></div>
+      <div class="bc-metric" data-field="total_atestados"><small>Atestados</small><strong id="m-atest">—</strong></div>
+      <div class="bc-metric" data-field="total_dias_perdidos"><small>Dias perdidos</small><strong id="m-dias">—</strong></div>
+      <div class="bc-metric" data-field="total_horas_perdidas"><small>Horas perdidas</small><strong id="m-horas">—</strong></div>
+      <div class="bc-metric" data-field="frequencia"><small>Frequência</small><strong id="m-freq">—</strong></div>
+      <div class="bc-metric" data-field="duracao_media"><small>Duração média</small><strong id="m-dur">—</strong></div>
+      <div class="bc-metric" data-field="custo_estimado" id="m-custo-wrap" hidden><small>Custo estimado</small><strong id="m-custo">—</strong></div>
+    </div>
+
+    <section class="bc-section" data-source="evolucao_mensal">
+      <div class="bc-section-head">
+        <h2>Evolução do absenteísmo</h2>
+        <p>Tendência mensal de dias e atestados</p>
+      </div>
+      <div class="bc-card">
+        <div class="bc-chart is-tall"><canvas id="chartEvolucao"></canvas></div>
+        <div class="bc-empty" id="empty-evolucao" hidden><strong>Sem evolução</strong>Não há série mensal para o período.</div>
+      </div>
+    </section>
+
+    <section class="bc-section">
+      <div class="bc-section-head">
+        <h2>Onde está o problema</h2>
+        <p>Concentração por setor, centro de custo e escalas</p>
+      </div>
+      <div class="bc-grid-2">
+        <div class="bc-card" data-source="top_setores">
+          <h3>Setores</h3>
+          <p class="bc-card-sub">Áreas com maior volume</p>
+          <div class="bc-chart"><canvas id="chartSetores"></canvas></div>
+        </div>
+        <div class="bc-card" data-source="dias_centro_custo">
+          <h3>Centros de custo</h3>
+          <p class="bc-card-sub">Dias perdidos por centro</p>
+          <div class="bc-chart"><canvas id="chartCentro"></canvas></div>
+        </div>
+      </div>
+      <div class="bc-card" style="margin-top:var(--bc-gap)" data-source="top_escalas">
+        <h3>Escalas / turnos</h3>
+        <p class="bc-card-sub">Dimensão operacional disponível na base (proxy de cargos quando o campo não existe)</p>
+        <div class="bc-chart"><canvas id="chartEscalas"></canvas></div>
+        <div class="bc-empty" id="empty-escalas" hidden><strong>Sem escalas</strong>Campo não preenchido nesta empresa.</div>
+      </div>
+    </section>
+
+    <section class="bc-section">
+      <div class="bc-section-head">
+        <h2>Principais causas</h2>
+        <p>CID, diagnósticos e motivos</p>
+      </div>
+      <div class="bc-grid-2">
+        <div class="bc-card" data-source="top_cids">
+          <h3>CID / doenças</h3>
+          <p class="bc-card-sub">Principais diagnósticos</p>
+          <div class="bc-chart"><canvas id="chartCids"></canvas></div>
+        </div>
+        <div class="bc-card" data-source="top_motivos">
+          <h3>Motivos</h3>
+          <p class="bc-card-sub">Classificação do afastamento</p>
+          <div class="bc-chart"><canvas id="chartMotivos"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bc-section">
+      <div class="bc-section-head">
+        <h2>Padrões</h2>
+        <p>Distribuição, recorrência e sazonalidade</p>
+      </div>
+      <div class="bc-grid-2">
+        <div class="bc-card" data-source="distribuicao_dias">
+          <h3>Distribuição de dias</h3>
+          <p class="bc-card-sub">Faixas de duração do atestado</p>
+          <div class="bc-chart"><canvas id="chartDias"></canvas></div>
+        </div>
+        <div class="bc-card" data-source="frequencia_atestados">
+          <h3>Recorrência</h3>
+          <p class="bc-card-sub">Colaboradores com mais eventos</p>
+          <div class="bc-chart"><canvas id="chartRecorrencia"></canvas></div>
+        </div>
+      </div>
+      <div class="bc-grid-2" style="margin-top:var(--bc-gap)">
+        <div class="bc-card" data-source="distribuicao_genero">
+          <h3>Gênero</h3>
+          <p class="bc-card-sub">Participação por gênero</p>
+          <div class="bc-chart"><canvas id="chartGenero"></canvas></div>
+        </div>
+        <div class="bc-card" data-source="evolucao_mensal">
+          <h3>Sazonalidade</h3>
+          <p class="bc-card-sub">Atestados por mês</p>
+          <div class="bc-chart"><canvas id="chartSazonal"></canvas></div>
+        </div>
+      </div>
+      <div class="bc-card" style="margin-top:var(--bc-gap)" data-source="heatmap_setores_meses">
+        <h3>Heatmap — setores × meses</h3>
+        <p class="bc-card-sub">Intensidade de dias perdidos</p>
+        <div class="bc-heatmap-wrap" id="heatmapRoot"></div>
+        <div class="bc-empty" id="empty-heatmap" hidden><strong>Sem heatmap</strong>Sem matriz para o período.</div>
+      </div>
+    </section>
+
+    <section class="bc-section" data-source="produtividade">
+      <div class="bc-section-head">
+        <h2>Produtividade / impacto</h2>
+        <p>Consolidado de produtividade quando disponível na resposta</p>
+      </div>
+      <div class="bc-card">
+        <div class="bc-chart"><canvas id="chartProd"></canvas></div>
+        <div class="bc-empty" id="empty-prod" hidden><strong>Sem produtividade</strong>Não há consolidado no período.</div>
+      </div>
+    </section>
+
+    <p class="bc-empty" id="bc-global-empty" hidden>
+      <strong>Selecione uma empresa</strong>
+      Escolha a empresa em Operação · Empresas para carregar analytics reais.
+    </p>
+  </div>
+
+  <script src="/static/js/auth.js?v=rc25"></script>
+  <script src="/static/js/biomed-platform-shell.js?v=rc25"></script>
+  <script src="/static/js/biomed-core.js?v=rc25"></script>
+  <script src="/static/js/analytics-core.js?v=rc25"></script>
+</body>
+</html>

@@ -582,8 +582,18 @@ async def index_html():
         return HTMLResponse(content=f.read())
 
 @app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page():
+    """RC-25: Analytics core redesign (new DOM). Same /api/dashboard data."""
+    file_path = os.path.join(FRONTEND_DIR, "analytics-core.html")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Arquivo analytics-core.html não encontrado")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/dashboard-legacy", response_class=HTMLResponse)
 async def dashboard_legacy_page():
-    """Dashboard operacional legado (preservado; acessível pela shell)."""
+    """Dashboard operacional legado (preservado para regressão de métricas)."""
     file_path = os.path.join(FRONTEND_DIR, "index-legacy.html")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Arquivo index-legacy.html não encontrado")
@@ -592,8 +602,8 @@ async def dashboard_legacy_page():
 
 @app.get("/upload", response_class=HTMLResponse)
 async def upload_page():
-    """Página de upload"""
-    file_path = os.path.join(FRONTEND_DIR, "upload.html")
+    """RC-25: Upload core redesign."""
+    file_path = os.path.join(FRONTEND_DIR, "upload-core.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
@@ -719,14 +729,13 @@ async def analises_page():
 
 @app.get("/analytics", response_class=HTMLResponse)
 async def analytics_page():
-    """BioMed Analytics organizer — links to existing REAL surfaces."""
-    file_path = os.path.join(FRONTEND_DIR, "analytics.html")
-    with open(file_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+    """RC-25: Analytics core is the product surface (alias of /dashboard)."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard", status_code=302)
 
 @app.get("/tendencias", response_class=HTMLResponse)
 async def tendencias_page():
-    """RC-21: redirect stub to dashboard evolução (reuse charts)."""
+    """RC-25: redirect to Analytics evolução section."""
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/dashboard#chartEvolucao", status_code=302)
 # Rota de relatórios removida - exportação agora está na apresentação
@@ -739,22 +748,22 @@ async def tendencias_page():
 
 @app.get("/apresentacao", response_class=HTMLResponse)
 async def apresentacao_page():
-    """Página de apresentação"""
-    file_path = os.path.join(FRONTEND_DIR, "apresentacao.html")
+    """RC-25: Apresentação core redesign (not Presentation Premium)."""
+    file_path = os.path.join(FRONTEND_DIR, "apresentacao-core.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/funcionarios", response_class=HTMLResponse)
 async def funcionarios_page():
-    """Página de funcionários"""
-    file_path = os.path.join(FRONTEND_DIR, "funcionarios.html")
+    """RC-25: Funcionários core redesign."""
+    file_path = os.path.join(FRONTEND_DIR, "funcionarios-core.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 @app.get("/comparativos", response_class=HTMLResponse)
 async def comparativos_page():
-    """Página de comparativos"""
-    file_path = os.path.join(FRONTEND_DIR, "comparativos.html")
+    """RC-25: Comparativos core redesign."""
+    file_path = os.path.join(FRONTEND_DIR, "comparativos-core.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
@@ -768,8 +777,8 @@ async def dados_powerbi_page():
 
 @app.get("/produtividade", response_class=HTMLResponse)
 async def produtividade_page():
-    """Página de produtividade"""
-    file_path = os.path.join(FRONTEND_DIR, "produtividade.html")
+    """RC-25: Produtividade core redesign."""
+    file_path = os.path.join(FRONTEND_DIR, "produtividade-core.html")
     with open(file_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
@@ -3375,15 +3384,26 @@ async def buscar_cnpj(
 
 @app.get("/clientes")
 async def pagina_clientes():
-    """Página de gerenciamento de clientes"""
+    """RC-25: Empresas core redesign."""
+    file_path = os.path.join(FRONTEND_DIR, "empresas-core.html")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Página não encontrada")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/clientes-legacy")
+async def pagina_clientes_legacy():
+    """Legado preservado para comparação visual/métricas."""
     file_path = os.path.join(FRONTEND_DIR, "clientes.html")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Página não encontrada")
     return FileResponse(file_path)
 
-@app.get("/apresentacao")
-async def pagina_apresentacao():
-    """Página de apresentação de gráficos"""
+
+@app.get("/apresentacao-legacy")
+async def pagina_apresentacao_legacy():
+    """Legado preservado para comparação visual."""
     file_path = os.path.join(FRONTEND_DIR, "apresentacao.html")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Página não encontrada")
