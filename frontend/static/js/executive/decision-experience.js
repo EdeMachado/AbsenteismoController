@@ -77,7 +77,7 @@
     );
   }
 
-  function render(root, dx, onBack) {
+  function render(root, dx, onBack, onEvidence) {
     if (!root || !dx) return;
     const h = dx.header || {};
     const bi = dx.business_impact || {};
@@ -193,6 +193,10 @@
       '<p class="bm-dx-six"><strong>Problema:</strong> ' +
       esc(six.problem || "") +
       "</p>" +
+      '<div class="bm-dx-cta-row">' +
+      '<button type="button" class="bm-btn bm-btn-ghost" id="bm-dx-evidence">' +
+      "Como sabemos disso?" +
+      "</button></div>" +
       "</section>" +
       // 2 evidence
       '<section class="bm-dx-block">' +
@@ -267,6 +271,8 @@
 
     const back = root.querySelector("#bm-dx-back");
     if (back && onBack) back.addEventListener("click", onBack);
+    const ev = root.querySelector("#bm-dx-evidence");
+    if (ev && onEvidence) ev.addEventListener("click", onEvidence);
   }
 
   global.BioMedDecisionExperience = { render: render };

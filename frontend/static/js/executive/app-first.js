@@ -1,11 +1,12 @@
 /**
- * EXEC-08/09 — bootstrap: first experience → Decision Experience (full view).
+ * EXEC-08/09/10 — bootstrap: Abertura → Decision → Evidence Intelligence.
  */
 (function () {
   "use strict";
 
   const FX = window.BioMedFirstExperience;
   const DX = window.BioMedDecisionExperience;
+  const EI = window.BioMedEvidenceIntelligence;
   let lastPayload = null;
 
   function tokenHeaders() {
@@ -63,18 +64,41 @@
     const title = document.getElementById("bm-page-title");
     const lede = document.getElementById("bm-page-lede");
     const navDec = document.getElementById("bm-nav-decision");
-    if (id === "decision") {
+    const navEv = document.getElementById("bm-nav-evidence");
+
+    if (id === "evidence") {
+      if (title) title.textContent = "Evidence Intelligence";
+      if (lede) lede.textContent = "Como sabemos disso — sustentação da recomendação.";
+      if (navDec) navDec.hidden = false;
+      if (navEv) navEv.hidden = false;
+      history.replaceState(null, "", "#evidence");
+    } else if (id === "decision") {
       if (title) title.textContent = "Executive Decision";
       if (lede) lede.textContent = "Conversa visual — problema, evidência, custo, caminho e primeiro passo.";
       if (navDec) navDec.hidden = false;
+      if (navEv) navEv.hidden = false;
       history.replaceState(null, "", "#decision");
     } else {
       if (title) title.textContent = "Abertura executiva";
       if (lede) lede.textContent = "Primeiros 30 segundos — estado, indicadores e uma decisão.";
       if (navDec) navDec.hidden = true;
+      if (navEv) navEv.hidden = true;
       history.replaceState(null, "", "#first");
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openEvidenceIntelligence() {
+    if (!lastPayload || !lastPayload.evidence_intelligence || !EI) {
+      setStatus("Evidence Intelligence indisponível neste payload.", true);
+      return;
+    }
+    EI.render(document.getElementById("bm-evidence-intelligence"), lastPayload.evidence_intelligence, {
+      onBack: function () {
+        openDecisionExperience();
+      },
+    });
+    showView("evidence");
   }
 
   function openDecisionExperience() {
@@ -87,7 +111,8 @@
       lastPayload.decision_experience,
       function () {
         showView("first");
-      }
+      },
+      openEvidenceIntelligence
     );
     showView("decision");
   }
@@ -100,7 +125,10 @@
       return;
     }
     FX.render(document.getElementById("bm-first-experience"), fx, openDecisionExperience);
-    if ((location.hash || "").replace("#", "") === "decision") {
+    const hash = (location.hash || "").replace("#", "");
+    if (hash === "evidence") {
+      openEvidenceIntelligence();
+    } else if (hash === "decision") {
       openDecisionExperience();
     } else {
       showView("first");
@@ -147,9 +175,19 @@
       openDecisionExperience();
     });
   }
+  const navEv = document.getElementById("bm-nav-evidence");
+  if (navEv) {
+    navEv.addEventListener("click", function (e) {
+      e.preventDefault();
+      openEvidenceIntelligence();
+    });
+  }
 
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") showView("first");
+    if (e.key !== "Escape") return;
+    const hash = (location.hash || "").replace("#", "");
+    if (hash === "evidence") openDecisionExperience();
+    else showView("first");
   });
 
   (function initDates() {
