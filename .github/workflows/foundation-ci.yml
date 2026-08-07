@@ -30,6 +30,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Some shadow/FIT tests hardcode cwd/PYTHONPATH=/workspace (Cursor agent layout).
+      # Map that path onto GITHUB_WORKSPACE so GitHub-hosted runners can execute them.
+      - name: Compat symlink /workspace -> GITHUB_WORKSPACE
+        run: |
+          if [ ! -e /workspace ]; then
+            sudo ln -sfn "$GITHUB_WORKSPACE" /workspace
+          fi
+          test -f /workspace/backend/main.py
+          test -f /workspace/.env.example
+
       - name: Prepare disposable CI database path
         run: |
           mkdir -p "$(dirname "$ABSENTEISMO_SQLITE_PATH")"
